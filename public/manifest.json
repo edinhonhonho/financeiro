@@ -1,0 +1,19 @@
+{
+  "name": "Financeiro",
+  "short_name": "Financeiro",
+  "description": "Controle financeiro pessoal: receitas, despesas, cartões e gastos compartilhados.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F1EDFA",
+  "theme_color": "#B39DDB",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

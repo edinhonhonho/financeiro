@@ -1,0 +1,6 @@
+{
+  "name": "Financeiro",
+  "description": "Sistema intuitivo de controle financeiro pessoal com gestão de receitas, despesas e faturas de cartão de crédito.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
