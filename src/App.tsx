@@ -580,6 +580,7 @@ export default function App() {
       });
 
       await api.insertTransactions(rows);
+      await Promise.all([loadCards(), loadPeople(), loadTransactions()]);
       showAlert('Dados de teste criados!', `${rows.length} lançamentos, ${seedPeople.length >= 2 ? 'pessoas' : 'sem pessoas novas'} e cartões de exemplo foram adicionados.`);
     } catch (err) {
       handleSupabaseError(err, OperationType.WRITE, 'transactions');
@@ -601,6 +602,66 @@ export default function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Carregam cada lista do Supabase e atualizam o estado local. Ficam no escopo
+  // do componente (não só dentro do efeito de sync) para que os handlers de
+  // criar/editar/excluir possam chamá-las diretamente após a escrita, em vez de
+  // depender só do Realtime — assim a UI atualiza na hora mesmo se a assinatura
+  // em tempo real demorar, cair ou não estar habilitada no projeto Supabase.
+  const loadProfile = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const profile = await api.fetchProfile(user.id);
+      setUserProfile(profile);
+      if (!profile?.nickname) setIsNicknameModalOpen(true);
+    } catch (err) {
+      handleSupabaseError(err, OperationType.GET, 'profiles');
+    }
+  }, [user]);
+
+  const loadTransactions = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await api.fetchTransactions(user.id);
+      setTransactions(data);
+    } catch (err) {
+      handleSupabaseError(err, OperationType.LIST, 'transactions');
+    }
+  }, [user]);
+
+  const loadCards = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await api.fetchCards(user.id);
+      setCards(data);
+    } catch (err) {
+      handleSupabaseError(err, OperationType.LIST, 'cards');
+    }
+  }, [user]);
+
+  const loadPeople = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await api.fetchPeople(user.id);
+      setPeople(data);
+    } catch (err) {
+      handleSupabaseError(err, OperationType.LIST, 'people');
+    }
+  }, [user]);
+
+  const loadCategories = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      let data = await api.fetchCategories(user.id);
+      if (data.length === 0) {
+        await api.seedDefaultCategories(user.id, mockCategories.map(({ id, ...rest }) => rest));
+        data = await api.fetchCategories(user.id);
+      }
+      setCategories(data);
+    } catch (err) {
+      handleSupabaseError(err, OperationType.LIST, 'categories');
+    }
+  }, [user]);
+
   // Supabase Data Sync
   React.useEffect(() => {
     if (!user) {
@@ -611,81 +672,26 @@ export default function App() {
       return;
     }
 
-    const userId = user.id;
-    let cancelled = false;
-
-    const loadProfile = async () => {
-      try {
-        const profile = await api.fetchProfile(userId);
-        if (cancelled) return;
-        setUserProfile(profile);
-        if (!profile?.nickname) setIsNicknameModalOpen(true);
-      } catch (err) {
-        handleSupabaseError(err, OperationType.GET, 'profiles');
-      }
-    };
-
-    const loadTransactions = async () => {
-      try {
-        const data = await api.fetchTransactions(userId);
-        if (!cancelled) setTransactions(data);
-      } catch (err) {
-        handleSupabaseError(err, OperationType.LIST, 'transactions');
-      }
-    };
-
-    const loadCards = async () => {
-      try {
-        const data = await api.fetchCards(userId);
-        if (!cancelled) setCards(data);
-      } catch (err) {
-        handleSupabaseError(err, OperationType.LIST, 'cards');
-      }
-    };
-
-    const loadPeople = async () => {
-      try {
-        const data = await api.fetchPeople(userId);
-        if (!cancelled) setPeople(data);
-      } catch (err) {
-        handleSupabaseError(err, OperationType.LIST, 'people');
-      }
-    };
-
-    const loadCategories = async () => {
-      try {
-        let data = await api.fetchCategories(userId);
-        if (data.length === 0) {
-          await api.seedDefaultCategories(userId, mockCategories.map(({ id, ...rest }) => rest));
-          data = await api.fetchCategories(userId);
-        }
-        if (!cancelled) setCategories(data);
-      } catch (err) {
-        handleSupabaseError(err, OperationType.LIST, 'categories');
-      }
-    };
-
     loadProfile();
     loadTransactions();
     loadCards();
     loadPeople();
     loadCategories();
 
-    const unsubscribeProfile = api.subscribeToTable('profiles', userId, loadProfile);
-    const unsubscribeTransactions = api.subscribeToTable('transactions', userId, loadTransactions);
-    const unsubscribeCards = api.subscribeToTable('cards', userId, loadCards);
-    const unsubscribePeople = api.subscribeToTable('people', userId, loadPeople);
-    const unsubscribeCategories = api.subscribeToTable('categories', userId, loadCategories);
+    const unsubscribeProfile = api.subscribeToTable('profiles', user.id, loadProfile);
+    const unsubscribeTransactions = api.subscribeToTable('transactions', user.id, loadTransactions);
+    const unsubscribeCards = api.subscribeToTable('cards', user.id, loadCards);
+    const unsubscribePeople = api.subscribeToTable('people', user.id, loadPeople);
+    const unsubscribeCategories = api.subscribeToTable('categories', user.id, loadCategories);
 
     return () => {
-      cancelled = true;
       unsubscribeProfile();
       unsubscribeTransactions();
       unsubscribeCards();
       unsubscribePeople();
       unsubscribeCategories();
     };
-  }, [user]);
+  }, [user, loadProfile, loadTransactions, loadCards, loadPeople, loadCategories]);
 
   const getTransactionEffectiveMonth = (t: Transaction) => {
     if (t.category === 'Fatura cartão' || t.category === 'Fatura Cartão') {
@@ -1479,6 +1485,7 @@ export default function App() {
         await api.insertTransactions(rows);
       }
 
+      await loadTransactions();
       setIsRegistrarOpen(false);
       setCreateLinkedIncome(true);
       setNewTransaction({
@@ -1510,6 +1517,7 @@ export default function App() {
         nickname: tempNickname.trim(),
         email: user.email ?? ''
       });
+      await loadProfile();
       setIsNicknameModalOpen(false);
     } catch (err) {
       handleSupabaseError(err, OperationType.WRITE, 'profiles');
@@ -1557,6 +1565,7 @@ export default function App() {
       }
       setEditNewPassword('');
       setEditConfirmPassword('');
+      await loadProfile();
       showAlert('Sucesso', 'Suas informações foram atualizadas.');
       setIsAccountEditOpen(false);
     } catch (err) {
@@ -1665,6 +1674,7 @@ export default function App() {
       } else {
         await api.createPerson(user.id, { ...personData, visible: true });
       }
+      await loadPeople();
       setNewPersonName('');
       setNewPersonEmail('');
       setNewPersonPhone('');
@@ -1726,6 +1736,7 @@ export default function App() {
   const handleTogglePersonVisibility = async (p: Person) => {
     try {
       await api.updatePerson(p.id, { visible: p.visible === false ? true : false });
+      await loadPeople();
     } catch (err) {
       handleSupabaseError(err, OperationType.UPDATE, 'people');
       showAlert('Erro', 'Não foi possível atualizar a visibilidade dessa pessoa.');
@@ -1735,6 +1746,7 @@ export default function App() {
   const handleDeletePerson = async (id: string) => {
     try {
       await api.deletePerson(id);
+      await loadPeople();
     } catch (err) {
       handleSupabaseError(err, OperationType.DELETE, 'people');
       showAlert('Erro', 'Não foi possível excluir essa pessoa.');
@@ -1744,6 +1756,7 @@ export default function App() {
   const handleDeleteCard = async (id: string) => {
     try {
       await api.deleteCard(id);
+      await loadCards();
     } catch (err) {
       handleSupabaseError(err, OperationType.DELETE, 'cards');
       showAlert('Erro', 'Não foi possível excluir esse cartão.');
@@ -1770,6 +1783,7 @@ export default function App() {
       } else {
         await api.createCard(user.id, cardData);
       }
+      await loadCards();
 
       setNewCardName('');
       setLimitInput('0,00');
@@ -1803,6 +1817,7 @@ export default function App() {
       } else {
         await api.createCategory(user.id, catData);
       }
+      await loadCategories();
       setNewCategoryName('');
       setNewCategoryColor('#8b5cf6');
     } catch (err) {
@@ -1814,6 +1829,7 @@ export default function App() {
     if (!user) return;
     try {
       await api.deleteCategory(id);
+      await loadCategories();
     } catch (err) {
       handleSupabaseError(err, OperationType.DELETE, 'categories');
     }
@@ -1846,6 +1862,7 @@ export default function App() {
           actualDate: actualDate
         });
       }
+      await loadTransactions();
       setConfirmingTransaction(null);
     } catch (err) {
       handleSupabaseError(err, OperationType.UPDATE, 'transactions');
@@ -1910,6 +1927,7 @@ export default function App() {
         showAlert('Sucesso', 'Lançamento apagado com sucesso.');
       }
 
+      await loadTransactions();
       setIsDeleteDialogOpen(false);
       setTransactionToDelete(null);
       setEditingTransaction(null);
@@ -1925,6 +1943,7 @@ export default function App() {
     if (!user) return;
     try {
       await api.deleteAllTransactions(user.id);
+      await loadTransactions();
       showAlert('Sucesso', 'Todos os lançamentos foram apagados.');
       setIsDeleteAllConfirmOpen(false);
       setIsProfileOpen(false);
