@@ -504,6 +504,7 @@ export default function App() {
   const [amountInput, setAmountInput] = useState('0,00');
   const [showPersonSelector, setShowPersonSelector] = useState(false);
   const [globalSplitType, setGlobalSplitType] = useState<'parts' | 'percentage' | 'value'>('parts');
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   const handleExportGlobalCSV = () => {
     if (transactions.length === 0) {
@@ -2472,44 +2473,7 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Detalhes</Label>
                 <div className="p-4 bg-slate-50 dark:bg-[#333333] rounded-2xl space-y-4">
-                {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && (
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Pagamento no crédito? (opcional)</Label>
-                    <Select
-                      value={newTransaction.cardId || "none"}
-                      onValueChange={(v) => {
-                        const cardId = v === "none" ? null : v;
-                        setNewTransaction({
-                          ...newTransaction,
-                          cardId,
-                          type: cardId ? 'card_purchase' : 'expense'
-                        });
-                      }}
-                    >
-                      <SelectTrigger className="h-11 border-none bg-white dark:bg-[#3A3A3A] rounded-xl font-normal text-sm px-4 shadow-sm">
-                        <SelectValue>
-                          {newTransaction.cardId
-                            ? cards.find(c => c.id === newTransaction.cardId)?.name
-                            : "Não"}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-none shadow-deep p-2">
-                        <SelectItem value="none" className="rounded-lg font-normal p-2">Não</SelectItem>
-                        {cards.map(card => (
-                          <SelectItem key={card.id} value={card.id} className="rounded-lg font-normal p-2">
-                            <div className="flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
-                              <span>{card.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
                 <div className="space-y-1">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Descrição</Label>
                   <Input
@@ -2563,33 +2527,70 @@ export default function App() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">É no cartão de crédito?</Label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
+                        className={cn(
+                          "h-9 px-3 rounded-xl text-xs font-medium border-2 transition-all",
+                          !newTransaction.cardId ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B]"
+                        )}
+                      >
+                        Não
+                      </button>
+                      {cards.map(card => (
+                        <button
+                          key={card.id}
+                          type="button"
+                          onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
+                          className={cn(
+                            "h-9 px-3 rounded-xl text-xs font-medium border-2 transition-all flex items-center gap-2",
+                            newTransaction.cardId === card.id ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B]"
+                          )}
+                        >
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
+                          {card.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 </div>
               </div>
 
                 <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreOptions(v => !v)}
+                    className="w-full flex items-center justify-between px-1 py-1"
+                  >
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] cursor-pointer">
+                      Mais opções {(personSplits.length > 0 || isRecurrent || isInstallment) && !showMoreOptions && '(em uso)'}
+                    </Label>
+                    <ChevronDown size={14} strokeWidth={2.5} className={cn("text-slate-400 dark:text-[#9C958B] transition-transform", (showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && "rotate-180")} />
+                  </button>
+                </div>
+
+                {(showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-1">
+                <div className="space-y-3">
                   <div className="p-4 bg-slate-50 dark:bg-[#333333] rounded-2xl space-y-3">
-                  <div className="flex gap-6">
-                    <div className="flex items-center gap-2">
-                      <div className="relative cursor-pointer">
-                        <input
-                          type="checkbox"
-                          id="assign-someone-m"
-                          className="peer sr-only"
-                          checked={showPersonSelector}
-                          onChange={(e) => {
-                            setShowPersonSelector(e.target.checked);
-                            if (!e.target.checked) {
-                              setPersonSplits([]);
-                              setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                            }
-                          }}
-                        />
-                        <div className="w-5 h-5 rounded-lg border-2 border-slate-200 dark:border-[#4f4f4f] peer-checked:bg-primary peer-checked:border-primary transition-all flex items-center justify-center text-white scale-100 peer-active:scale-90">
-                          <Plus size={12} className={cn("transition-transform", showPersonSelector ? "rotate-45" : "rotate-0")} strokeWidth={4} />
-                        </div>
-                      </div>
-                      <Label htmlFor="assign-someone-m" className="text-[10px] font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-tight">Atribuir a alguém</Label>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="assign-someone-m" className="text-[10px] font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-tight">Dividir com pessoas</Label>
+                    <ToggleSwitch
+                      checked={showPersonSelector}
+                      onChange={(checked) => {
+                        setShowPersonSelector(checked);
+                        if (!checked) {
+                          setPersonSplits([]);
+                          setNewTransaction({...newTransaction, payerPayee: 'geral'});
+                        }
+                      }}
+                    />
                   </div>
 
                   {showPersonSelector && (
@@ -2681,7 +2682,7 @@ export default function App() {
                                 type: type,
                                 value: type === 'parts' ? '1' : '0,00'
                               }));
-                              
+
                               if (type === 'percentage' && newSplits.length > 0) {
                                 const perPerson = Math.floor(100 / newSplits.length);
                                 const remainder = 100 % newSplits.length;
@@ -2702,7 +2703,7 @@ export default function App() {
                         ))}
                       </div>
                     </div>
-                    
+
                     {personSplits.length === 1 ? (
                       // Single person card (existing style but without uppercase)
                       <div className="grid gap-3">
@@ -2727,7 +2728,7 @@ export default function App() {
                                   </div>
                                 </div>
                               </div>
-                              
+
                               <div className="flex items-center justify-between">
                                 <p className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B] ml-1">
                                   {split.type === 'parts' ? 'Quantas partes?' : split.type === 'percentage' ? 'Qual percentual?' : 'Qual valor fixo?'}
@@ -2801,43 +2802,28 @@ export default function App() {
                 <div className="space-y-3">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Repetição</Label>
                   <div className="p-4 bg-slate-50 dark:bg-[#333333] rounded-2xl space-y-4">
-                    <div className="flex gap-6">
-                      <div className="flex items-center gap-2">
-                        <div className="relative cursor-pointer">
-                          <input
-                            type="checkbox"
-                            id="recurrent-m"
-                            className="peer sr-only"
-                            checked={isRecurrent}
-                            onChange={(e) => {
-                              setIsRecurrent(e.target.checked);
-                              if (e.target.checked) setIsInstallment(false);
-                            }}
-                          />
-                          <div className="w-5 h-5 rounded-lg border-2 border-slate-200 dark:border-[#4f4f4f] peer-checked:bg-primary peer-checked:border-primary transition-all flex items-center justify-center text-white scale-100 peer-active:scale-90">
-                            <Plus size={12} className={cn("transition-transform", isRecurrent ? "rotate-45" : "rotate-0")} strokeWidth={4} />
-                          </div>
-                        </div>
-                        <Label htmlFor="recurrent-m" className="text-[10px] font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-tight">Recorrente</Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="relative cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            id="installment-m" 
-                            className="peer sr-only"
-                            checked={isInstallment}
-                            onChange={(e) => {
-                              setIsInstallment(e.target.checked);
-                              if (e.target.checked) setIsRecurrent(false);
-                            }}
-                          />
-                          <div className="w-5 h-5 rounded-lg border-2 border-slate-200 dark:border-[#4f4f4f] peer-checked:bg-primary peer-checked:border-primary transition-all flex items-center justify-center text-white scale-100 peer-active:scale-90">
-                            <Plus size={12} className={cn("transition-transform", isInstallment ? "rotate-45" : "rotate-0")} strokeWidth={4} />
-                          </div>
-                        </div>
-                        <Label htmlFor="installment-m" className="text-[10px] font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-tight">Parcelado</Label>
-                      </div>
+                    <div className="flex bg-white dark:bg-[#3A3A3A] rounded-xl p-1 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
+                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", !isRecurrent && !isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                      >
+                        Única vez
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsRecurrent(true); setIsInstallment(false); }}
+                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isRecurrent ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                      >
+                        Recorrente
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsInstallment(true); setIsRecurrent(false); }}
+                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                      >
+                        Parcelado
+                      </button>
                     </div>
 
                     {isRecurrent && (
@@ -2923,53 +2909,76 @@ export default function App() {
                     )}
                   </div>
                 </div>
-                
-                <div className="flex items-center gap-3 pt-2">
-                  {newTransaction.type === 'card_purchase' && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && (
-                    <div className="flex items-center gap-3 bg-indigo-50/80 px-4 h-12 rounded-2xl border border-indigo-100 flex-1 relative">
-                      <input 
-                        type="checkbox" 
-                        id="linked-income-m" 
-                        className="w-5 h-5 rounded-lg border-2 border-indigo-200 text-indigo-500 focus:ring-indigo-500 transition-all cursor-pointer"
-                        checked={createLinkedIncome}
-                        onChange={(e) => setCreateLinkedIncome(e.target.checked)}
-                      />
-                      <Label htmlFor="linked-income-m" className="text-[10px] font-medium text-indigo-600 cursor-pointer flex items-center gap-2">
-                        Associar receita
-                        <Popover>
-                          <PopoverTrigger render={
-                            <button className="h-5 w-5 flex items-center justify-center rounded-full bg-white dark:bg-[#3A3A3A] shadow-sm outline-none">
-                              <Info size={12} className="text-indigo-400" />
-                            </button>
-                          } />
-                          <PopoverContent className="w-56 p-4 rounded-3xl bg-indigo-600 text-white border-none shadow-deep z-[70]">
-                            <p className="text-[10px] font-normal leading-relaxed tracking-tight">
-                              Cria uma receita automática para a pessoa selecionada. Útil para reembolsos.
-                            </p>
-                          </PopoverContent>
-                        </Popover>
-                      </Label>
-                    </div>
-                  )}
+                </div>
+                )}
 
-                  {newTransaction.type !== 'card_purchase' && (
-                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#333333] px-4 h-12 rounded-2xl border border-slate-100 dark:border-[#454545]">
-                      <input
-                        type="checkbox"
-                        id="status-m"
-                        className="w-5 h-5 rounded border-2 border-slate-200 dark:border-[#4f4f4f] text-emerald-500 focus:ring-emerald-500"
-                        checked={newTransaction.status === 'actual'}
-                        onChange={(e) => {
-                          setNewTransaction({
-                            ...newTransaction,
-                            status: e.target.checked ? 'actual' : 'planned'
-                          });
-                        }}
-                      />
-                      <Label htmlFor="status-m" className="text-xs font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer">
-                        {newTransaction.type === 'income' ? 'Recebido' : 'Pago'}
-                      </Label>
+                {newTransaction.type === 'card_purchase' && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && (
+                  <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-4 h-12 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 relative">
+                    <Label htmlFor="linked-income-m" className="text-[10px] font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
+                      Associar receita
+                      <Popover>
+                        <PopoverTrigger render={
+                          <button className="h-5 w-5 flex items-center justify-center rounded-full bg-white dark:bg-[#3A3A3A] shadow-sm outline-none">
+                            <Info size={12} className="text-indigo-400" />
+                          </button>
+                        } />
+                        <PopoverContent className="w-56 p-4 rounded-3xl bg-indigo-600 text-white border-none shadow-deep z-[70]">
+                          <p className="text-[10px] font-normal leading-relaxed tracking-tight">
+                            Cria uma receita automática para a pessoa selecionada. Útil para reembolsos.
+                          </p>
+                        </PopoverContent>
+                      </Popover>
+                    </Label>
+                    <ToggleSwitch checked={createLinkedIncome} onChange={setCreateLinkedIncome} />
+                  </div>
+                )}
+
+                {newTransaction.type !== 'card_purchase' && (
+                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#333333] px-4 h-12 rounded-2xl border border-slate-100 dark:border-[#454545]">
+                    <Label htmlFor="status-m" className="text-xs font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer flex-1">
+                      {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
+                    </Label>
+                    <ToggleSwitch
+                      checked={newTransaction.status === 'actual'}
+                      onChange={(checked) => setNewTransaction({ ...newTransaction, status: checked ? 'actual' : 'planned' })}
+                    />
+                  </div>
+                )}
+
+                {editingTransaction?.linkedTransactionId && (() => {
+                  const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
+                  if (!linked) return null;
+                  return (
+                    <div
+                      onClick={() => handleEditClick(linked)}
+                      className="flex items-center justify-between p-3 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#3A3A3A] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
+                          {linked.type === 'income' ? <ArrowUpCircle size={16} strokeWidth={3} /> : <CreditCard size={16} strokeWidth={3} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-normal text-slate-700 dark:text-[#E5E1DB] truncate">Vinculado a: {linked.description}</p>
+                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
                     </div>
+                  );
+                })()}
+
+                <div className="flex items-center gap-3 pt-2">
+                  {editingTransaction && !editingTransaction.id.startsWith('bill-') && (
+                    <Button
+                      onClick={() => {
+                        setTransactionToDelete(editingTransaction);
+                        setIsDeleteDialogOpen(true);
+                      }}
+                      variant="outline"
+                      className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border-none text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-all flex items-center justify-center shrink-0"
+                    >
+                      <Trash2 size={18} />
+                    </Button>
                   )}
                   <Button onClick={() => handleAddTransaction()} className="flex-1 h-12 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white hover:bg-primary/95 active:scale-95 transition-all">
                     Salvar lançamento
@@ -3129,44 +3138,7 @@ export default function App() {
 
               <div className="space-y-6">
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Detalhes</Label>
                   <div className="p-6 bg-slate-50 dark:bg-[#333333] rounded-[1.75rem] space-y-5">
-                    {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && (
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Pagamento no crédito? (opcional)</Label>
-                        <Select
-                          value={newTransaction.cardId || "none"}
-                          onValueChange={(v) => {
-                            const cardId = v === "none" ? null : v;
-                            setNewTransaction({
-                              ...newTransaction,
-                              cardId,
-                              type: cardId ? 'card_purchase' : 'expense'
-                            });
-                          }}
-                        >
-                          <SelectTrigger className="h-14 border-none bg-white dark:bg-[#3A3A3A] rounded-xl font-normal text-sm px-6 shadow-sm">
-                            <SelectValue>
-                              {newTransaction.cardId
-                                ? cards.find(c => c.id === newTransaction.cardId)?.name
-                                : "Não"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl border-none shadow-deep p-2">
-                            <SelectItem value="none" className="rounded-xl font-normal p-3">Não</SelectItem>
-                            {cards.map(card => (
-                              <SelectItem key={card.id} value={card.id} className="rounded-xl font-normal p-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: card.color }} />
-                                  <span>{card.name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-
                     <div className="space-y-2">
                       <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Descrição</Label>
                       <Input
@@ -3177,7 +3149,7 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Valor</Label>
                         <div className="relative group">
@@ -3207,48 +3179,83 @@ export default function App() {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
+                        <DateField
+                          className="h-14 rounded-2xl bg-white dark:bg-[#3A3A3A] text-sm px-6 shadow-sm"
+                          value={newTransaction.date || ''}
+                          onChange={(v) => {
+                            setNewTransaction({...newTransaction, date: v});
+                            setLinkedIncomeDate(v);
+                          }}
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
-                      <DateField
-                        className="h-14 rounded-2xl bg-white dark:bg-[#3A3A3A] text-sm px-6 shadow-sm"
-                        value={newTransaction.date || ''}
-                        onChange={(v) => {
-                          setNewTransaction({...newTransaction, date: v});
-                          setLinkedIncomeDate(v);
-                        }}
-                      />
-                    </div>
+                    {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">É no cartão de crédito?</Label>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
+                            className={cn(
+                              "h-11 px-4 rounded-xl text-sm font-medium border-2 transition-all",
+                              !newTransaction.cardId ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B]"
+                            )}
+                          >
+                            Não
+                          </button>
+                          {cards.map(card => (
+                            <button
+                              key={card.id}
+                              type="button"
+                              onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
+                              className={cn(
+                                "h-11 px-4 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-2",
+                                newTransaction.cardId === card.id ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B]"
+                              )}
+                            >
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
+                              {card.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowMoreOptions(v => !v)}
+                    className="w-full flex items-center justify-between px-1 py-1"
+                  >
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] cursor-pointer">
+                      Mais opções {(personSplits.length > 0 || isRecurrent || isInstallment) && !showMoreOptions && '(em uso)'}
+                    </Label>
+                    <ChevronDown size={14} strokeWidth={2.5} className={cn("text-slate-400 dark:text-[#9C958B] transition-transform", (showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && "rotate-180")} />
+                  </button>
+                </div>
+
+                {(showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-top-1">
                   <div className="p-6 bg-slate-50 dark:bg-[#333333] rounded-[1.75rem] space-y-4">
-                    <div className="flex gap-8 px-1">
-                      <div className="flex items-center gap-3">
-                        <div className="relative cursor-pointer">
-                          <input
-                            type="checkbox"
-                            id="assign-someone-d"
-                            className="peer sr-only"
-                            checked={showPersonSelector}
-                            onChange={(e) => {
-                              setShowPersonSelector(e.target.checked);
-                              if (!e.target.checked) {
-                                setPersonSplits([]);
-                                setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                              }
-                            }}
-                          />
-                          <div className="w-6 h-6 rounded-lg border-2 border-slate-200 dark:border-[#4f4f4f] peer-checked:bg-primary peer-checked:border-primary transition-all flex items-center justify-center text-white scale-100 peer-active:scale-90 shadow-sm">
-                            <Plus size={14} className={cn("transition-transform", showPersonSelector ? "rotate-45" : "rotate-0")} strokeWidth={4} />
-                          </div>
-                        </div>
-                        <Label htmlFor="assign-someone-d" className="text-xs font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-wide">Atribuir a alguém</Label>
-                      </div>
+                    <div className="flex items-center justify-between px-1">
+                      <Label htmlFor="assign-someone-d" className="text-xs font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-wide">Dividir com pessoas</Label>
+                      <ToggleSwitch
+                        checked={showPersonSelector}
+                        onChange={(checked) => {
+                          setShowPersonSelector(checked);
+                          if (!checked) {
+                            setPersonSplits([]);
+                            setNewTransaction({...newTransaction, payerPayee: 'geral'});
+                          }
+                        }}
+                      />
                     </div>
-                    
+
                     {showPersonSelector && (
                       <div className="flex flex-wrap gap-2 p-1 animate-in fade-in slide-in-from-top-2">
                         {people.filter(p => p.visible !== false).map(p => {
@@ -3453,38 +3460,32 @@ export default function App() {
                       )}
                     </div>
                   )}
-                </div>
 
                   <div className="space-y-3">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Repetição</Label>
                   <div className="p-6 bg-slate-50 dark:bg-[#333333] rounded-[1.5rem] space-y-4">
-                    <div className="flex gap-8">
-                      <div className="flex items-center gap-3">
-                        <input 
-                          type="checkbox" 
-                          id="recurrent-d" 
-                          className="w-5 h-5 rounded-lg border-2 border-slate-200 dark:border-[#4f4f4f] text-primary focus:ring-primary"
-                          checked={isRecurrent}
-                          onChange={(e) => {
-                            setIsRecurrent(e.target.checked);
-                            if (e.target.checked) setIsInstallment(false);
-                          }}
-                        />
-                        <Label htmlFor="recurrent-d" className="text-xs font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-wide">Recorrente</Label>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <input 
-                          type="checkbox" 
-                          id="installment-d" 
-                          className="w-5 h-5 rounded-lg border-2 border-slate-200 dark:border-[#4f4f4f] text-primary focus:ring-primary"
-                          checked={isInstallment}
-                          onChange={(e) => {
-                            setIsInstallment(e.target.checked);
-                            if (e.target.checked) setIsRecurrent(false);
-                          }}
-                        />
-                        <Label htmlFor="installment-d" className="text-xs font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-wide">Parcelado</Label>
-                      </div>
+                    <div className="flex bg-white dark:bg-[#3A3A3A] rounded-2xl p-1 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
+                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", !isRecurrent && !isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                      >
+                        Única vez
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsRecurrent(true); setIsInstallment(false); }}
+                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isRecurrent ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                      >
+                        Recorrente
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsInstallment(true); setIsRecurrent(false); }}
+                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                      >
+                        Parcelado
+                      </button>
                     </div>
 
                     {isRecurrent && (
@@ -3580,79 +3581,69 @@ export default function App() {
                     )}
                   </div>
                 </div>
+                </div>
+                )}
 
-                  <div className="flex items-center gap-4 pt-4">
-                    {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && (
-                      <div className="space-y-3 flex-1">
-                        <div className="flex items-center gap-3 bg-indigo-50/80 px-5 h-16 rounded-2xl border border-indigo-100 shadow-sm">
-                          <input 
-                            type="checkbox" 
-                            id="linked-income-d" 
-                            className="w-6 h-6 rounded-lg border-2 border-indigo-200 text-indigo-500 focus:ring-indigo-500 transition-all cursor-pointer"
-                            checked={createLinkedIncome}
-                            onChange={(e) => setCreateLinkedIncome(e.target.checked)}
-                          />
-                          <Label htmlFor="linked-income-d" className="text-xs font-medium text-indigo-600 cursor-pointer flex items-center gap-2">
-                            Associar receita
-                            <Popover>
-                              <PopoverTrigger render={
-                                <button className="h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-[#3A3A3A] shadow-sm hover:scale-110 active:scale-95 transition-all outline-none">
-                                  <Info size={14} className="text-indigo-400" />
-                                </button>
-                              } />
-                              <PopoverContent className="w-64 p-4 rounded-[1.5rem] bg-indigo-600 text-white border-none shadow-deep z-[70]">
-                                <p className="text-[11px] font-normal leading-relaxed tracking-tight">
-                                  AO ATIVAR, O SISTEMA GERARÁ AUTOMATICAMENTE UMA RECEITA CORRESPONDENTE PARA A PESSOA SELECIONADA. ÚTIL PARA QUANDO VOCÊ PAGA ALGO PARA ALGUÉM E QUER CONTROLAR O REEMBOLSO.
-                                </p>
-                              </PopoverContent>
-                            </Popover>
-                          </Label>
-                        </div>
-                        
-                        {createLinkedIncome && (
-                          <div className="p-4 bg-indigo-50/40 rounded-2xl border border-indigo-100/50 space-y-2 animate-in fade-in slide-in-from-top-2">
-                            <Label className="text-[10px] font-medium uppercase tracking-wider text-indigo-400 ml-1">
-                              Data limite para reembolso
-                            </Label>
-                            <DateField
-                              value={linkedIncomeDate}
-                              onChange={setLinkedIncomeDate}
-                              className="h-12 rounded-xl text-sm text-indigo-600"
-                            />
-                          </div>
-                        )}
+                <div className="flex items-center gap-4">
+                  {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && (
+                    <div className="space-y-3 flex-1">
+                      <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-5 h-16 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm">
+                        <Label htmlFor="linked-income-d" className="text-xs font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
+                          Associar receita
+                          <Popover>
+                            <PopoverTrigger render={
+                              <button className="h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-[#3A3A3A] shadow-sm hover:scale-110 active:scale-95 transition-all outline-none">
+                                <Info size={14} className="text-indigo-400" />
+                              </button>
+                            } />
+                            <PopoverContent className="w-64 p-4 rounded-[1.5rem] bg-indigo-600 text-white border-none shadow-deep z-[70]">
+                              <p className="text-[11px] font-normal leading-relaxed tracking-tight">
+                                Ao ativar, o sistema gerará automaticamente uma receita correspondente para a pessoa selecionada. Útil para quando você paga algo para alguém e quer controlar o reembolso.
+                              </p>
+                            </PopoverContent>
+                          </Popover>
+                        </Label>
+                        <ToggleSwitch checked={createLinkedIncome} onChange={setCreateLinkedIncome} />
                       </div>
-                    )}
 
-                    {newTransaction.type !== 'card_purchase' && (
-                      <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#333333] px-5 h-16 rounded-2xl border border-slate-100 dark:border-[#454545] shadow-sm">
-                      <input 
-                        type="checkbox" 
-                        id="status-d" 
-                        className="w-6 h-6 rounded border-2 border-slate-200 dark:border-[#4f4f4f] text-emerald-500 focus:ring-emerald-500"
-                        checked={newTransaction.status === 'actual'}
-                        onChange={(e) => {
-                          setNewTransaction({
-                            ...newTransaction,
-                            status: e.target.checked ? 'actual' : 'planned'
-                          });
-                        }}
-                      />
-                      <Label htmlFor="status-d" className="text-sm font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer">
-                        {newTransaction.type === 'income' ? 'Recebido' : 'Pago'}
-                      </Label>
+                      {createLinkedIncome && (
+                        <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/10 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/30 space-y-2 animate-in fade-in slide-in-from-top-2">
+                          <Label className="text-[10px] font-medium uppercase tracking-wider text-indigo-400 ml-1">
+                            Data limite para reembolso
+                          </Label>
+                          <DateField
+                            value={linkedIncomeDate}
+                            onChange={setLinkedIncomeDate}
+                            className="h-12 rounded-xl text-sm text-indigo-600"
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
-                  {editingTransaction?.linkedTransactionId && (
-                  <div className="pt-4 border-t border-slate-100 dark:border-[#454545]">
+
+                  {newTransaction.type !== 'card_purchase' && (
+                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#333333] px-5 h-16 rounded-2xl border border-slate-100 dark:border-[#454545] shadow-sm flex-1">
+                    <Label htmlFor="status-d" className="text-sm font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer flex-1">
+                      {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
+                    </Label>
+                    <ToggleSwitch
+                      checked={newTransaction.status === 'actual'}
+                      onChange={(checked) => setNewTransaction({ ...newTransaction, status: checked ? 'actual' : 'planned' })}
+                    />
+                  </div>
+                )}
+                </div>
+
+                {editingTransaction?.linkedTransactionId && (
+                  <div>
                     <p className="text-[10px] font-medium tracking-wider text-indigo-400 ml-1 mb-2">Lançamento vinculado</p>
                     {(() => {
                       const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
                       if (!linked) return <p className="text-xs font-normal text-slate-300 dark:text-[#7D766C] italic ml-1 font-heading">Lançamento original não encontrado</p>;
                       return (
-                        <div 
+                        <div
                           onClick={() => handleEditClick(linked)}
-                          className="flex items-center justify-between p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50 cursor-pointer hover:bg-indigo-50 transition-all group"
+                          className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#3A3A3A] shadow-sm flex items-center justify-center text-indigo-500">
@@ -3686,7 +3677,6 @@ export default function App() {
                   <Button onClick={() => handleAddTransaction()} className="flex-1 h-16 rounded-2xl font-medium text-lg shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/95 transition-all active:scale-95">
                       Salvar lançamento
                   </Button>
-                </div>
                 </div>
               </div>
             </div>
