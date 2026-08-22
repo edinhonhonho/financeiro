@@ -41,7 +41,7 @@ import {
   UserCog,
   Sparkles
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
 import {
   Card as ShadcnCard,
   CardContent
@@ -2410,7 +2410,7 @@ export default function App() {
       </div>
 
       {/* FAB tucked into the right side of the bottom nav bar */}
-      <div className="fixed bottom-4 right-[5vw] z-40 md:hidden">
+      <div className="fixed bottom-6 right-[5vw] z-50 md:hidden">
         <Dialog open={isRegistrarOpen && window.innerWidth < 768} onOpenChange={setIsRegistrarOpen}>
           <DialogTrigger
             render={
@@ -3676,7 +3676,7 @@ export default function App() {
       </div>
 
       {/* Bottom Navigation - Mobile */}
-      <nav className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[90vw] h-16 bg-white dark:bg-[#3A3A3A] shadow-bubbly flex items-center justify-start gap-1 pl-3 pr-20 z-40 rounded-[2rem] border border-slate-100 dark:border-[#4a4a4a]">
+      <nav className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[90vw] h-20 bg-white dark:bg-[#3A3A3A] shadow-bubbly flex items-center justify-start gap-1 pl-3 pr-20 z-40 rounded-[2rem] border border-slate-100 dark:border-[#4a4a4a]">
         <MobileNavItem
           active={activeTab === 'visao-geral'}
           onClick={() => setActiveTab('visao-geral')}
@@ -4290,7 +4290,7 @@ export default function App() {
                       {sortMode !== 'date' || groupMode === 'category' || groupMode === 'person' || activeTab === 'visao-geral' ? date : format(parseISO(date), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                     </h3>
                   </div>
-                  <ShadcnCard className="border-none shadow-soft rounded-[1.25rem] md:rounded-2xl overflow-hidden bg-white dark:bg-[#3A3A3A]">
+                  <ShadcnCard className="border-none shadow-soft rounded-[1.25rem] md:rounded-2xl overflow-hidden py-0 md:py-4 bg-white dark:bg-[#3A3A3A]">
                     {/* Mobile: card list */}
                     <div className="md:hidden divide-y divide-slate-100 dark:divide-[#454545]">
                       {items.map(t => {
@@ -4477,7 +4477,7 @@ export default function App() {
                   <h3 className={cn("text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-2", groupIndex > 0 && "md:hidden")}>
                     {sortMode !== 'date' || groupMode === 'category' || groupMode === 'person' ? date : format(parseISO(date), "dd 'de' MMMM", { locale: ptBR })}
                   </h3>
-                  <ShadcnCard className="border-none shadow-sm rounded-[1.25rem] md:rounded-2xl overflow-hidden">
+                  <ShadcnCard className="border-none shadow-sm rounded-[1.25rem] md:rounded-2xl overflow-hidden py-0 md:py-4">
                     {/* Mobile: card list */}
                     <div className="md:hidden divide-y divide-slate-50 dark:divide-[#3f3f3f]">
                       {items.map(t => {
@@ -5361,16 +5361,27 @@ function TransactionItem({
   hideDate?: boolean
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
+  const canSwipe = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-');
+  const x = useMotionValue(0);
+  const revealOpacity = useTransform(x, [0, 90], [0, 1]);
+  const draggedRef = useRef(false);
+  const SWIPE_THRESHOLD = 90;
 
-  return (
-    <div 
-      onClick={onClick}
-      className={cn(
-        "flex items-center justify-between group cursor-pointer rounded-[1rem] hover:bg-primary/5 transition-all border border-transparent",
-        hideIcon ? "py-1 px-4" : "py-3 px-4",
-        isSimplified && "py-1"
-      )}
-    >
+  const handleDragEnd = (_e: unknown, info: { offset: { x: number } }) => {
+    if (Math.abs(info.offset.x) > 5) draggedRef.current = true;
+    if (info.offset.x > SWIPE_THRESHOLD) onQuickConfirm?.();
+  };
+
+  const handleClick = () => {
+    if (draggedRef.current) {
+      draggedRef.current = false;
+      return;
+    }
+    onClick?.();
+  };
+
+  const rowContent = (
+    <>
       <div className="flex items-center gap-5 overflow-hidden flex-1">
         {!hideIcon && (
           <div className={cn(
@@ -5444,25 +5455,17 @@ function TransactionItem({
         hideIcon ? "gap-0" : "gap-5"
       )}>
         <div className="text-right flex items-center gap-3">
-          {transaction.status === 'actual' ? (
+          {transaction.status === 'actual' && (
             <div className={cn(
               "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
               transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
             )}>
               <CheckCircle2 size={20} strokeWidth={3} />
             </div>
-          ) : onQuickConfirm && !transaction.id.startsWith('bill-') && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onQuickConfirm(); }}
-              title={transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
-              className="w-6 h-6 rounded-full border-2 border-slate-200 dark:border-[#4f4f4f] shrink-0 hover:border-primary hover:bg-primary/10 active:scale-90 transition-all flex items-center justify-center text-transparent hover:text-primary"
-            >
-              <CheckCircle2 size={16} strokeWidth={3} />
-            </button>
           )}
           <p className={cn(
-            "text-xl font-heading font-bold tracking-tighter whitespace-nowrap transition-colors",
+            "font-heading font-bold tracking-tighter whitespace-nowrap transition-colors",
+            hideIcon ? "text-base" : "text-xl",
             transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
           )}>
             R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -5474,6 +5477,53 @@ function TransactionItem({
           </div>
         )}
       </div>
+    </>
+  );
+
+  if (!canSwipe) {
+    return (
+      <div
+        onClick={onClick}
+        className={cn(
+          "flex items-center justify-between group cursor-pointer rounded-[1rem] hover:bg-primary/5 transition-all border border-transparent",
+          hideIcon ? "py-1 px-4" : "py-3 px-4",
+          isSimplified && "py-1"
+        )}
+      >
+        {rowContent}
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-[1rem]">
+      <div className={cn(
+        "absolute inset-0 flex items-center px-5 rounded-[1rem]",
+        transaction.type === 'income' ? "bg-emerald-400" : "bg-rose-400"
+      )}>
+        <motion.div style={{ opacity: revealOpacity }} className="flex items-center gap-2 text-white">
+          <CheckCircle2 size={18} strokeWidth={3} />
+          <span className="text-xs font-medium">
+            {transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
+          </span>
+        </motion.div>
+      </div>
+      <motion.div
+        drag="x"
+        dragConstraints={{ left: 0, right: 130 }}
+        dragElastic={0.15}
+        dragSnapToOrigin
+        style={{ x }}
+        onDragEnd={handleDragEnd}
+        onClick={handleClick}
+        className={cn(
+          "relative flex items-center justify-between group cursor-pointer rounded-[1rem] bg-white dark:bg-[#3A3A3A] hover:bg-primary/5 transition-colors border border-transparent",
+          hideIcon ? "py-1 px-4" : "py-3 px-4",
+          isSimplified && "py-1"
+        )}
+      >
+        {rowContent}
+      </motion.div>
     </div>
   );
 }
