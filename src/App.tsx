@@ -41,7 +41,7 @@ import {
   UserCog,
   Sparkles
 } from 'lucide-react';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Card as ShadcnCard,
   CardContent
@@ -85,7 +85,7 @@ import {
   XAxis,
   YAxis
 } from 'recharts';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Papa from 'papaparse';
 
@@ -157,6 +157,13 @@ const years = Array.from({ length: 4 }, (_, i) => ({
   value: String(currentYear + i),
   label: String(currentYear + i),
 }));
+// Faixa mais ampla (passado e futuro) para o navegador de meses, que precisa
+// alcançar lançamentos de anos anteriores — diferente de `years`, usado só
+// para datas-limite de recorrência (sempre no futuro).
+const monthPickerYears = Array.from({ length: 9 }, (_, i) => ({
+  value: String(currentYear - 6 + i),
+  label: String(currentYear - 6 + i),
+}));
 
 const CARD_COLOR_PRESETS = [
   '#6366f1', '#8b5cf6', '#ec4899', '#f43f5e',
@@ -184,17 +191,17 @@ function DateField({
         <button
           type="button"
           className={cn(
-            "h-11 rounded-lg border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-4 flex items-center gap-2 text-left w-full transition-all",
+            "h-11 rounded-lg border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-4 flex items-center gap-2 text-left w-full transition-all",
             className
           )}
         >
-          <CalendarIcon size={15} className="text-slate-400 dark:text-[#9C958B] shrink-0" />
-          <span className={cn(!selected && "text-slate-400 dark:text-[#9C958B] font-medium")}>
+          <CalendarIcon size={15} className="text-slate-400 dark:text-[#9E97B8] shrink-0" />
+          <span className={cn(!selected && "text-slate-400 dark:text-[#9E97B8] font-medium")}>
             {selected ? format(selected, 'dd/MM/yyyy') : placeholder}
           </span>
         </button>
       } />
-      <PopoverContent className="w-auto p-2 rounded-2xl border-none shadow-deep bg-white dark:bg-[#3A3A3A] z-[80]">
+      <PopoverContent className="w-auto p-2 rounded-2xl border-none shadow-deep bg-white dark:bg-[#302D3A] z-[80]">
         <Calendar
           mode="single"
           selected={selected}
@@ -218,7 +225,7 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (valu
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={cn("w-12 h-7 rounded-full transition-colors relative shrink-0", checked ? "bg-primary" : "bg-slate-200 dark:bg-[#4f4f4f]")}
+      className={cn("w-12 h-7 rounded-full transition-colors relative shrink-0", checked ? "bg-primary" : "bg-slate-200 dark:bg-[#4A4658]")}
     >
       <span className={cn("absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform", checked && "translate-x-5")} />
     </button>
@@ -242,6 +249,32 @@ function AccountRow({
   right?: React.ReactNode;
   disabled?: boolean;
 }) {
+  const content = (
+    <>
+      <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shrink-0", danger ? "bg-rose-50 text-rose-400" : "bg-primary/10 text-primary")}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={cn("font-medium text-sm", danger ? "text-rose-500" : "text-slate-800 dark:text-[#EDE9E3]")}>{title}</p>
+        {description && (
+          <p className={cn("text-[11px] font-normal mt-0.5 leading-relaxed", danger ? "text-rose-400/70" : "text-slate-400 dark:text-[#9E97B8]")}>{description}</p>
+        )}
+      </div>
+      {right !== undefined ? right : (onClick && !disabled && <ChevronRight size={16} className="text-slate-300 dark:text-[#7A7390] shrink-0" />)}
+    </>
+  );
+
+  // Quando `right` traz seu próprio elemento interativo (ex: ToggleSwitch), a
+  // linha não pode ser um <button> — um <button> dentro de outro é HTML inválido
+  // e quebra a hidratação.
+  if (right !== undefined) {
+    return (
+      <div className="w-full flex items-center gap-4 p-5 text-left">
+        {content}
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -249,19 +282,10 @@ function AccountRow({
       disabled={disabled}
       className={cn(
         "w-full flex items-center gap-4 p-5 text-left transition-colors",
-        disabled ? "opacity-50 cursor-default" : "hover:bg-slate-50 dark:hover:bg-[#333333]"
+        disabled ? "opacity-50 cursor-default" : "hover:bg-slate-50 dark:hover:bg-[#28262F]"
       )}
     >
-      <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shrink-0", danger ? "bg-rose-50 text-rose-400" : "bg-primary/10 text-primary")}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={cn("font-medium text-sm", danger ? "text-rose-500" : "text-slate-800 dark:text-[#EDE9E3]")}>{title}</p>
-        {description && (
-          <p className={cn("text-[11px] font-normal mt-0.5 leading-relaxed", danger ? "text-rose-400/70" : "text-slate-400 dark:text-[#9C958B]")}>{description}</p>
-        )}
-      </div>
-      {right !== undefined ? right : (onClick && !disabled && <ChevronRight size={16} className="text-slate-300 dark:text-[#7D766C] shrink-0" />)}
+      {content}
     </button>
   );
 }
@@ -269,8 +293,8 @@ function AccountRow({
 function AccountSection({ label, children }: { label?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      {label && <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-[#9C958B] ml-1">{label}</p>}
-      <div className="bg-white dark:bg-[#3A3A3A] rounded-[2rem] shadow-soft divide-y divide-slate-100 dark:divide-[#454545] overflow-hidden">
+      {label && <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-[#9E97B8] ml-1">{label}</p>}
+      <div className="bg-white dark:bg-[#302D3A] rounded-[2rem] shadow-soft divide-y divide-slate-100 dark:divide-[#423F4E] overflow-hidden">
         {children}
       </div>
     </div>
@@ -290,6 +314,11 @@ export default function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('darkMode', String(darkMode));
+    // Mantém a cor da barra de status do PWA/navegador igual ao fundo do app,
+    // já que o modo escuro aqui é uma preferência manual (não só do SO).
+    document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
+      meta.setAttribute('content', darkMode ? '#1C1B22' : '#FAF7F2');
+    });
   }, [darkMode]);
 
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -336,7 +365,12 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('visao-geral');
   const [transactionFilter, setTransactionFilter] = useState<'pending' | 'all'>('all');
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [manageCardId, setManageCardId] = useState<string | null>(null);
+  const [showCardForm, setShowCardForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(format(new Date(), 'MM'));
+  const [pickerYear, setPickerYear] = useState(format(new Date(), 'yyyy'));
   const [isRegistrarOpen, setIsRegistrarOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPessoasOpen, setIsPessoasOpen] = useState(false);
@@ -496,6 +530,7 @@ export default function App() {
   const [editingCard, setEditingCard] = useState<Card | null>(null);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
+  const [personToDelete, setPersonToDelete] = useState<Person | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleteAllConfirmOpen, setIsDeleteAllConfirmOpen] = useState(false);
@@ -704,8 +739,9 @@ export default function App() {
       if (card) {
         const tDate = parseISO(t.date);
         const tDay = tDate.getDate();
-        const closingDay = Number(card.closingDay);
-        
+        // Sem fechamento cadastrado, não há corte: a compra fica no próprio mês.
+        const closingDay = card.closingDay ? Number(card.closingDay) : 31;
+
         if (tDay > closingDay) {
           return addMonths(startOfMonth(tDate), 1);
         } else {
@@ -716,51 +752,36 @@ export default function App() {
     return startOfMonth(parseISO(t.date));
   };
 
+  /** Fatura sintética de um cartão num mês (soma das compras cuja competência cai nesse mês). */
+  const computeCardBill = (card: Card, month: Date): Transaction => {
+    const amount = transactions
+      .filter(t => t.type === 'card_purchase' && t.cardId === card.id && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(month, 'yyyy-MM'))
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    return {
+      id: `bill-${card.id}`,
+      type: 'expense',
+      description: `Fatura ${card.name}`,
+      amount,
+      date: format(endOfMonth(month), 'yyyy-MM-dd'),
+      category: 'Fatura cartão',
+      status: 'planned',
+      cardId: card.id,
+      payerPayee: 'geral',
+      recurrence: 'none',
+      assignments: []
+    };
+  };
+
   // Grouping logic
   const groupedTransactions = useMemo(() => {
     let list = [...transactions];
-    
+
     // Calculate card bills for 'despesas' tab if grouped by date or category
     if (activeTab === 'despesas') {
-      const cardBills: Transaction[] = cards.map(card => {
-        const targetMonthStart = startOfMonth(currentDate);
-        const targetMonthEnd = endOfMonth(currentDate);
-
-        const amount = transactions
-          .filter(t => {
-            if (t.type !== 'card_purchase' || t.cardId !== card.id) return false;
-            
-            const transactionDate = parseISO(t.date);
-            const tDay = transactionDate.getDate();
-            const closingDay = Number(card.closingDay);
-
-            // Determine which bill this transaction belongs to
-            let billMonth: Date;
-            if (tDay > closingDay) {
-              // Transactions after closing day go to next month's bill
-              billMonth = addMonths(startOfMonth(transactionDate), 1);
-            } else {
-              // Transactions until closing day go to current month's bill
-              billMonth = startOfMonth(transactionDate);
-            }
-
-            // Check if this bill month matches the current view month
-            return format(billMonth, 'yyyy-MM') === format(currentDate, 'yyyy-MM');
-          })
-          .reduce((acc, t) => acc + t.amount, 0);
-
-        return {
-          id: `bill-${card.id}`,
-          type: 'expense' as TransactionType,
-          description: `Fatura ${card.name}`,
-          amount,
-          date: format(endOfMonth(currentDate), 'yyyy-MM-dd'),
-          category: 'Fatura cartão',
-          status: 'planned',
-          cardId: card.id,
-          payerPayee: 'geral'
-        };
-      }).filter(bill => bill.amount > 0);
+      const cardBills: Transaction[] = cards
+        .map(card => computeCardBill(card, currentDate))
+        .filter(bill => bill.amount > 0);
       
       list = [...list, ...cardBills];
     }
@@ -873,18 +894,7 @@ export default function App() {
         const card = cards.find(c => c.id === t.cardId);
         if (!card) return false;
 
-        const transactionDate = parseISO(t.date);
-        const tDay = transactionDate.getDate();
-        const closingDay = Number(card.closingDay);
-
-        let billMonth: Date;
-        if (tDay > closingDay) {
-          billMonth = addMonths(startOfMonth(transactionDate), 1);
-        } else {
-          billMonth = startOfMonth(transactionDate);
-        }
-
-        return format(billMonth, 'yyyy-MM') === format(currentDate, 'yyyy-MM');
+        return format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM');
       });
 
       if (sortMode === 'min') cardPurchases.sort((a,b) => a.amount - b.amount);
@@ -1748,6 +1758,7 @@ export default function App() {
     try {
       await api.deletePerson(id);
       await loadPeople();
+      setPersonToDelete(null);
     } catch (err) {
       handleSupabaseError(err, OperationType.DELETE, 'people');
       showAlert('Erro', 'Não foi possível excluir essa pessoa.');
@@ -1758,6 +1769,7 @@ export default function App() {
     try {
       await api.deleteCard(id);
       await loadCards();
+      setManageCardId(prev => prev === id ? null : prev);
     } catch (err) {
       handleSupabaseError(err, OperationType.DELETE, 'cards');
       showAlert('Erro', 'Não foi possível excluir esse cartão.');
@@ -1780,11 +1792,14 @@ export default function App() {
 
       if (editingCard) {
         await api.updateCard(editingCard.id, cardData);
+        setManageCardId(editingCard.id);
         setEditingCard(null);
       } else {
         await api.createCard(user.id, cardData);
+        setManageCardId(null);
       }
       await loadCards();
+      setShowCardForm(false);
 
       setNewCardName('');
       setLimitInput('0,00');
@@ -1963,13 +1978,7 @@ export default function App() {
     const card = cards.find(c => c.id === viewingBill.cardId);
     if (!card) return [];
     return transactions
-      .filter(t => {
-        if (t.type !== 'card_purchase' || t.cardId !== card.id) return false;
-        const tDate = parseISO(t.date);
-        const closingDay = Number(card.closingDay);
-        const billMonth = tDate.getDate() > closingDay ? addMonths(startOfMonth(tDate), 1) : startOfMonth(tDate);
-        return format(billMonth, 'yyyy-MM') === format(currentDate, 'yyyy-MM');
-      })
+      .filter(t => t.type === 'card_purchase' && t.cardId === card.id && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM'))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [viewingBill, cards, transactions, currentDate]);
 
@@ -1982,14 +1991,14 @@ export default function App() {
           className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full mb-6"
         ></motion.div>
         <h2 className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Carregando seu financeiro...</h2>
-        <p className="text-slate-500 dark:text-[#B5AFA6] font-normal mt-2">Estamos preparando tudo para você.</p>
+        <p className="text-slate-500 dark:text-[#B4AFC9] font-normal mt-2">Estamos preparando tudo para você.</p>
       </div>
     );
   }
 
   if (isPasswordRecovery) {
     return (
-      <div className="min-h-screen bg-[#FAF7F2] dark:bg-[#201F26] flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-[#FAF7F2] dark:bg-[#1C1B22] flex flex-col items-center justify-center p-6 text-center">
         <div className="max-w-sm w-full">
           <div className="w-20 h-20 bg-primary rounded-[1.75rem] flex items-center justify-center text-white shadow-bubbly mx-auto mb-6 rotate-3">
             <KeyRound size={40} strokeWidth={2.5} />
@@ -1997,34 +2006,34 @@ export default function App() {
           <h1 className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] leading-[0.9] mb-2">
             Defina sua nova senha
           </h1>
-          <p className="text-sm font-normal text-slate-400 dark:text-[#9C958B] mb-8">Escolha uma nova senha para entrar no Financeiro.</p>
+          <p className="text-sm font-normal text-slate-400 dark:text-[#9E97B8] mb-8">Escolha uma nova senha para entrar no Financeiro.</p>
 
-          <div className="bg-white dark:bg-[#3A3A3A] p-8 rounded-[3rem] shadow-soft space-y-4 text-left">
+          <div className="bg-white dark:bg-[#302D3A] p-8 rounded-[3rem] shadow-soft space-y-4 text-left">
             <div className="space-y-2">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Nova senha</Label>
+              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Nova senha</Label>
               <div className="relative">
                 <Input
                   type={showRecoveryPassword ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm pl-5 pr-12"
+                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm pl-5 pr-12"
                   value={recoveryPassword}
                   onChange={(e) => setRecoveryPassword(e.target.value)}
                 />
                 <button
                   type="button"
                   onClick={() => setShowRecoveryPassword(v => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9C958B] hover:text-primary transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9E97B8] hover:text-primary transition-colors"
                 >
                   {showRecoveryPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Confirmar nova senha</Label>
+              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Confirmar nova senha</Label>
               <Input
                 type={showRecoveryPassword ? 'text' : 'password'}
                 placeholder="••••••••"
-                className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                 value={recoveryConfirmPassword}
                 onChange={(e) => setRecoveryConfirmPassword(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleRecoveryPasswordSubmit()}
@@ -2050,7 +2059,7 @@ export default function App() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#FAF7F2] dark:bg-[#201F26] flex flex-col items-center justify-center p-6 text-center">
+      <div className="min-h-screen bg-[#FAF7F2] dark:bg-[#1C1B22] flex flex-col items-center justify-center p-6 text-center">
         <div className="max-w-sm w-full">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
@@ -2064,7 +2073,7 @@ export default function App() {
             Financeiro
           </h1>
 
-          <div className="bg-white dark:bg-[#3A3A3A] p-8 rounded-[3rem] border border-white dark:border-[#3A3A3A] shadow-soft space-y-4 text-left">
+          <div className="bg-white dark:bg-[#302D3A] p-8 rounded-[3rem] border border-white dark:border-[#302D3A] shadow-soft space-y-4 text-left">
           {showForgotPassword ? (
             forgotSent ? (
               <div className="text-center space-y-4 py-4">
@@ -2073,7 +2082,7 @@ export default function App() {
                 </div>
                 <div>
                   <p className="font-medium text-slate-800 dark:text-[#EDE9E3]">Link enviado!</p>
-                  <p className="text-xs font-normal text-slate-400 dark:text-[#9C958B] mt-1">Verifique seu e-mail ({forgotEmail}) e clique no link para definir uma nova senha.</p>
+                  <p className="text-xs font-normal text-slate-400 dark:text-[#9E97B8] mt-1">Verifique seu e-mail ({forgotEmail}) e clique no link para definir uma nova senha.</p>
                 </div>
                 <Button
                   onClick={() => { setShowForgotPassword(false); setForgotSent(false); }}
@@ -2087,14 +2096,14 @@ export default function App() {
               <>
                 <div>
                   <p className="font-medium text-slate-800 dark:text-[#EDE9E3]">Esqueceu sua senha?</p>
-                  <p className="text-xs font-normal text-slate-400 dark:text-[#9C958B] mt-1">Informe seu e-mail e enviaremos um link para você redefinir a senha.</p>
+                  <p className="text-xs font-normal text-slate-400 dark:text-[#9E97B8] mt-1">Informe seu e-mail e enviaremos um link para você redefinir a senha.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">E-mail</Label>
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">E-mail</Label>
                   <Input
                     type="email"
                     placeholder="voce@email.com"
-                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleForgotPasswordSubmit()}
@@ -2113,7 +2122,7 @@ export default function App() {
                 <Button
                   onClick={() => { setShowForgotPassword(false); setForgotError(''); }}
                   variant="ghost"
-                  className="w-full h-11 rounded-xl font-normal text-slate-400 dark:text-[#9C958B]"
+                  className="w-full h-11 rounded-xl font-normal text-slate-400 dark:text-[#9E97B8]"
                 >
                   Voltar
                 </Button>
@@ -2121,18 +2130,18 @@ export default function App() {
             )
           ) : (
             <>
-            <div className="flex bg-slate-50 dark:bg-[#333333] rounded-2xl p-1">
+            <div className="flex bg-slate-50 dark:bg-[#28262F] rounded-2xl p-1">
               <button
                 type="button"
                 onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthInfo(''); }}
-                className={cn("flex-1 h-11 rounded-xl font-medium text-sm transition-all", authMode === 'signin' ? "bg-white dark:bg-[#3A3A3A] shadow-soft text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                className={cn("flex-1 h-11 rounded-xl font-medium text-sm transition-all", authMode === 'signin' ? "bg-white dark:bg-[#302D3A] shadow-soft text-primary" : "text-slate-400 dark:text-[#9E97B8]")}
               >
                 Entrar
               </button>
               <button
                 type="button"
                 onClick={() => { setAuthMode('signup'); setAuthError(''); setAuthInfo(''); }}
-                className={cn("flex-1 h-11 rounded-xl font-medium text-sm transition-all", authMode === 'signup' ? "bg-white dark:bg-[#3A3A3A] shadow-soft text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                className={cn("flex-1 h-11 rounded-xl font-medium text-sm transition-all", authMode === 'signup' ? "bg-white dark:bg-[#302D3A] shadow-soft text-primary" : "text-slate-400 dark:text-[#9E97B8]")}
               >
                 Criar conta
               </button>
@@ -2142,29 +2151,29 @@ export default function App() {
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Nome</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Nome</Label>
                     <Input
                       placeholder="Edson"
-                      className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                      className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                       value={authFirstName}
                       onChange={(e) => setAuthFirstName(e.target.value)}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Sobrenome</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Sobrenome</Label>
                     <Input
                       placeholder="Vargas"
-                      className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                      className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                       value={authLastName}
                       onChange={(e) => setAuthLastName(e.target.value)}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Usuário</Label>
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Usuário</Label>
                   <Input
                     placeholder="edson"
-                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                     value={authUsername}
                     onChange={(e) => setAuthUsername(e.target.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
                   />
@@ -2173,22 +2182,22 @@ export default function App() {
             )}
 
             <div className="space-y-2">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">E-mail</Label>
+              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">E-mail</Label>
               <Input
                 type="email"
                 placeholder="voce@email.com"
-                className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                 value={authEmail}
                 onChange={(e) => setAuthEmail(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Senha</Label>
+              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Senha</Label>
               <div className="relative">
                 <Input
                   type={showAuthPassword ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm pl-5 pr-12"
+                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm pl-5 pr-12"
                   value={authPassword}
                   onChange={(e) => setAuthPassword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAuthSubmit()}
@@ -2196,7 +2205,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowAuthPassword(v => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9C958B] hover:text-primary transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9E97B8] hover:text-primary transition-colors"
                   aria-label={showAuthPassword ? 'Ocultar senha' : 'Mostrar senha'}
                 >
                   {showAuthPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -2243,23 +2252,23 @@ export default function App() {
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/20 md:pl-80">
       {/* Onboarding / Nickname Modal */}
       <Dialog open={isNicknameModalOpen} onOpenChange={setIsNicknameModalOpen}>
-        <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#3A3A3A] flex flex-col">
-          <div className="p-4 border-b border-slate-50 dark:border-[#3f3f3f] shrink-0">
+        <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#302D3A] flex flex-col">
+          <div className="p-4 border-b border-slate-50 dark:border-[#3A3745] shrink-0">
             <DialogHeader>
               <DialogTitle className="text-2xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Quase lá! ✨</DialogTitle>
-              <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#9C958B] tracking-tight mt-1"></DialogDescription>
+              <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#9E97B8] tracking-tight mt-1"></DialogDescription>
             </DialogHeader>
           </div>
           <div className="p-6 space-y-6 flex-1 overflow-y-auto">
             <div className="flex gap-4 items-center">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 border-2 border-white dark:border-[#3A3A3A] shadow-soft flex items-center justify-center overflow-hidden shrink-0 text-primary font-medium text-xl">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 border-2 border-white dark:border-[#302D3A] shadow-soft flex items-center justify-center overflow-hidden shrink-0 text-primary font-medium text-xl">
                 {(tempNickname || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
                 <div className="flex-1 space-y-1.5">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Como quer ser chamado?</Label>
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Como quer ser chamado?</Label>
                   <Input 
                     placeholder="Ex: Edson" 
-                    className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm"
+                    className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm"
                     value={tempNickname || ''}
                     onChange={(e) => setTempNickname(e.target.value)}
                   />
@@ -2273,13 +2282,13 @@ export default function App() {
       </Dialog>
 
       <Dialog open={!!confirmingTransaction} onOpenChange={(open) => !open && setConfirmingTransaction(null)}>
-        <DialogContent className="rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep max-w-sm max-h-[90vh] p-0 overflow-hidden bg-white dark:bg-[#3A3A3A] flex flex-col">
-          <div className="p-6 border-b border-slate-50 dark:border-[#3f3f3f] shrink-0">
+        <DialogContent className="rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep max-w-sm max-h-[90vh] p-0 overflow-hidden bg-white dark:bg-[#302D3A] flex flex-col">
+          <div className="p-6 border-b border-slate-50 dark:border-[#3A3745] shrink-0">
             <DialogHeader>
               <DialogTitle className="text-xl font-heading font-medium text-slate-800 dark:text-[#EDE9E3] leading-tight">
                 {confirmingTransaction?.id.startsWith('bill-') ? 'Fatura do cartão' : 'Confirmar recebimento'}
               </DialogTitle>
-              <DialogDescription className="text-xs font-medium text-slate-500 dark:text-[#B5AFA6]">
+              <DialogDescription className="text-xs font-medium text-slate-500 dark:text-[#B4AFC9]">
                 {confirmingTransaction?.type === 'income' ? 'Registrar recebimento de' : 'Registrar pagamento de'} <strong className="text-primary">{confirmingTransaction?.description}</strong>
               </DialogDescription>
             </DialogHeader>
@@ -2287,13 +2296,13 @@ export default function App() {
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">
                   {confirmingTransaction?.type === 'card_purchase' || confirmingTransaction?.id.startsWith('bill-') ? 'Valor a pagar' : 'Quanto recebeu?'}
                 </Label>
                 <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-slate-300 dark:text-[#7D766C] group-focus-within:text-primary transition-colors">R$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-slate-300 dark:text-[#7A7390] group-focus-within:text-primary transition-colors">R$</span>
                   <Input 
-                    className="rounded-2xl border-none bg-slate-50 dark:bg-[#333333] h-12 pl-12 text-lg font-medium focus:bg-white dark:focus:bg-[#3A3A3A] focus:ring-2 focus:ring-primary/20 transition-all" 
+                    className="rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] h-12 pl-12 text-lg font-medium focus:bg-white dark:focus:bg-[#302D3A] focus:ring-2 focus:ring-primary/20 transition-all" 
                     value={confirmAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     onChange={(e) => setConfirmAmount(parseCurrency(maskCurrency(e.target.value)))}
                   />
@@ -2301,7 +2310,7 @@ export default function App() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Data que aconteceu</Label>
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Data que aconteceu</Label>
                 <DateField
                   className="rounded-2xl h-12"
                   value={confirmDate}
@@ -2320,7 +2329,7 @@ export default function App() {
                 {confirmingTransaction?.type === 'income' ? 'Confirmar recebimento' : (confirmingTransaction?.type === 'card_purchase' || confirmingTransaction?.id.startsWith('bill-') ? 'Confirmar pagamento' : 'Confirmar pagamento')}
               </Button>
               <div className="flex gap-2">
-                <Button variant="ghost" className="flex-1 h-12 rounded-2xl font-normal text-slate-500 dark:text-[#B5AFA6] hover:bg-slate-100 dark:hover:bg-[#3f3f3f]" onClick={() => {
+                <Button variant="ghost" className="flex-1 h-12 rounded-2xl font-normal text-slate-500 dark:text-[#B4AFC9] hover:bg-slate-100 dark:hover:bg-[#3A3745]" onClick={() => {
                   if (confirmingTransaction) {
                     if (confirmingTransaction.id.startsWith('bill-')) {
                       setSelectedCard(confirmingTransaction.cardId || null);
@@ -2354,21 +2363,21 @@ export default function App() {
 
       {/* Bill Details Modal */}
       <Dialog open={!!viewingBill} onOpenChange={(open) => !open && setViewingBill(null)}>
-        <DialogContent className="max-w-none sm:max-w-lg max-h-[85vh] p-0 border-none shadow-deep rounded-t-[2rem] rounded-b-none md:rounded-[2rem] overflow-hidden flex flex-col bg-white dark:bg-[#3A3A3A]">
-          <div className="p-6 border-b border-slate-50 dark:border-[#3f3f3f] shrink-0">
+        <DialogContent className="max-w-none sm:max-w-lg max-h-[85vh] p-0 border-none shadow-deep rounded-t-[2rem] rounded-b-none md:rounded-[2rem] overflow-hidden flex flex-col bg-white dark:bg-[#302D3A]">
+          <div className="p-6 border-b border-slate-50 dark:border-[#3A3745] shrink-0">
             <DialogHeader>
               <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">
                 Fatura {cards.find(c => c.id === viewingBill?.cardId)?.name || ''}
               </DialogTitle>
-              <DialogDescription className="font-medium text-xs text-slate-400 dark:text-[#9C958B]">
+              <DialogDescription className="font-medium text-xs text-slate-400 dark:text-[#9E97B8]">
                 {format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })} · {billTransactions.length} lançamento(s)
               </DialogDescription>
             </DialogHeader>
           </div>
           <ScrollArea className="flex-1 overflow-y-auto">
-            <div className="divide-y divide-slate-100 dark:divide-[#454545] px-2">
+            <div className="divide-y divide-slate-100 dark:divide-[#423F4E] px-2">
               {billTransactions.length === 0 && (
-                <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#7D766C]">Nenhum lançamento nessa fatura.</p>
+                <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#7A7390]">Nenhum lançamento nessa fatura.</p>
               )}
               {billTransactions.map(t => {
                 const person = people.find(p => p.id === t.payerPayee);
@@ -2378,15 +2387,17 @@ export default function App() {
                       transaction={t}
                       personName={person?.name}
                       onClick={() => { setViewingBill(null); handleEditClick(t); }}
+                      hideIcon
+                      isSimplified
                     />
                   </div>
                 );
               })}
             </div>
           </ScrollArea>
-          <div className="p-6 border-t border-slate-100 dark:border-[#454545] space-y-3 shrink-0">
+          <div className="p-6 border-t border-slate-100 dark:border-[#423F4E] space-y-3 shrink-0">
             <div className="flex justify-between items-center px-1">
-              <span className="text-[10px] font-medium text-slate-400 dark:text-[#9C958B] uppercase tracking-wider">Total da fatura</span>
+              <span className="text-[10px] font-medium text-slate-400 dark:text-[#9E97B8] uppercase tracking-wider">Total da fatura</span>
               <span className="text-xl font-heading font-bold text-slate-800 dark:text-[#EDE9E3]">R$ {(viewingBill?.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <Button
@@ -2406,44 +2417,94 @@ export default function App() {
         </DialogContent>
       </Dialog>
       {/* Floating Month Selector (Above Bottom Nav) */}
-      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center justify-center z-40 md:hidden w-full max-w-[90vw] px-2">
-        <motion.div
-          drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.4}
-          onDragEnd={(e, info) => {
-            if (info.offset.x > 100) prevMonth();
-            else if (info.offset.x < -100) nextMonth();
-          }}
-          className="flex items-center gap-2 bg-white dark:bg-[#3A3A3A] px-3 py-2 rounded-[2rem] border border-white dark:border-[#3A3A3A] shadow-bubbly pointer-events-auto max-w-[220px] justify-between cursor-grab active:cursor-grabbing"
-        >
-          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95" onClick={prevMonth}>
+      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 z-40 md:hidden w-full max-w-[90vw] px-2">
+        <div className="flex items-center gap-1 bg-white dark:bg-[#302D3A] px-2 py-2 rounded-[2rem] border border-white dark:border-[#302D3A] shadow-bubbly pointer-events-auto">
+          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 shrink-0" onClick={prevMonth}>
             <ChevronLeft size={20} strokeWidth={3} />
           </Button>
-          <span className="text-xs font-normal text-center capitalize text-slate-700 dark:text-[#E5E1DB] font-heading tracking-tight pointer-events-none">
+          <button
+            type="button"
+            onClick={() => {
+              setPickerMonth(format(currentDate, 'MM'));
+              setPickerYear(format(currentDate, 'yyyy'));
+              setIsMonthPickerOpen(true);
+            }}
+            className="text-xs font-normal text-center capitalize text-slate-700 dark:text-[#E7E3EF] font-heading tracking-tight px-2 hover:text-primary transition-colors whitespace-nowrap"
+          >
             {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
-          </span>
-          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95" onClick={nextMonth}>
+          </button>
+          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 shrink-0" onClick={nextMonth}>
             <ChevronRight size={20} strokeWidth={3} />
           </Button>
-        </motion.div>
+        </div>
+        {!isSameMonth(currentDate, new Date()) && (
+          <button
+            type="button"
+            onClick={() => setCurrentDate(new Date())}
+            className="h-11 px-3 rounded-full bg-white dark:bg-[#302D3A] shadow-bubbly text-[10px] font-medium text-primary shrink-0 pointer-events-auto whitespace-nowrap"
+          >
+            Hoje
+          </button>
+        )}
       </div>
 
-      {/* FAB tucked into the right side of the bottom nav bar */}
-      <div className="fixed bottom-6 right-[5vw] z-50 md:hidden">
+      {/* Month/Year Picker */}
+      <Dialog open={isMonthPickerOpen} onOpenChange={setIsMonthPickerOpen}>
+        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#302D3A]">
+          <div className="p-6 space-y-5">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Ir para o mês</DialogTitle>
+            </DialogHeader>
+            <div className="grid grid-cols-2 gap-3">
+              <Select value={pickerMonth} onValueChange={setPickerMonth}>
+                <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#28262F] rounded-xl font-normal text-sm px-4 shadow-sm">
+                  <SelectValue placeholder="Mês" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-deep p-2">
+                  {months.map(m => (
+                    <SelectItem key={m.value} value={m.value} className="rounded-lg font-normal text-sm p-2">{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={pickerYear} onValueChange={setPickerYear}>
+                <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#28262F] rounded-xl font-normal text-sm px-4 shadow-sm">
+                  <SelectValue placeholder="Ano" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-deep p-2">
+                  {monthPickerYears.map(y => (
+                    <SelectItem key={y.value} value={y.value} className="rounded-lg font-normal text-sm p-2">{y.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => {
+                setCurrentDate(new Date(Number(pickerYear), Number(pickerMonth) - 1, 1));
+                setIsMonthPickerOpen(false);
+              }}
+              className="w-full h-12 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white"
+            >
+              Ir para esse mês
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* FAB, positioned beside the bottom nav bar (not overlapping it) */}
+      <div className="fixed bottom-4 right-[5vw] z-40 md:hidden">
         <Dialog open={isRegistrarOpen && window.innerWidth < 768} onOpenChange={setIsRegistrarOpen}>
           <DialogTrigger
             render={
               <Button
-                className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-[#C9B6E8] hover:scale-105 active:scale-95 shadow-bubbly shadow-primary/40 p-0 border-[5px] border-[#FAF7F2] dark:border-[#201F26] transition-all duration-500 overflow-hidden group"
+                className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-[#C9B6E8] hover:scale-105 active:scale-95 shadow-bubbly shadow-primary/40 p-0 border-[5px] border-[#FAF7F2] dark:border-[#1C1B22] transition-all duration-500 overflow-hidden group"
                 onClick={handleOpenRegistrar}
               >
                 <Plus size={30} className="text-white relative z-10 transition-transform duration-500 group-hover:rotate-90" strokeWidth={3} />
               </Button>
             }
           />
-          <DialogContent className="max-w-none sm:max-w-lg h-[85vh] flex flex-col p-0 border-none shadow-deep rounded-t-[2.5rem] rounded-b-none overflow-hidden bg-white dark:bg-[#3A3A3A]">
-            <div className="px-6 py-4 border-b border-slate-50 dark:border-[#3f3f3f] shrink-0 flex items-center justify-between">
+          <DialogContent className="max-w-none sm:max-w-lg h-[85vh] flex flex-col p-0 border-none shadow-deep rounded-t-[2.5rem] rounded-b-none overflow-hidden bg-white dark:bg-[#302D3A]">
+            <div className="px-6 py-4 border-b border-slate-50 dark:border-[#3A3745] shrink-0 flex items-center justify-between">
               <DialogHeader>
                 <DialogTitle className="text-lg font-medium tracking-tight text-slate-800 dark:text-[#EDE9E3]">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
               </DialogHeader>
@@ -2454,7 +2515,7 @@ export default function App() {
                   onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null})}
                   className={cn(
                     "flex-1 py-2 rounded-xl font-medium transition-all flex flex-col items-center gap-1 text-[9px] capitalize tracking-wide relative overflow-hidden group",
-                    newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#333333] text-slate-400 dark:text-[#9C958B] hover:bg-slate-100 dark:hover:bg-[#3f3f3f]/80"
+                    newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#28262F] text-slate-400 dark:text-[#9E97B8] hover:bg-slate-100 dark:hover:bg-[#3A3745]/80"
                   )}
                 >
                   <ArrowUpCircle size={16} strokeWidth={3} />
@@ -2464,7 +2525,7 @@ export default function App() {
                   onClick={() => setNewTransaction({...newTransaction, type: 'expense'})}
                   className={cn(
                     "flex-1 py-2 rounded-xl font-medium transition-all flex flex-col items-center gap-1 text-[9px] capitalize tracking-wide relative overflow-hidden group",
-                    (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#333333] text-slate-400 dark:text-[#9C958B] hover:bg-slate-100 dark:hover:bg-[#3f3f3f]/80"
+                    (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#28262F] text-slate-400 dark:text-[#9E97B8] hover:bg-slate-100 dark:hover:bg-[#3A3745]/80"
                   )}
                 >
                   <ArrowDownCircle size={16} strokeWidth={3} />
@@ -2473,12 +2534,12 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                <div className="p-4 bg-slate-50 dark:bg-[#333333] rounded-2xl space-y-4">
+                <div className="p-4 bg-slate-50 dark:bg-[#28262F] rounded-2xl space-y-4">
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Descrição</Label>
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Descrição</Label>
                   <Input
                     placeholder="Ex: Aluguel"
-                    className="h-11 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-sm px-4 shadow-sm"
+                    className="h-11 rounded-xl border-none bg-white dark:bg-[#302D3A] font-normal text-sm px-4 shadow-sm"
                     value={newTransaction.description || ''}
                     onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
                   />
@@ -2486,20 +2547,20 @@ export default function App() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Valor</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Valor</Label>
                     <div className="relative group">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-normal text-slate-300 dark:text-[#7D766C] group-focus-within:text-primary transition-colors text-xs">R$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-normal text-slate-300 dark:text-[#7A7390] group-focus-within:text-primary transition-colors text-xs">R$</span>
                       <Input
-                        className="h-11 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-sm pl-10 pr-4 shadow-sm"
+                        className="h-11 rounded-xl border-none bg-white dark:bg-[#302D3A] font-normal text-sm pl-10 pr-4 shadow-sm"
                         value={amountInput}
                         onChange={(e) => setAmountInput(maskCurrency(e.target.value))}
                       />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
                     <DateField
-                      className="h-11 text-xs bg-white dark:bg-[#3A3A3A] shadow-sm"
+                      className="h-11 text-xs bg-white dark:bg-[#302D3A] shadow-sm"
                       value={newTransaction.date || ''}
                       onChange={(v) => {
                         setNewTransaction({...newTransaction, date: v});
@@ -2510,9 +2571,9 @@ export default function App() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Categoria</Label>
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Categoria</Label>
                   <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
-                    <SelectTrigger className="h-11 border-none bg-white dark:bg-[#3A3A3A] rounded-xl font-normal text-sm px-4 shadow-sm">
+                    <SelectTrigger className="h-11 border-none bg-white dark:bg-[#302D3A] rounded-xl font-normal text-sm px-4 shadow-sm">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -2530,14 +2591,14 @@ export default function App() {
 
                 {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
                   <div className="space-y-1">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">É no cartão de crédito?</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">É no cartão de crédito?</Label>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
                         className={cn(
                           "h-9 px-3 rounded-xl text-xs font-medium border-2 transition-all",
-                          !newTransaction.cardId ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B]"
+                          !newTransaction.cardId ? "bg-white dark:bg-[#302D3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#302D3A] border-transparent text-slate-400 dark:text-[#9E97B8]"
                         )}
                       >
                         Não
@@ -2549,7 +2610,7 @@ export default function App() {
                           onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
                           className={cn(
                             "h-9 px-3 rounded-xl text-xs font-medium border-2 transition-all flex items-center gap-2",
-                            newTransaction.cardId === card.id ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B]"
+                            newTransaction.cardId === card.id ? "bg-white dark:bg-[#302D3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#302D3A] border-transparent text-slate-400 dark:text-[#9E97B8]"
                           )}
                         >
                           <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
@@ -2568,19 +2629,19 @@ export default function App() {
                     onClick={() => setShowMoreOptions(v => !v)}
                     className="w-full flex items-center justify-between px-1 py-1"
                   >
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] cursor-pointer">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] cursor-pointer">
                       Mais opções {(personSplits.length > 0 || isRecurrent || isInstallment) && !showMoreOptions && '(em uso)'}
                     </Label>
-                    <ChevronDown size={14} strokeWidth={2.5} className={cn("text-slate-400 dark:text-[#9C958B] transition-transform", (showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && "rotate-180")} />
+                    <ChevronDown size={14} strokeWidth={2.5} className={cn("text-slate-400 dark:text-[#9E97B8] transition-transform", (showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && "rotate-180")} />
                   </button>
                 </div>
 
                 {(showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && (
                 <div className="space-y-3 animate-in fade-in slide-in-from-top-1">
                 <div className="space-y-3">
-                  <div className="p-4 bg-slate-50 dark:bg-[#333333] rounded-2xl space-y-3">
+                  <div className="p-4 bg-slate-50 dark:bg-[#28262F] rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="assign-someone-m" className="text-[10px] font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-tight">Dividir com pessoas</Label>
+                    <Label htmlFor="assign-someone-m" className="text-[10px] font-medium text-slate-500 dark:text-[#B4AFC9] cursor-pointer tracking-tight">Dividir com pessoas</Label>
                     <ToggleSwitch
                       checked={showPersonSelector}
                       onChange={(checked) => {
@@ -2630,8 +2691,8 @@ export default function App() {
                             className={cn(
                               "h-10 px-3 rounded-xl font-normal text-xs transition-all flex items-center gap-2 border-2",
                               isSelected
-                                ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm"
-                                : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B] hover:border-slate-200 dark:hover:border-[#4f4f4f]"
+                                ? "bg-white dark:bg-[#302D3A] border-primary text-primary shadow-sm"
+                                : "bg-white dark:bg-[#302D3A] border-transparent text-slate-400 dark:text-[#9E97B8] hover:border-slate-200 dark:hover:border-[#4A4658]"
                             )}
                           >
                             <img src={p.image} alt="" className="w-5 h-5 rounded-full object-cover shadow-sm" />
@@ -2644,10 +2705,10 @@ export default function App() {
                   {showPersonSelector && (
                     <div className="flex items-center gap-2 pt-1">
                       <div className="relative flex-1">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9C958B] font-medium text-xs pointer-events-none">@</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9E97B8] font-medium text-xs pointer-events-none">@</span>
                         <Input
                           placeholder="usuário ou nome novo"
-                          className="h-10 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-xs pl-8 pr-3 shadow-sm"
+                          className="h-10 rounded-xl border-none bg-white dark:bg-[#302D3A] font-normal text-xs pl-8 pr-3 shadow-sm"
                           value={quickAssignQuery}
                           onChange={(e) => setQuickAssignQuery(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleQuickAssignPerson()}
@@ -2667,10 +2728,10 @@ export default function App() {
                 </div>
 
                 {personSplits.length > 0 && (
-                  <div className="p-4 bg-slate-50 dark:bg-[#333333] rounded-2xl space-y-3">
+                  <div className="p-4 bg-slate-50 dark:bg-[#28262F] rounded-2xl space-y-3">
                     <div className="flex items-center justify-between px-1">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Configurar divisões</Label>
-                      <div className="flex bg-slate-100 dark:bg-[#3f3f3f] p-0.5 rounded-lg border border-slate-200 dark:border-[#4f4f4f] shadow-sm overflow-hidden min-w-[120px]">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Configurar divisões</Label>
+                      <div className="flex bg-slate-100 dark:bg-[#3A3745] p-0.5 rounded-lg border border-slate-200 dark:border-[#4A4658] shadow-sm overflow-hidden min-w-[120px]">
                         {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
                           <button
                             key={type}
@@ -2695,7 +2756,7 @@ export default function App() {
                             }}
                             className={cn(
                               "flex-1 py-1 rounded-md text-[8px] font-medium transition-all",
-                              globalSplitType === type ? "bg-white dark:bg-[#3A3A3A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9C958B] hover:text-slate-600 dark:hover:text-[#D4CFC7]"
+                              globalSplitType === type ? "bg-white dark:bg-[#302D3A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9E97B8] hover:text-slate-600 dark:hover:text-[#D1CCE0]"
                             )}
                           >
                             {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
@@ -2710,14 +2771,14 @@ export default function App() {
                         {personSplits.map((split, index) => {
                           const person = people.find(p => p.id === split.personId);
                           return (
-                            <div key={index} className="bg-white dark:bg-[#3A3A3A] p-4 rounded-2xl shadow-sm space-y-3 group hover:ring-1 hover:ring-primary/20 transition-all">
+                            <div key={index} className="bg-white dark:bg-[#302D3A] p-4 rounded-2xl shadow-sm space-y-3 group hover:ring-1 hover:ring-primary/20 transition-all">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-2xl bg-white dark:bg-[#3A3A3A] shadow-sm flex items-center justify-center overflow-hidden border border-slate-50 dark:border-[#3f3f3f]">
+                                  <div className="w-10 h-10 rounded-2xl bg-white dark:bg-[#302D3A] shadow-sm flex items-center justify-center overflow-hidden border border-slate-50 dark:border-[#3A3745]">
                                     <img src={person?.image} alt="" className="w-full h-full object-cover" />
                                   </div>
                                   <div>
-                                    <p className="text-xs font-medium text-slate-700 dark:text-[#E5E1DB]">{person?.name}</p>
+                                    <p className="text-xs font-medium text-slate-700 dark:text-[#E7E3EF]">{person?.name}</p>
                                     <p className="text-[10px] font-normal text-primary">
                                       {(() => {
                                         const amount = parseCurrency(amountInput);
@@ -2730,12 +2791,12 @@ export default function App() {
                               </div>
 
                               <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B] ml-1">
+                                <p className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8] ml-1">
                                   {split.type === 'parts' ? 'Quantas partes?' : split.type === 'percentage' ? 'Qual percentual?' : 'Qual valor fixo?'}
                                 </p>
                                 <div className="relative w-32">
                                   <Input
-                                    className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#3f3f3f] font-medium text-xs px-4 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
+                                    className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#3A3745] font-medium text-xs px-4 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
                                     value={split.value}
                                     onChange={(e) => {
                                       setPersonSplits(prev => prev.map((s, i) => {
@@ -2746,8 +2807,8 @@ export default function App() {
                                       }));
                                     }}
                                   />
-                                  {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#7D766C]">%</span>}
-                                  {split.type === 'value' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-200 dark:text-[#676057]">R$</span>}
+                                  {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#7A7390]">%</span>}
+                                  {split.type === 'value' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-200 dark:text-[#6B6480]">R$</span>}
                                 </div>
                               </div>
                             </div>
@@ -2756,15 +2817,15 @@ export default function App() {
                       </div>
                     ) : (
                       // Unified card for multiple people
-                      <div className="bg-white dark:bg-[#3A3A3A] p-4 rounded-2xl shadow-sm space-y-4">
+                      <div className="bg-white dark:bg-[#302D3A] p-4 rounded-2xl shadow-sm space-y-4">
                         <div className="space-y-3">
                           {personSplits.map((split, index) => {
                             const person = people.find(p => p.id === split.personId);
                             return (
-                              <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-50 dark:border-[#454545] last:border-0 last:pb-0">
+                              <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-50 dark:border-[#423F4E] last:border-0 last:pb-0">
                                 <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] font-medium text-slate-700 dark:text-[#E5E1DB] truncate">{person?.name}</p>
+                                  <p className="text-[10px] font-medium text-slate-700 dark:text-[#E7E3EF] truncate">{person?.name}</p>
                                   <p className="text-[9px] font-normal text-primary">
                                     {(() => {
                                       const amount = parseCurrency(amountInput);
@@ -2776,7 +2837,7 @@ export default function App() {
                                 <div className="flex items-center gap-2">
                                   <div className="relative w-20">
                                     <input
-                                      className="w-full h-8 bg-slate-50 dark:bg-[#3f3f3f] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
+                                      className="w-full h-8 bg-slate-50 dark:bg-[#3A3745] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
                                       value={split.value}
                                       onChange={(e) => {
                                         setPersonSplits(prev => prev.map((s, i) => {
@@ -2787,7 +2848,7 @@ export default function App() {
                                         }));
                                       }}
                                     />
-                                    {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-300 dark:text-[#7D766C]">%</span>}
+                                    {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-300 dark:text-[#7A7390]">%</span>}
                                   </div>
                                 </div>
                               </div>
@@ -2800,34 +2861,34 @@ export default function App() {
                 )}
 
                 <div className="space-y-3">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Repetição</Label>
-                  <div className="p-4 bg-slate-50 dark:bg-[#333333] rounded-2xl space-y-4">
-                    <div className="flex bg-white dark:bg-[#3A3A3A] rounded-xl p-1 shadow-sm">
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Repetição</Label>
+                  <div className="p-4 bg-slate-50 dark:bg-[#28262F] rounded-2xl space-y-4">
+                    <div className="flex bg-white dark:bg-[#302D3A] rounded-xl p-1 shadow-sm">
                       <button
                         type="button"
                         onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
-                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", !isRecurrent && !isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", !isRecurrent && !isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}
                       >
                         Única vez
                       </button>
                       <button
                         type="button"
                         onClick={() => { setIsRecurrent(true); setIsInstallment(false); }}
-                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isRecurrent ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isRecurrent ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}
                       >
                         Recorrente
                       </button>
                       <button
                         type="button"
                         onClick={() => { setIsInstallment(true); setIsRecurrent(false); }}
-                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}
                       >
                         Parcelado
                       </button>
                     </div>
 
                     {isRecurrent && (
-                      <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-[#4f4f4f] transition-all animate-in fade-in slide-in-from-top-2">
+                      <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-[#4A4658] transition-all animate-in fade-in slide-in-from-top-2">
                         <div className="flex items-center gap-2 mb-1">
                           <CalendarIcon size={12} className="text-primary" />
                           <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
@@ -2840,7 +2901,7 @@ export default function App() {
                               setNewTransaction({...newTransaction, recurrenceEndDate: `${year}-${m}`});
                             }}
                           >
-                            <SelectTrigger className="h-10 border-none bg-white dark:bg-[#3A3A3A] rounded-xl font-normal text-xs px-4 shadow-sm focus:ring-1 focus:ring-primary/20">
+                            <SelectTrigger className="h-10 border-none bg-white dark:bg-[#302D3A] rounded-xl font-normal text-xs px-4 shadow-sm focus:ring-1 focus:ring-primary/20">
                               <SelectValue placeholder="Mês" />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -2856,7 +2917,7 @@ export default function App() {
                               setNewTransaction({...newTransaction, recurrenceEndDate: `${y}-${month}`});
                             }}
                           >
-                            <SelectTrigger className="h-10 border-none bg-white dark:bg-[#3A3A3A] rounded-xl font-normal text-xs px-4 shadow-sm focus:ring-1 focus:ring-primary/20">
+                            <SelectTrigger className="h-10 border-none bg-white dark:bg-[#302D3A] rounded-xl font-normal text-xs px-4 shadow-sm focus:ring-1 focus:ring-primary/20">
                               <SelectValue placeholder="Ano" />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -2868,12 +2929,12 @@ export default function App() {
                         </div>
 
                         <div className="space-y-2 pt-1">
-                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Quando lançar todo mês</Label>
-                          <div className="flex bg-white dark:bg-[#3A3A3A] rounded-xl p-1 shadow-sm">
-                            <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}>
+                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Quando lançar todo mês</Label>
+                          <div className="flex bg-white dark:bg-[#302D3A] rounded-xl p-1 shadow-sm">
+                            <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}>
                               Dia fixo
                             </button>
-                            <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}>
+                            <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}>
                               Dia útil
                             </button>
                           </div>
@@ -2883,11 +2944,11 @@ export default function App() {
                                 type="number"
                                 min="1"
                                 max="23"
-                                className="h-10 w-16 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-medium text-sm text-center shadow-sm px-2"
+                                className="h-10 w-16 rounded-xl border-none bg-white dark:bg-[#302D3A] font-medium text-sm text-center shadow-sm px-2"
                                 value={recurrenceBusinessDay}
                                 onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
                               />
-                              <span className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
+                              <span className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
                             </div>
                           )}
                         </div>
@@ -2895,13 +2956,13 @@ export default function App() {
                     )}
 
                     {isInstallment && (
-                      <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-[#4f4f4f] transition-all animate-in fade-in slide-in-from-top-2">
+                      <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-[#4A4658] transition-all animate-in fade-in slide-in-from-top-2">
                         <Label className="text-[10px] font-medium tracking-wider text-primary block">Quantidade de Parcelas</Label>
                         <Input
                           type="number" 
                           min="2" 
                           max="84"
-                          className="h-10 border-none bg-white dark:bg-[#3A3A3A] rounded-xl font-normal text-base px-4 shadow-sm"
+                          className="h-10 border-none bg-white dark:bg-[#302D3A] rounded-xl font-normal text-base px-4 shadow-sm"
                           value={installmentCount ?? 2}
                           onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value)))}
                         />
@@ -2918,7 +2979,7 @@ export default function App() {
                       Associar receita
                       <Popover>
                         <PopoverTrigger render={
-                          <button className="h-5 w-5 flex items-center justify-center rounded-full bg-white dark:bg-[#3A3A3A] shadow-sm outline-none">
+                          <button className="h-5 w-5 flex items-center justify-center rounded-full bg-white dark:bg-[#302D3A] shadow-sm outline-none">
                             <Info size={12} className="text-indigo-400" />
                           </button>
                         } />
@@ -2934,8 +2995,8 @@ export default function App() {
                 )}
 
                 {newTransaction.type !== 'card_purchase' && (
-                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#333333] px-4 h-12 rounded-2xl border border-slate-100 dark:border-[#454545]">
-                    <Label htmlFor="status-m" className="text-xs font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer flex-1">
+                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#28262F] px-4 h-12 rounded-2xl border border-slate-100 dark:border-[#423F4E]">
+                    <Label htmlFor="status-m" className="text-xs font-medium text-slate-500 dark:text-[#B4AFC9] cursor-pointer flex-1">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
                     <ToggleSwitch
@@ -2954,12 +3015,12 @@ export default function App() {
                       className="flex items-center justify-between p-3 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#3A3A3A] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#302D3A] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
                           {linked.type === 'income' ? <ArrowUpCircle size={16} strokeWidth={3} /> : <CreditCard size={16} strokeWidth={3} />}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-normal text-slate-700 dark:text-[#E5E1DB] truncate">Vinculado a: {linked.description}</p>
-                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                          <p className="text-xs font-normal text-slate-700 dark:text-[#E7E3EF] truncate">Vinculado a: {linked.description}</p>
+                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         </div>
                       </div>
                       <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
@@ -2990,15 +3051,15 @@ export default function App() {
 
         {/* Categories Management Modal */}
         <Dialog open={isCategoriasOpen} onOpenChange={setIsCategoriasOpen}>
-          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep flex flex-col overflow-hidden bg-white dark:bg-[#3A3A3A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
-            <div className="p-6 border-b border-slate-50 dark:border-[#3f3f3f] shrink-0">
+          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep flex flex-col overflow-hidden bg-white dark:bg-[#302D3A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+            <div className="p-6 border-b border-slate-50 dark:border-[#3A3745] shrink-0">
               <DialogHeader>
                 <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Gerenciar categorias</DialogTitle>
-                <DialogDescription className="font-normal text-[10px] text-slate-400 dark:text-[#9C958B] tracking-tight mt-1">Personalize sua organização</DialogDescription>
+                <DialogDescription className="font-normal text-[10px] text-slate-400 dark:text-[#9E97B8] tracking-tight mt-1">Personalize sua organização</DialogDescription>
               </DialogHeader>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-              <div className="space-y-4 p-6 bg-slate-50 dark:bg-[#333333] rounded-[2rem]">
+              <div className="space-y-4 p-6 bg-slate-50 dark:bg-[#28262F] rounded-[2rem]">
                 {editingCategory && (
                   <div className="flex items-center justify-between bg-primary/10 text-primary text-xs font-medium rounded-xl px-4 py-2.5">
                     <span>Editando "{editingCategory.name}"</span>
@@ -3008,17 +3069,17 @@ export default function App() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Nome da categoria</Label>
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Nome da categoria</Label>
                   <Input 
                     placeholder="Ex: Assinaturas" 
-                    className="h-12 rounded-2xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-sm px-5 shadow-sm"
+                    className="h-12 rounded-2xl border-none bg-white dark:bg-[#302D3A] font-normal text-sm px-5 shadow-sm"
                     value={newCategoryName || ''}
                     onChange={(e) => setNewCategoryName(e.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Cor</Label>
-                  <div className="grid grid-cols-5 gap-2 bg-white dark:bg-[#3A3A3A] p-3 rounded-2xl shadow-sm">
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Cor</Label>
+                  <div className="grid grid-cols-5 gap-2 bg-white dark:bg-[#302D3A] p-3 rounded-2xl shadow-sm">
                     {['#9BC4B4', '#FFECC7', '#FFDAB9', '#C2E7DA', '#FFB3B0', '#D0D7F4', '#8b5cf6', '#3b82f6', '#ef4444'].map(color => (
                       <button
                         key={color}
@@ -3034,7 +3095,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => colorInputRef.current?.click()}
-                      className="w-8 h-8 rounded-full bg-slate-100 dark:bg-[#3f3f3f] flex items-center justify-center text-slate-400 dark:text-[#9C958B] hover:text-slate-600 dark:hover:text-[#D4CFC7] transition-all border-2 border-dashed border-slate-300 dark:border-[#5a5a5a]"
+                      className="w-8 h-8 rounded-full bg-slate-100 dark:bg-[#3A3745] flex items-center justify-center text-slate-400 dark:text-[#9E97B8] hover:text-slate-600 dark:hover:text-[#D1CCE0] transition-all border-2 border-dashed border-slate-300 dark:border-[#5a5a5a]"
                     >
                       <Plus size={16} />
                       <input 
@@ -3053,19 +3114,19 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Suas categorias ({categories.length})</p>
+                <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Suas categorias ({categories.length})</p>
                 <div className="flex flex-col gap-3">
                   {categories.map(cat => (
-                    <div key={cat.id} className="flex items-center gap-4 p-4 bg-white dark:bg-[#3A3A3A] rounded-2xl border border-slate-50 dark:border-[#3f3f3f] shadow-soft group hover:bg-slate-50 dark:hover:bg-[#333333] transition-all">
+                    <div key={cat.id} className="flex items-center gap-4 p-4 bg-white dark:bg-[#302D3A] rounded-2xl border border-slate-50 dark:border-[#3A3745] shadow-soft group hover:bg-slate-50 dark:hover:bg-[#28262F] transition-all">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0" style={{ backgroundColor: cat.color }}>
                         <PieChartIcon size={18} />
                       </div>
-                      <span className="flex-1 font-normal text-slate-700 dark:text-[#E5E1DB] text-sm leading-tight">{cat.name}</span>
+                      <span className="flex-1 font-normal text-slate-700 dark:text-[#E7E3EF] text-sm leading-tight">{cat.name}</span>
                       <div className="flex items-center gap-1">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-9 w-9 text-slate-300 dark:text-[#7D766C] hover:text-primary rounded-full transition-all" 
+                          className="h-9 w-9 text-slate-300 dark:text-[#7A7390] hover:text-primary rounded-full transition-all" 
                           onClick={() => {
                             setEditingCategory(cat);
                             setNewCategoryName(cat.name);
@@ -3077,7 +3138,7 @@ export default function App() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-9 w-9 text-slate-300 dark:text-[#7D766C] hover:text-rose-400 rounded-full transition-all" 
+                          className="h-9 w-9 text-slate-300 dark:text-[#7A7390] hover:text-rose-400 rounded-full transition-all" 
                           onClick={() => handleDeleteCategory(cat.id)}
                         >
                           <Trash2 size={14} strokeWidth={2.5} />
@@ -3098,15 +3159,15 @@ export default function App() {
           <DialogTrigger 
             render={
               <Button 
-                className="w-16 h-16 rounded-full bg-primary hover:active:scale-90 shadow-deep p-0 border-[6px] border-white dark:border-[#3A3A3A] transition-all duration-500 overflow-hidden group"
+                className="w-16 h-16 rounded-full bg-primary hover:active:scale-90 shadow-deep p-0 border-[6px] border-white dark:border-[#302D3A] transition-all duration-500 overflow-hidden group"
                 onClick={handleOpenRegistrar}
               >
                 <Plus size={32} className="text-white relative z-10 transition-transform duration-500 group-hover:rotate-90" strokeWidth={3} />
               </Button>
             }
           />
-          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none flex flex-col p-0 overflow-hidden border-none shadow-deep bg-white dark:bg-[#3A3A3A] sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-xl sm:h-auto sm:max-h-[85vh] sm:rounded-[1.75rem]">
-            <div className="px-8 py-5 border-b border-slate-50 dark:border-[#3f3f3f] shrink-0 flex items-center justify-between">
+          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none flex flex-col p-0 overflow-hidden border-none shadow-deep bg-white dark:bg-[#302D3A] sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-xl sm:h-auto sm:max-h-[85vh] sm:rounded-[1.75rem]">
+            <div className="px-8 py-5 border-b border-slate-50 dark:border-[#3A3745] shrink-0 flex items-center justify-between">
               <DialogHeader>
                 <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
               </DialogHeader>
@@ -3118,7 +3179,7 @@ export default function App() {
                   onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null})}
                   className={cn(
                     "flex-1 py-3 rounded-2xl font-medium transition-all flex flex-col items-center gap-2 text-[10px] capitalize tracking-wide relative overflow-hidden group",
-                    newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#333333] text-slate-400 dark:text-[#9C958B] hover:bg-slate-100 dark:hover:bg-[#3f3f3f]/80"
+                    newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#28262F] text-slate-400 dark:text-[#9E97B8] hover:bg-slate-100 dark:hover:bg-[#3A3745]/80"
                   )}
                 >
                   <ArrowUpCircle size={22} strokeWidth={3} />
@@ -3128,7 +3189,7 @@ export default function App() {
                   onClick={() => setNewTransaction({...newTransaction, type: 'expense'})}
                   className={cn(
                     "flex-1 py-3 rounded-2xl font-medium transition-all flex flex-col items-center gap-2 text-[10px] capitalize tracking-wide relative overflow-hidden group",
-                    (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#333333] text-slate-400 dark:text-[#9C958B] hover:bg-slate-100 dark:hover:bg-[#3f3f3f]/80"
+                    (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#28262F] text-slate-400 dark:text-[#9E97B8] hover:bg-slate-100 dark:hover:bg-[#3A3745]/80"
                   )}
                 >
                   <ArrowDownCircle size={22} strokeWidth={3} />
@@ -3138,12 +3199,12 @@ export default function App() {
 
               <div className="space-y-6">
                 <div className="space-y-3">
-                  <div className="p-6 bg-slate-50 dark:bg-[#333333] rounded-[1.75rem] space-y-5">
+                  <div className="p-6 bg-slate-50 dark:bg-[#28262F] rounded-[1.75rem] space-y-5">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Descrição</Label>
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Descrição</Label>
                       <Input
                         placeholder="Ex: Aluguel"
-                        className="h-14 rounded-2xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-base px-6 shadow-sm"
+                        className="h-14 rounded-2xl border-none bg-white dark:bg-[#302D3A] font-normal text-base px-6 shadow-sm"
                         value={newTransaction.description || ''}
                         onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
                       />
@@ -3151,20 +3212,20 @@ export default function App() {
 
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Valor</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Valor</Label>
                         <div className="relative group">
-                          <span className="absolute left-6 top-1/2 -translate-y-1/2 font-normal text-slate-300 dark:text-[#7D766C] group-focus-within:text-primary transition-colors text-lg">R$</span>
+                          <span className="absolute left-6 top-1/2 -translate-y-1/2 font-normal text-slate-300 dark:text-[#7A7390] group-focus-within:text-primary transition-colors text-lg">R$</span>
                           <Input
-                            className="h-14 rounded-2xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-base pl-16 pr-6 shadow-sm"
+                            className="h-14 rounded-2xl border-none bg-white dark:bg-[#302D3A] font-normal text-base pl-16 pr-6 shadow-sm"
                             value={amountInput}
                             onChange={(e) => setAmountInput(maskCurrency(e.target.value))}
                           />
                         </div>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Categoria</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Categoria</Label>
                         <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
-                          <SelectTrigger className="h-14 border-none bg-white dark:bg-[#3A3A3A] rounded-2xl font-normal text-base px-6 shadow-sm">
+                          <SelectTrigger className="h-14 border-none bg-white dark:bg-[#302D3A] rounded-2xl font-normal text-base px-6 shadow-sm">
                             <SelectValue placeholder="Selecione..." />
                           </SelectTrigger>
                           <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -3180,9 +3241,9 @@ export default function App() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
                         <DateField
-                          className="h-14 rounded-2xl bg-white dark:bg-[#3A3A3A] text-sm px-6 shadow-sm"
+                          className="h-14 rounded-2xl bg-white dark:bg-[#302D3A] text-sm px-6 shadow-sm"
                           value={newTransaction.date || ''}
                           onChange={(v) => {
                             setNewTransaction({...newTransaction, date: v});
@@ -3194,14 +3255,14 @@ export default function App() {
 
                     {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
                       <div className="space-y-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">É no cartão de crédito?</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">É no cartão de crédito?</Label>
                         <div className="flex flex-wrap gap-2">
                           <button
                             type="button"
                             onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
                             className={cn(
                               "h-11 px-4 rounded-xl text-sm font-medium border-2 transition-all",
-                              !newTransaction.cardId ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B]"
+                              !newTransaction.cardId ? "bg-white dark:bg-[#302D3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#302D3A] border-transparent text-slate-400 dark:text-[#9E97B8]"
                             )}
                           >
                             Não
@@ -3213,7 +3274,7 @@ export default function App() {
                               onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
                               className={cn(
                                 "h-11 px-4 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-2",
-                                newTransaction.cardId === card.id ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B]"
+                                newTransaction.cardId === card.id ? "bg-white dark:bg-[#302D3A] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#302D3A] border-transparent text-slate-400 dark:text-[#9E97B8]"
                               )}
                             >
                               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
@@ -3232,18 +3293,18 @@ export default function App() {
                     onClick={() => setShowMoreOptions(v => !v)}
                     className="w-full flex items-center justify-between px-1 py-1"
                   >
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] cursor-pointer">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] cursor-pointer">
                       Mais opções {(personSplits.length > 0 || isRecurrent || isInstallment) && !showMoreOptions && '(em uso)'}
                     </Label>
-                    <ChevronDown size={14} strokeWidth={2.5} className={cn("text-slate-400 dark:text-[#9C958B] transition-transform", (showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && "rotate-180")} />
+                    <ChevronDown size={14} strokeWidth={2.5} className={cn("text-slate-400 dark:text-[#9E97B8] transition-transform", (showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && "rotate-180")} />
                   </button>
                 </div>
 
                 {(showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-top-1">
-                  <div className="p-6 bg-slate-50 dark:bg-[#333333] rounded-[1.75rem] space-y-4">
+                  <div className="p-6 bg-slate-50 dark:bg-[#28262F] rounded-[1.75rem] space-y-4">
                     <div className="flex items-center justify-between px-1">
-                      <Label htmlFor="assign-someone-d" className="text-xs font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer tracking-wide">Dividir com pessoas</Label>
+                      <Label htmlFor="assign-someone-d" className="text-xs font-medium text-slate-500 dark:text-[#B4AFC9] cursor-pointer tracking-wide">Dividir com pessoas</Label>
                       <ToggleSwitch
                         checked={showPersonSelector}
                         onChange={(checked) => {
@@ -3293,8 +3354,8 @@ export default function App() {
                               className={cn(
                                 "h-12 px-4 rounded-2xl font-normal text-sm transition-all flex items-center gap-3 border-2 outline-none",
                                 isSelected
-                                  ? "bg-white dark:bg-[#3A3A3A] border-primary text-primary shadow-sm"
-                                  : "bg-white dark:bg-[#3A3A3A] border-transparent text-slate-400 dark:text-[#9C958B] hover:bg-slate-100 dark:hover:bg-[#3f3f3f]"
+                                  ? "bg-white dark:bg-[#302D3A] border-primary text-primary shadow-sm"
+                                  : "bg-white dark:bg-[#302D3A] border-transparent text-slate-400 dark:text-[#9E97B8] hover:bg-slate-100 dark:hover:bg-[#3A3745]"
                               )}
                             >
                               <img src={p.image} alt="" className="w-6 h-6 rounded-full object-cover shadow-sm" />
@@ -3307,10 +3368,10 @@ export default function App() {
                     {showPersonSelector && (
                       <div className="flex items-center gap-2 px-1 pt-1">
                         <div className="relative flex-1">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9C958B] font-medium text-sm pointer-events-none">@</span>
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9E97B8] font-medium text-sm pointer-events-none">@</span>
                           <Input
                             placeholder="usuário ou nome novo"
-                            className="h-11 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-sm pl-9 pr-4"
+                            className="h-11 rounded-xl border-none bg-white dark:bg-[#302D3A] font-normal text-sm pl-9 pr-4"
                             value={quickAssignQuery}
                             onChange={(e) => setQuickAssignQuery(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleQuickAssignPerson()}
@@ -3331,8 +3392,8 @@ export default function App() {
                   {personSplits.length > 0 && (
                     <div className="space-y-4 pt-2">
                       <div className="flex items-center justify-between px-1">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B]">Configurar divisões</Label>
-                        <div className="flex bg-slate-100 dark:bg-[#3f3f3f] p-1 rounded-xl border border-slate-200 dark:border-[#4f4f4f] shadow-sm overflow-hidden min-w-[180px]">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8]">Configurar divisões</Label>
+                        <div className="flex bg-slate-100 dark:bg-[#3A3745] p-1 rounded-xl border border-slate-200 dark:border-[#4A4658] shadow-sm overflow-hidden min-w-[180px]">
                           {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
                             <button
                               key={type}
@@ -3357,7 +3418,7 @@ export default function App() {
                               }}
                               className={cn(
                                 "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
-                                globalSplitType === type ? "bg-white dark:bg-[#3A3A3A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9C958B] hover:text-slate-600 dark:hover:text-[#D4CFC7]"
+                                globalSplitType === type ? "bg-white dark:bg-[#302D3A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9E97B8] hover:text-slate-600 dark:hover:text-[#D1CCE0]"
                               )}
                             >
                               {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
@@ -3371,14 +3432,14 @@ export default function App() {
                           {personSplits.map((split, index) => {
                             const person = people.find(p => p.id === split.personId);
                             return (
-                              <div key={index} className="bg-slate-50/50 dark:bg-[#333333]/50 p-5 rounded-[2rem] border border-slate-100 dark:border-[#454545] space-y-4 group hover:border-primary/20 transition-all">
+                              <div key={index} className="bg-slate-50/50 dark:bg-[#28262F]/50 p-5 rounded-[2rem] border border-slate-100 dark:border-[#423F4E] space-y-4 group hover:border-primary/20 transition-all">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white dark:bg-[#3A3A3A] shadow-sm flex items-center justify-center overflow-hidden border border-slate-50 dark:border-[#3f3f3f]">
+                                    <div className="w-12 h-12 rounded-2xl bg-white dark:bg-[#302D3A] shadow-sm flex items-center justify-center overflow-hidden border border-slate-50 dark:border-[#3A3745]">
                                       <img src={person?.image} alt="" className="w-full h-full object-cover" />
                                     </div>
                                     <div>
-                                      <p className="text-sm font-medium text-slate-700 dark:text-[#E5E1DB]">{person?.name}</p>
+                                      <p className="text-sm font-medium text-slate-700 dark:text-[#E7E3EF]">{person?.name}</p>
                                       <p className="text-xs font-medium text-primary">
                                         {(() => {
                                           const amount = parseCurrency(amountInput);
@@ -3391,12 +3452,12 @@ export default function App() {
                                 </div>
                                 
                                 <div className="flex items-center justify-between gap-4">
-                                  <p className="text-xs font-normal text-slate-400 dark:text-[#9C958B] ml-1">
+                                  <p className="text-xs font-normal text-slate-400 dark:text-[#9E97B8] ml-1">
                                     {split.type === 'parts' ? 'Quantas partes desse valor?' : split.type === 'percentage' ? 'Qual percentual do total?' : 'Qual o valor exato?'}
                                   </p>
                                   <div className="relative w-40">
                                     <Input 
-                                      className="h-12 rounded-2xl border-none bg-white dark:bg-[#3A3A3A] font-medium text-sm px-6 text-right shadow-sm focus:ring-2 focus:ring-primary/10"
+                                      className="h-12 rounded-2xl border-none bg-white dark:bg-[#302D3A] font-medium text-sm px-6 text-right shadow-sm focus:ring-2 focus:ring-primary/10"
                                       value={split.value}
                                       onChange={(e) => {
                                         setPersonSplits(prev => prev.map((s, i) => {
@@ -3407,8 +3468,8 @@ export default function App() {
                                         }));
                                       }}
                                     />
-                                    {split.type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#7D766C]">%</span>}
-                                    {split.type === 'value' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-200 dark:text-[#676057]">R$</span>}
+                                    {split.type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#7A7390]">%</span>}
+                                    {split.type === 'value' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-200 dark:text-[#6B6480]">R$</span>}
                                   </div>
                                 </div>
                               </div>
@@ -3416,17 +3477,17 @@ export default function App() {
                           })}
                         </div>
                       ) : (
-                        <div className="bg-slate-50/50 dark:bg-[#333333]/50 p-6 rounded-[2rem] border border-slate-100 dark:border-[#454545] space-y-4">
+                        <div className="bg-slate-50/50 dark:bg-[#28262F]/50 p-6 rounded-[2rem] border border-slate-100 dark:border-[#423F4E] space-y-4">
                           <div className="space-y-4">
                             {personSplits.map((split, index) => {
                               const person = people.find(p => p.id === split.personId);
                               return (
-                                <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-100 dark:border-[#454545] last:border-0 last:pb-0">
-                                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white dark:border-[#3A3A3A] shadow-sm shrink-0">
+                                <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-100 dark:border-[#423F4E] last:border-0 last:pb-0">
+                                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white dark:border-[#302D3A] shadow-sm shrink-0">
                                     <img src={person?.image} alt="" className="w-full h-full object-cover" />
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-slate-700 dark:text-[#E5E1DB] truncate">{person?.name}</p>
+                                    <p className="text-xs font-medium text-slate-700 dark:text-[#E7E3EF] truncate">{person?.name}</p>
                                     <p className="text-[10px] font-normal text-primary">
                                       {(() => {
                                         const amount = parseCurrency(amountInput);
@@ -3438,7 +3499,7 @@ export default function App() {
                                   <div className="flex items-center gap-3">
                                     <div className="relative w-28">
                                       <input 
-                                        className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
+                                        className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#302D3A] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
                                         value={split.value}
                                         onChange={(e) => {
                                           setPersonSplits(prev => prev.map((s, i) => {
@@ -3449,7 +3510,7 @@ export default function App() {
                                           }));
                                         }}
                                       />
-                                      {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#7D766C]">%</span>}
+                                      {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#7A7390]">%</span>}
                                     </div>
                                   </div>
                                 </div>
@@ -3462,36 +3523,36 @@ export default function App() {
                   )}
 
                   <div className="space-y-3">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Repetição</Label>
-                  <div className="p-6 bg-slate-50 dark:bg-[#333333] rounded-[1.5rem] space-y-4">
-                    <div className="flex bg-white dark:bg-[#3A3A3A] rounded-2xl p-1 shadow-sm">
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Repetição</Label>
+                  <div className="p-6 bg-slate-50 dark:bg-[#28262F] rounded-[1.5rem] space-y-4">
+                    <div className="flex bg-white dark:bg-[#302D3A] rounded-2xl p-1 shadow-sm">
                       <button
                         type="button"
                         onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
-                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", !isRecurrent && !isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", !isRecurrent && !isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}
                       >
                         Única vez
                       </button>
                       <button
                         type="button"
                         onClick={() => { setIsRecurrent(true); setIsInstallment(false); }}
-                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isRecurrent ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isRecurrent ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}
                       >
                         Recorrente
                       </button>
                       <button
                         type="button"
                         onClick={() => { setIsInstallment(true); setIsRecurrent(false); }}
-                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}
+                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}
                       >
                         Parcelado
                       </button>
                     </div>
 
                     {isRecurrent && (
-                      <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-[#4f4f4f] transition-all animate-in fade-in slide-in-from-top-2">
+                      <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-[#4A4658] transition-all animate-in fade-in slide-in-from-top-2">
                         <div className="flex items-center gap-3 mb-1">
-                          <div className="p-2 bg-white dark:bg-[#3A3A3A] rounded-xl shadow-sm">
+                          <div className="p-2 bg-white dark:bg-[#302D3A] rounded-xl shadow-sm">
                             <CalendarIcon size={16} className="text-primary" />
                           </div>
                           <div>
@@ -3508,7 +3569,7 @@ export default function App() {
                                 setNewTransaction({...newTransaction, recurrenceEndDate: `${year}-${m}`});
                               }}
                             >
-                              <SelectTrigger className="h-12 border-none bg-white dark:bg-[#3A3A3A] rounded-2xl font-normal text-sm px-6 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all">
+                              <SelectTrigger className="h-12 border-none bg-white dark:bg-[#302D3A] rounded-2xl font-normal text-sm px-6 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all">
                                 <SelectValue placeholder="Mês" />
                               </SelectTrigger>
                               <SelectContent className="rounded-2xl border-none shadow-deep">
@@ -3527,7 +3588,7 @@ export default function App() {
                                 setNewTransaction({...newTransaction, recurrenceEndDate: `${y}-${month}`});
                               }}
                             >
-                              <SelectTrigger className="h-12 border-none bg-white dark:bg-[#3A3A3A] rounded-2xl font-normal text-sm px-6 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all">
+                              <SelectTrigger className="h-12 border-none bg-white dark:bg-[#302D3A] rounded-2xl font-normal text-sm px-6 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all">
                                 <SelectValue placeholder="Ano" />
                               </SelectTrigger>
                               <SelectContent className="rounded-2xl border-none shadow-deep">
@@ -3541,11 +3602,11 @@ export default function App() {
 
                         <div className="space-y-2 pt-2">
                           <Label className="text-[9px] font-normal text-primary/40 ml-1">Quando lançar todo mês</Label>
-                          <div className="flex bg-white dark:bg-[#3A3A3A] rounded-2xl p-1 shadow-sm">
-                            <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}>
+                          <div className="flex bg-white dark:bg-[#302D3A] rounded-2xl p-1 shadow-sm">
+                            <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}>
                               Dia fixo
                             </button>
-                            <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9C958B]")}>
+                            <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#9E97B8]")}>
                               Dia útil
                             </button>
                           </div>
@@ -3555,11 +3616,11 @@ export default function App() {
                                 type="number"
                                 min="1"
                                 max="23"
-                                className="h-11 w-20 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-medium text-sm text-center shadow-sm px-2"
+                                className="h-11 w-20 rounded-xl border-none bg-white dark:bg-[#302D3A] font-medium text-sm text-center shadow-sm px-2"
                                 value={recurrenceBusinessDay}
                                 onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
                               />
-                              <span className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
+                              <span className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
                             </div>
                           )}
                         </div>
@@ -3567,13 +3628,13 @@ export default function App() {
                     )}
 
                     {isInstallment && (
-                      <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-[#4f4f4f] transition-all animate-in fade-in slide-in-from-top-2">
+                      <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-[#4A4658] transition-all animate-in fade-in slide-in-from-top-2">
                         <Label className="text-[10px] font-medium tracking-wider text-primary ml-1">Quantidade de Parcelas</Label>
                         <Input
                           type="number" 
                           min="2" 
                           max="84"
-                          className="h-12 border-none bg-white dark:bg-[#3A3A3A] rounded-xl font-normal text-base px-6 shadow-sm"
+                          className="h-12 border-none bg-white dark:bg-[#302D3A] rounded-xl font-normal text-base px-6 shadow-sm"
                           value={installmentCount ?? 2}
                           onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value)))}
                         />
@@ -3592,7 +3653,7 @@ export default function App() {
                           Associar receita
                           <Popover>
                             <PopoverTrigger render={
-                              <button className="h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-[#3A3A3A] shadow-sm hover:scale-110 active:scale-95 transition-all outline-none">
+                              <button className="h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-[#302D3A] shadow-sm hover:scale-110 active:scale-95 transition-all outline-none">
                                 <Info size={14} className="text-indigo-400" />
                               </button>
                             } />
@@ -3622,8 +3683,8 @@ export default function App() {
                   )}
 
                   {newTransaction.type !== 'card_purchase' && (
-                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#333333] px-5 h-16 rounded-2xl border border-slate-100 dark:border-[#454545] shadow-sm flex-1">
-                    <Label htmlFor="status-d" className="text-sm font-medium text-slate-500 dark:text-[#B5AFA6] cursor-pointer flex-1">
+                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#28262F] px-5 h-16 rounded-2xl border border-slate-100 dark:border-[#423F4E] shadow-sm flex-1">
+                    <Label htmlFor="status-d" className="text-sm font-medium text-slate-500 dark:text-[#B4AFC9] cursor-pointer flex-1">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
                     <ToggleSwitch
@@ -3639,19 +3700,19 @@ export default function App() {
                     <p className="text-[10px] font-medium tracking-wider text-indigo-400 ml-1 mb-2">Lançamento vinculado</p>
                     {(() => {
                       const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
-                      if (!linked) return <p className="text-xs font-normal text-slate-300 dark:text-[#7D766C] italic ml-1 font-heading">Lançamento original não encontrado</p>;
+                      if (!linked) return <p className="text-xs font-normal text-slate-300 dark:text-[#7A7390] italic ml-1 font-heading">Lançamento original não encontrado</p>;
                       return (
                         <div
                           onClick={() => handleEditClick(linked)}
                           className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#3A3A3A] shadow-sm flex items-center justify-center text-indigo-500">
+                            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#302D3A] shadow-sm flex items-center justify-center text-indigo-500">
                               {linked.type === 'income' ? <ArrowUpCircle size={16} strokeWidth={3} /> : <CreditCard size={16} strokeWidth={3} />}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-normal text-slate-700 dark:text-[#E5E1DB] truncate">{linked.description}</p>
-                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <p className="text-sm font-normal text-slate-700 dark:text-[#E7E3EF] truncate">{linked.description}</p>
+                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                             </div>
                           </div>
                           <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform" />
@@ -3669,7 +3730,7 @@ export default function App() {
                         setIsDeleteDialogOpen(true);
                       }}
                       variant="outline"
-                      className="w-16 h-16 rounded-2xl bg-rose-50 border-none text-rose-400 hover:bg-rose-100 transition-all flex items-center justify-center shrink-0"
+                      className="w-16 h-16 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border-none text-rose-400 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all flex items-center justify-center shrink-0"
                     >
                       <Trash2 size={24} />
                     </Button>
@@ -3685,7 +3746,7 @@ export default function App() {
       </div>
 
       {/* Bottom Navigation - Mobile */}
-      <nav className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 w-[90vw] h-20 bg-white dark:bg-[#3A3A3A] shadow-bubbly flex items-center justify-start gap-1 pl-3 pr-20 z-40 rounded-[2rem] border border-slate-100 dark:border-[#4a4a4a]">
+      <nav className="md:hidden fixed bottom-4 left-[5vw] w-[calc(90vw-5.75rem)] h-20 bg-white dark:bg-[#302D3A] shadow-bubbly flex items-center justify-around px-1 z-40 rounded-[2rem] border border-slate-100 dark:border-[#4A4658]">
         <MobileNavItem
           active={activeTab === 'visao-geral'}
           onClick={() => setActiveTab('visao-geral')}
@@ -3710,26 +3771,26 @@ export default function App() {
               <button
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 px-1.5 py-1 rounded-2xl transition-all duration-500 relative min-w-[44px]",
-                  isProfileOpen ? "active:scale-90" : "text-slate-400 dark:text-[#9C958B]"
+                  isProfileOpen ? "active:scale-90" : "text-slate-400 dark:text-[#9E97B8]"
                 )}
               >
-                <div className={cn("w-6 h-6 rounded-full overflow-hidden border-2 transition-all duration-500 border-white dark:border-[#3A3A3A] shadow-soft flex items-center justify-center bg-primary/10 text-primary font-medium text-[10px]", isProfileOpen ? "ring-2 ring-primary scale-110" : "")}>
+                <div className={cn("w-6 h-6 rounded-full overflow-hidden border-2 transition-all duration-500 border-white dark:border-[#302D3A] shadow-soft flex items-center justify-center bg-primary/10 text-primary font-medium text-[10px]", isProfileOpen ? "ring-2 ring-primary scale-110" : "")}>
                   {(userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()}
                 </div>
-                <span className={cn("text-[9px] font-normal tracking-tight transition-all", isProfileOpen ? "text-primary opacity-100" : "text-slate-400 dark:text-[#9C958B] opacity-60")}>
+                <span className={cn("text-[9px] font-normal tracking-tight transition-all", isProfileOpen ? "text-primary opacity-100" : "text-slate-400 dark:text-[#9E97B8] opacity-60")}>
                   Conta
                 </span>
               </button>
             }
           />
-          <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#FAF7F2] dark:bg-[#201F26] sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:w-screen sm:max-w-none sm:translate-x-0 sm:rounded-none">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-[#454545] shrink-0 bg-white dark:bg-[#3A3A3A] flex items-center gap-3">
+          <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#FAF7F2] dark:bg-[#1C1B22] sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:w-screen sm:max-w-none sm:translate-x-0 sm:rounded-none">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-[#423F4E] shrink-0 bg-white dark:bg-[#302D3A] flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white font-medium text-sm shrink-0">
                 {(userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <DialogHeader className="min-w-0">
                 <DialogTitle className="text-base font-medium text-slate-800 dark:text-[#EDE9E3] truncate">Minha conta</DialogTitle>
-                <DialogDescription className="text-[11px] font-normal text-slate-400 dark:text-[#9C958B] truncate">
+                <DialogDescription className="text-[11px] font-normal text-slate-400 dark:text-[#9E97B8] truncate">
                   {userProfile?.username ? `@${userProfile.username} · ` : ''}{user?.email}
                 </DialogDescription>
               </DialogHeader>
@@ -3804,7 +3865,7 @@ export default function App() {
                   />
                 </AccountSection>
 
-                <p className="text-[10px] font-normal text-slate-300 dark:text-[#7D766C] text-center">Feito com carinho, por edinho</p>
+                <p className="text-[10px] font-normal text-slate-300 dark:text-[#7A7390] text-center">Feito com carinho, por edinho</p>
               </div>
             </div>
           </DialogContent>
@@ -3813,21 +3874,21 @@ export default function App() {
 
       {/* iOS Install Instructions */}
       <Dialog open={showIOSInstallHelp} onOpenChange={setShowIOSInstallHelp}>
-        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#3A3A3A]">
+        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#302D3A]">
           <div className="p-8 space-y-6 text-center">
             <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto text-primary">
               <Smartphone size={32} strokeWidth={2.5} />
             </div>
             <div className="space-y-2">
               <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Instalar no iPhone/iPad</h3>
-              <p className="text-sm font-normal text-slate-400 dark:text-[#9C958B] leading-relaxed">
+              <p className="text-sm font-normal text-slate-400 dark:text-[#9E97B8] leading-relaxed">
                 O iOS não permite instalar apps direto pelo navegador. Siga os passos:
               </p>
             </div>
-            <div className="text-left space-y-3 bg-slate-50 dark:bg-[#333333] rounded-2xl p-5">
-              <p className="text-sm font-normal text-slate-700 dark:text-[#E5E1DB]">1. Toque no ícone de compartilhar (□↑) na barra do Safari.</p>
-              <p className="text-sm font-normal text-slate-700 dark:text-[#E5E1DB]">2. Escolha "Adicionar à Tela de Início".</p>
-              <p className="text-sm font-normal text-slate-700 dark:text-[#E5E1DB]">3. Toque em "Adicionar" no canto superior direito.</p>
+            <div className="text-left space-y-3 bg-slate-50 dark:bg-[#28262F] rounded-2xl p-5">
+              <p className="text-sm font-normal text-slate-700 dark:text-[#E7E3EF]">1. Toque no ícone de compartilhar (□↑) na barra do Safari.</p>
+              <p className="text-sm font-normal text-slate-700 dark:text-[#E7E3EF]">2. Escolha "Adicionar à Tela de Início".</p>
+              <p className="text-sm font-normal text-slate-700 dark:text-[#E7E3EF]">3. Toque em "Adicionar" no canto superior direito.</p>
             </div>
             <Button onClick={() => setShowIOSInstallHelp(false)} className="w-full h-14 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white">
               Entendi
@@ -3838,70 +3899,70 @@ export default function App() {
 
       {/* Account Edit Dialog */}
       <Dialog open={isAccountEditOpen} onOpenChange={setIsAccountEditOpen}>
-        <DialogContent className="max-w-none sm:max-w-md rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#3A3A3A] max-h-[85vh] flex flex-col">
-          <div className="p-6 border-b border-slate-50 dark:border-[#3f3f3f] shrink-0">
+        <DialogContent className="max-w-none sm:max-w-md rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#302D3A] max-h-[85vh] flex flex-col">
+          <div className="p-6 border-b border-slate-50 dark:border-[#3A3745] shrink-0">
             <DialogHeader>
               <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Editar informações</DialogTitle>
-              <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#9C958B]">Atualize seus dados de conta</DialogDescription>
+              <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#9E97B8]">Atualize seus dados de conta</DialogDescription>
             </DialogHeader>
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Nome</Label>
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Nome</Label>
                 <Input
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                   value={editFirstName}
                   onChange={(e) => setEditFirstName(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Sobrenome</Label>
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Sobrenome</Label>
                 <Input
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                   value={editLastName}
                   onChange={(e) => setEditLastName(e.target.value)}
                 />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Usuário</Label>
+              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Usuário</Label>
               <div className="relative">
-                <AtSign size={15} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7D766C]" />
+                <AtSign size={15} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7A7390]" />
                 <Input
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm pl-11 pr-5"
+                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm pl-11 pr-5"
                   value={editUsername}
                   onChange={(e) => setEditUsername(e.target.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
                 />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Apelido</Label>
+              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Apelido</Label>
               <Input
                 placeholder="Como quer ser chamado no app"
-                className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                 value={editNickname}
                 onChange={(e) => setEditNickname(e.target.value)}
               />
             </div>
 
-            <div className="pt-2 border-t border-slate-50 dark:border-[#3f3f3f] space-y-4">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-[#9C958B] pt-4">Trocar senha (opcional)</p>
+            <div className="pt-2 border-t border-slate-50 dark:border-[#3A3745] space-y-4">
+              <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-[#9E97B8] pt-4">Trocar senha (opcional)</p>
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Nova senha</Label>
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Nova senha</Label>
                 <div className="relative">
-                  <KeyRound size={15} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7D766C]" />
+                  <KeyRound size={15} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7A7390]" />
                   <Input
                     type={showEditPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm pl-11 pr-12"
+                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm pl-11 pr-12"
                     value={editNewPassword}
                     onChange={(e) => setEditNewPassword(e.target.value)}
                   />
                   <button
                     type="button"
                     onClick={() => setShowEditPassword(v => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9C958B] hover:text-primary transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9E97B8] hover:text-primary transition-colors"
                   >
                     {showEditPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -3909,11 +3970,11 @@ export default function App() {
               </div>
               {editNewPassword && (
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Confirmar nova senha</Label>
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Confirmar nova senha</Label>
                   <Input
                     type={showEditPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#333333] focus:bg-white dark:focus:bg-[#3A3A3A] font-normal text-sm px-5"
+                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#28262F] focus:bg-white dark:focus:bg-[#302D3A] font-normal text-sm px-5"
                     value={editConfirmPassword}
                     onChange={(e) => setEditConfirmPassword(e.target.value)}
                   />
@@ -3925,7 +3986,7 @@ export default function App() {
               <p className="text-xs font-normal text-rose-500 bg-rose-50 rounded-xl px-4 py-3">{editError}</p>
             )}
           </div>
-          <div className="p-6 border-t border-slate-50 dark:border-[#3f3f3f] shrink-0 space-y-2">
+          <div className="p-6 border-t border-slate-50 dark:border-[#3A3745] shrink-0 space-y-2">
             <Button
               onClick={handleUpdateAccountInfo}
               disabled={editSubmitting}
@@ -3933,7 +3994,7 @@ export default function App() {
             >
               Salvar alterações
             </Button>
-            <Button variant="ghost" onClick={() => setIsAccountEditOpen(false)} className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9C958B]">
+            <Button variant="ghost" onClick={() => setIsAccountEditOpen(false)} className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9E97B8]">
               Cancelar
             </Button>
           </div>
@@ -3941,7 +4002,7 @@ export default function App() {
       </Dialog>
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex flex-col fixed left-4 top-4 bottom-4 w-72 bg-white dark:bg-[#3A3A3A] rounded-[3rem] border border-slate-100 dark:border-[#4a4a4a] shadow-bubbly p-8 z-50">
+      <aside className="hidden md:flex flex-col fixed left-4 top-4 bottom-4 w-72 bg-white dark:bg-[#302D3A] rounded-[3rem] border border-slate-100 dark:border-[#4A4658] shadow-bubbly p-8 z-50">
     <div className="flex items-center gap-4 mb-12 px-2 transition-transform hover:scale-105 duration-500">
       <div className="w-14 h-14 bg-primary rounded-[1.75rem] flex items-center justify-center text-white shadow-bubbly rotate-3">
         <Wallet size={28} strokeWidth={2.5} />
@@ -3976,21 +4037,21 @@ export default function App() {
           />
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-slate-100 dark:border-[#454545] flex flex-col gap-6">
+        <div className="mt-auto pt-6 border-t border-slate-100 dark:border-[#423F4E] flex flex-col gap-6">
           <div className="flex items-center gap-3 p-2 group cursor-pointer" onClick={() => setIsProfileOpen(true)}>
             <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white shadow-soft group-hover:rotate-6 transition-all font-medium text-lg">
               {(userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3] truncate tracking-tight">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
-              <p className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B] truncate tracking-tight">{user?.email}</p>
+              <p className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8] truncate tracking-tight">{user?.email}</p>
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 pt-4 md:p-12 md:pt-12 max-w-7xl mx-auto w-full pb-48 md:pb-12 text-slate-400 dark:text-[#9C958B]">
+      <main className="flex-1 p-6 pt-4 md:p-12 md:pt-12 max-w-7xl mx-auto w-full pb-48 md:pb-12 text-slate-400 dark:text-[#9E97B8]">
         <AnimatePresence mode="wait">
           {activeTab === 'visao-geral' && (
             <motion.div
@@ -4000,11 +4061,43 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-8 pb-32"
             >
-              <div>
-                <h2 className="text-3xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
-                  Olá, {userProfile?.nickname || 'de novo'} 👋
-                </h2>
-                <p className="text-slate-400 dark:text-[#9C958B] font-normal text-sm mt-1 capitalize">{format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}</p>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h2 className="text-3xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
+                    Olá, {userProfile?.nickname || 'de novo'} 👋
+                  </h2>
+                  <p className="text-slate-400 dark:text-[#9E97B8] font-normal text-sm mt-1 capitalize">{format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 bg-white dark:bg-[#302D3A] px-1.5 py-1.5 rounded-full shadow-soft">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95" onClick={prevMonth}>
+                      <ChevronLeft size={18} strokeWidth={3} />
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPickerMonth(format(currentDate, 'MM'));
+                        setPickerYear(format(currentDate, 'yyyy'));
+                        setIsMonthPickerOpen(true);
+                      }}
+                      className="text-sm font-normal text-center capitalize text-slate-700 dark:text-[#E7E3EF] font-heading tracking-tight px-2 hover:text-primary transition-colors whitespace-nowrap"
+                    >
+                      {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
+                    </button>
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95" onClick={nextMonth}>
+                      <ChevronRight size={18} strokeWidth={3} />
+                    </Button>
+                  </div>
+                  {!isSameMonth(currentDate, new Date()) && (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentDate(new Date())}
+                      className="h-11 px-4 rounded-full bg-white dark:bg-[#302D3A] shadow-soft text-xs font-medium text-primary shrink-0"
+                    >
+                      Hoje
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -4030,9 +4123,9 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                <ShadcnCard className="lg:col-span-3 border-none shadow-soft rounded-[2rem] bg-white dark:bg-[#3A3A3A]">
+                <ShadcnCard className="lg:col-span-3 border-none shadow-soft rounded-[2rem] bg-white dark:bg-[#302D3A]">
                   <CardContent className="p-8">
-                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#E5E1DB] mb-6">Receitas x despesas (últimos 6 meses)</h3>
+                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#E7E3EF] mb-6">Receitas x despesas (últimos 6 meses)</h3>
                     <ResponsiveContainer width="100%" height={260}>
                       <AreaChart data={evolutionData}>
                         <defs>
@@ -4055,11 +4148,11 @@ export default function App() {
                   </CardContent>
                 </ShadcnCard>
 
-                <ShadcnCard className="lg:col-span-2 border-none shadow-soft rounded-[2rem] bg-white dark:bg-[#3A3A3A]">
+                <ShadcnCard className="lg:col-span-2 border-none shadow-soft rounded-[2rem] bg-white dark:bg-[#302D3A]">
                   <CardContent className="p-8">
-                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#E5E1DB] mb-6">Principais categorias</h3>
+                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#E7E3EF] mb-6">Principais categorias</h3>
                     {chartData.length === 0 ? (
-                      <p className="text-xs font-normal text-slate-300 dark:text-[#7D766C] py-16 text-center">Sem despesas neste mês.</p>
+                      <p className="text-xs font-normal text-slate-300 dark:text-[#7A7390] py-16 text-center">Sem despesas neste mês.</p>
                     ) : (
                       <>
                         <ResponsiveContainer width="100%" height={160}>
@@ -4076,7 +4169,7 @@ export default function App() {
                           {[...chartData].sort((a, b) => b.value - a.value).slice(0, 5).map((cat, i) => (
                             <div key={cat.name} className="flex items-center gap-3">
                               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[chartData.findIndex(c => c.name === cat.name) % COLORS.length] }} />
-                              <span className="text-xs font-normal text-slate-600 dark:text-[#D4CFC7] flex-1 truncate">{cat.name}</span>
+                              <span className="text-xs font-normal text-slate-600 dark:text-[#D1CCE0] flex-1 truncate">{cat.name}</span>
                               <span className="text-xs font-medium text-slate-800 dark:text-[#EDE9E3] shrink-0">R$ {cat.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                           ))}
@@ -4088,26 +4181,26 @@ export default function App() {
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-slate-700 dark:text-[#E5E1DB] mb-4 ml-2">Devedores do mês</h3>
-                <ShadcnCard className="border-none shadow-soft rounded-2xl overflow-hidden bg-white dark:bg-[#3A3A3A]">
+                <h3 className="text-sm font-medium text-slate-700 dark:text-[#E7E3EF] mb-4 ml-2">Devedores do mês</h3>
+                <ShadcnCard className="border-none shadow-soft rounded-2xl overflow-hidden bg-white dark:bg-[#302D3A]">
                   {(() => {
                     const debtors = people
                       .map(p => ({ person: p, charges: getPersonMonthlyCharges(p.id, currentDate) }))
                       .filter(d => d.charges.pendingTotal > 0)
                       .sort((a, b) => b.charges.pendingTotal - a.charges.pendingTotal);
                     if (debtors.length === 0) {
-                      return <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#7D766C]">Ninguém deve nada neste mês. 🎉</p>;
+                      return <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#7A7390]">Ninguém deve nada neste mês. 🎉</p>;
                     }
                     return (
-                      <div className="divide-y divide-slate-100 dark:divide-[#454545]">
+                      <div className="divide-y divide-slate-100 dark:divide-[#423F4E]">
                         {debtors.map(({ person, charges }) => (
                           <button
                             key={person.id}
                             onClick={() => { setIsPessoasSummaryOpen(true); setSelectedPersonId(person.id); }}
-                            className="w-full flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-[#333333] transition-colors text-left"
+                            className="w-full flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-[#28262F] transition-colors text-left"
                           >
                             <img src={person.image || `https://picsum.photos/seed/${person.name}/100/100`} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0" />
-                            <span className="flex-1 min-w-0 font-normal text-slate-700 dark:text-[#E5E1DB] text-sm truncate">{person.name}</span>
+                            <span className="flex-1 min-w-0 font-normal text-slate-700 dark:text-[#E7E3EF] text-sm truncate">{person.name}</span>
                             <span className="font-bold text-rose-400 text-sm shrink-0">R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             <MessageCircle
                               size={16}
@@ -4123,9 +4216,9 @@ export default function App() {
               </div>
 
               <div>
-                <h3 className="text-sm font-medium text-slate-700 dark:text-[#E5E1DB] mb-4 ml-2">Lançamentos recentes</h3>
-                <ShadcnCard className="border-none shadow-soft rounded-2xl overflow-hidden bg-white dark:bg-[#3A3A3A]">
-                  <div className="divide-y divide-slate-100 dark:divide-[#454545]">
+                <h3 className="text-sm font-medium text-slate-700 dark:text-[#E7E3EF] mb-4 ml-2">Lançamentos recentes</h3>
+                <ShadcnCard className="border-none shadow-soft rounded-2xl overflow-hidden bg-white dark:bg-[#302D3A]">
+                  <div className="divide-y divide-slate-100 dark:divide-[#423F4E]">
                     {((groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'] || []).map(t => {
                       const person = people.find(p => p.id === t.payerPayee);
                       const card = cards.find(c => c.id === t.cardId);
@@ -4142,7 +4235,7 @@ export default function App() {
                       );
                     })}
                     {(!(groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'] || (groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'].length === 0) && (
-                      <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#7D766C]">Nenhum lançamento ainda.</p>
+                      <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#7A7390]">Nenhum lançamento ainda.</p>
                     )}
                   </div>
                 </ShadcnCard>
@@ -4159,12 +4252,12 @@ export default function App() {
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-2 flex-1 relative">
-                  <div className="flex bg-slate-100 dark:bg-[#3f3f3f] p-1 rounded-2xl shadow-inner">
+                  <div className="flex bg-slate-100 dark:bg-[#3A3745] p-1 rounded-2xl shadow-inner">
                     <button 
                       onClick={() => setTransactionFilter('all')}
                       className={cn(
                         "px-6 py-2.5 rounded-xl text-[10px] font-medium transition-all",
-                        transactionFilter === 'all' ? "bg-white dark:bg-[#3A3A3A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9C958B] hover:text-slate-600 dark:hover:text-[#D4CFC7]"
+                        transactionFilter === 'all' ? "bg-white dark:bg-[#302D3A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9E97B8] hover:text-slate-600 dark:hover:text-[#D1CCE0]"
                       )}
                     >
                       Todas
@@ -4173,7 +4266,7 @@ export default function App() {
                       onClick={() => setTransactionFilter('pending')}
                       className={cn(
                         "px-6 py-2.5 rounded-xl text-[10px] font-medium transition-all",
-                        transactionFilter === 'pending' ? "bg-white dark:bg-[#3A3A3A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9C958B] hover:text-slate-600 dark:hover:text-[#D4CFC7]"
+                        transactionFilter === 'pending' ? "bg-white dark:bg-[#302D3A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9E97B8] hover:text-slate-600 dark:hover:text-[#D1CCE0]"
                       )}
                     >
                       Pendentes
@@ -4183,19 +4276,19 @@ export default function App() {
                   <div className="ml-auto flex items-center gap-2">
                     <Popover>
                       <PopoverTrigger render={
-                        <Button variant="outline" className="h-11 w-11 p-0 border-none bg-slate-100/50 dark:bg-[#3f3f3f]/50 hover:bg-slate-100 dark:hover:bg-[#3f3f3f] rounded-xl shadow-sm">
+                        <Button variant="outline" className="h-11 w-11 p-0 border-none bg-slate-100/50 dark:bg-[#3A3745]/50 hover:bg-slate-100 dark:hover:bg-[#3A3745] rounded-xl shadow-sm">
                           <LayoutDashboard size={18} strokeWidth={3} className="text-primary" />
                         </Button>
                       } />
-                      <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#3A3A3A] z-50">
+                      <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#302D3A] z-50">
                         <div className="space-y-3">
-                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Agrupamento</Label>
+                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Agrupamento</Label>
                           <div className="flex flex-col gap-2">
                             <button 
                               onClick={() => setGroupMode('date')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                groupMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                                groupMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                               )}
                             >
                               Agrupar por data
@@ -4204,7 +4297,7 @@ export default function App() {
                               onClick={() => setGroupMode('category')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                groupMode === 'category' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                                groupMode === 'category' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                               )}
                             >
                               Agrupar por categoria
@@ -4213,7 +4306,7 @@ export default function App() {
                               onClick={() => setGroupMode('person')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                groupMode === 'person' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                                groupMode === 'person' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                               )}
                             >
                               Agrupar por pessoa
@@ -4225,19 +4318,19 @@ export default function App() {
 
                     <Popover>
                       <PopoverTrigger render={
-                        <Button variant="outline" className="h-11 w-11 p-0 border-none bg-slate-100/50 dark:bg-[#3f3f3f]/50 hover:bg-slate-100 dark:hover:bg-[#3f3f3f] rounded-xl shadow-sm">
+                        <Button variant="outline" className="h-11 w-11 p-0 border-none bg-slate-100/50 dark:bg-[#3A3745]/50 hover:bg-slate-100 dark:hover:bg-[#3A3745] rounded-xl shadow-sm">
                           <ArrowUpDown size={18} strokeWidth={3} className="text-primary" />
                         </Button>
                       } />
-                      <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#3A3A3A] z-50">
+                      <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#302D3A] z-50">
                         <div className="space-y-3">
-                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Ordenamento</Label>
+                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Ordenamento</Label>
                           <div className="flex flex-col gap-2">
                             <button 
                               onClick={() => setSortMode('date')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                sortMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                                sortMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                               )}
                             >
                               Por data (mais antigos primeiro)
@@ -4246,7 +4339,7 @@ export default function App() {
                               onClick={() => setSortMode('min')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                sortMode === 'min' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                                sortMode === 'min' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                               )}
                             >
                               Menor valor
@@ -4255,7 +4348,7 @@ export default function App() {
                               onClick={() => setSortMode('max')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                sortMode === 'max' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                                sortMode === 'max' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                               )}
                             >
                               Maior valor
@@ -4267,10 +4360,10 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex-1 bg-white dark:bg-[#3A3A3A] px-6 py-4 rounded-[1.75rem] border border-white dark:border-[#3A3A3A] shadow-soft flex justify-between items-center relative overflow-hidden">
+                <div className="flex-1 bg-white dark:bg-[#302D3A] px-6 py-4 rounded-[1.75rem] border border-white dark:border-[#302D3A] shadow-soft flex justify-between items-center relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary/2 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-125 duration-700"></div>
                   <div>
-                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#9C958B] tracking-widest uppercase opacity-60">Total</p>
+                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#9E97B8] tracking-widest uppercase opacity-60">Total</p>
                     <p className={cn(
                       "text-lg font-heading font-bold tracking-tighter",
                       activeTab === 'receitas' ? "text-emerald-500" : "text-rose-400"
@@ -4278,9 +4371,9 @@ export default function App() {
                       R$ {(activeTab === 'receitas' ? stats.incomeTotal : stats.expenseTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
-                  <div className="w-px h-8 bg-slate-100 dark:bg-[#3f3f3f] mx-2" />
+                  <div className="w-px h-8 bg-slate-100 dark:bg-[#3A3745] mx-2" />
                   <div className="text-right">
-                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#9C958B] tracking-widest uppercase opacity-60">Pendente</p>
+                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#9E97B8] tracking-widest uppercase opacity-60">Pendente</p>
                     <p className={cn(
                       "text-lg font-heading font-bold tracking-tighter",
                       activeTab === 'receitas' ? "text-emerald-500" : "text-rose-400"
@@ -4295,20 +4388,20 @@ export default function App() {
                 <div key={date} className="space-y-4">
                   <div className={cn("flex items-center gap-3 ml-2 group", groupIndex > 0 && "md:hidden")}>
                     <div className="w-1.5 h-6 rounded-full bg-primary/20 group-hover:bg-primary transition-colors"></div>
-                    <h3 className="text-sm font-medium tracking-tight text-slate-400 dark:text-[#9C958B] lowercase first-letter:uppercase">
+                    <h3 className="text-sm font-medium tracking-tight text-slate-400 dark:text-[#9E97B8] lowercase first-letter:uppercase">
                       {sortMode !== 'date' || groupMode === 'category' || groupMode === 'person' || activeTab === 'visao-geral' ? date : format(parseISO(date), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                     </h3>
                   </div>
-                  <ShadcnCard className="border-none shadow-soft rounded-[1.25rem] md:rounded-2xl overflow-hidden py-0 md:py-4 bg-white dark:bg-[#3A3A3A]">
+                  <ShadcnCard className="border-none shadow-soft rounded-[1.25rem] md:rounded-2xl overflow-hidden py-0 md:py-4 bg-white dark:bg-[#302D3A]">
                     {/* Mobile: card list */}
-                    <div className="md:hidden divide-y divide-slate-100 dark:divide-[#454545]">
+                    <div className="md:hidden divide-y divide-slate-100 dark:divide-[#423F4E]">
                       {items.map(t => {
                         const person = people.find(p => p.id === t.payerPayee);
                         const card = cards.find(c => c.id === t.cardId);
                         return (
                           <div
                             key={t.id}
-                            className="hover:bg-white dark:hover:bg-[#3A3A3A]/80 transition-all duration-300"
+                            className="hover:bg-white dark:hover:bg-[#302D3A]/80 transition-all duration-300"
                           >
                             <TransactionItem
                               transaction={t}
@@ -4328,14 +4421,14 @@ export default function App() {
                     {/* Desktop: table */}
                     <Table className="hidden md:table">
                       <TableHeader>
-                        <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#454545]">
+                        <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#423F4E]">
                           <TableHead className="w-10 pl-6"></TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Data</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Descrição</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Categoria</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Pessoa</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Status</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B] text-right pr-6">Valor</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Data</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Descrição</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Categoria</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Pessoa</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Status</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8] text-right pr-6">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -4347,7 +4440,7 @@ export default function App() {
                             <TableRow
                               key={t.id}
                               onClick={() => handleTransactionClick(t)}
-                              className="cursor-pointer border-slate-50 dark:border-[#3f3f3f] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                              className="cursor-pointer border-slate-50 dark:border-[#3A3745] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                             >
                               <TableCell className="pl-6">
                                 {t.status === 'actual' ? (
@@ -4359,25 +4452,25 @@ export default function App() {
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handleQuickConfirm(t); }}
                                     title={t.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
-                                    className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#4f4f4f] hover:border-primary hover:bg-primary/10 active:scale-90 transition-all flex items-center justify-center text-transparent hover:text-primary"
+                                    className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#4A4658] hover:border-primary hover:bg-primary/10 active:scale-90 transition-all flex items-center justify-center text-transparent hover:text-primary"
                                   >
                                     <CheckCircle2 size={14} strokeWidth={3} />
                                   </button>
                                 )}
                               </TableCell>
-                              <TableCell className="text-xs font-normal text-slate-400 dark:text-[#9C958B]">{format(parseISO(t.date), 'dd/MM/yyyy')}</TableCell>
-                              <TableCell className="font-normal text-slate-700 dark:text-[#E5E1DB] max-w-xs truncate">
+                              <TableCell className="text-xs font-normal text-slate-400 dark:text-[#9E97B8]">{format(parseISO(t.date), 'dd/MM/yyyy')}</TableCell>
+                              <TableCell className="font-normal text-slate-700 dark:text-[#E7E3EF] max-w-xs truncate">
                                 <span className="flex items-center gap-2">
                                   {t.description}
-                                  {card && <Badge variant="outline" className="rounded-md text-[9px] border-none px-2 h-4 bg-indigo-50 text-indigo-500 font-medium shrink-0">{card.name}</Badge>}
+                                  {card && <Badge variant="outline" className="rounded-md text-[9px] border-none px-2 h-4 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 font-medium shrink-0">{card.name}</Badge>}
                                 </span>
                               </TableCell>
-                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B5AFA6]">{t.category}</TableCell>
-                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B5AFA6]">{person?.name || '—'}</TableCell>
+                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B4AFC9]">{t.category}</TableCell>
+                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B4AFC9]">{person?.name || '—'}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={cn(
                                   "rounded-md text-[9px] border-none px-2 h-5 uppercase font-medium",
-                                  t.status === 'actual' ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 dark:bg-[#3f3f3f] text-slate-400 dark:text-[#9C958B]"
+                                  t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#3A3745] text-slate-400 dark:text-[#9E97B8]"
                                 )}>
                                   {t.status === 'actual' ? 'Confirmado' : 'Planejado'}
                                 </Badge>
@@ -4413,7 +4506,7 @@ export default function App() {
                     onClick={() => setSelectedCard(null)}
                     className={cn(
                       "px-5 py-2.5 rounded-xl text-[10px] font-medium whitespace-nowrap transition-all shrink-0",
-                      !selectedCard ? "bg-primary text-white shadow-lg shadow-primary/20 scale-105" : "bg-white dark:bg-[#3A3A3A] text-slate-400 dark:text-[#9C958B] hover:bg-slate-50 dark:hover:bg-[#333333] border border-slate-100 dark:border-[#454545] shadow-sm"
+                      !selectedCard ? "bg-primary text-white shadow-lg shadow-primary/20 scale-105" : "bg-white dark:bg-[#302D3A] text-slate-400 dark:text-[#9E97B8] hover:bg-slate-50 dark:hover:bg-[#28262F] border border-slate-100 dark:border-[#423F4E] shadow-sm"
                     )}
                   >
                     Meus Cartões
@@ -4424,7 +4517,7 @@ export default function App() {
                       onClick={() => setSelectedCard(card.id)}
                       className={cn(
                         "px-5 py-2.5 rounded-xl text-[10px] font-medium whitespace-nowrap transition-all shrink-0",
-                        selectedCard === card.id ? "text-white shadow-lg shadow-primary/10 scale-105" : "bg-white dark:bg-[#3A3A3A] text-slate-400 dark:text-[#9C958B] hover:bg-slate-50 dark:hover:bg-[#333333] border border-slate-100 dark:border-[#454545] shadow-sm"
+                        selectedCard === card.id ? "text-white shadow-lg shadow-primary/10 scale-105" : "bg-white dark:bg-[#302D3A] text-slate-400 dark:text-[#9E97B8] hover:bg-slate-50 dark:hover:bg-[#28262F] border border-slate-100 dark:border-[#423F4E] shadow-sm"
                       )}
                       style={{ 
                         backgroundColor: selectedCard === card.id ? card.color : undefined,
@@ -4436,22 +4529,22 @@ export default function App() {
                   ))}
                 </div>
 
-                <div className="flex items-center gap-2 pl-2 shrink-0 border-l border-slate-100/50 dark:border-[#454545]/50">
+                <div className="flex items-center gap-2 pl-2 shrink-0 border-l border-slate-100/50 dark:border-[#423F4E]/50">
                   <Popover>
                     <PopoverTrigger render={
-                      <Button variant="outline" className="h-10 w-10 p-0 border-none bg-slate-100/50 dark:bg-[#3f3f3f]/50 hover:bg-slate-100 dark:hover:bg-[#3f3f3f] rounded-xl transition-all active:scale-95">
+                      <Button variant="outline" className="h-10 w-10 p-0 border-none bg-slate-100/50 dark:bg-[#3A3745]/50 hover:bg-slate-100 dark:hover:bg-[#3A3745] rounded-xl transition-all active:scale-95">
                         <ArrowUpDown size={16} strokeWidth={3} className="text-primary" />
                       </Button>
                     } />
-                    <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#3A3A3A] z-50">
+                    <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#302D3A] z-50">
                       <div className="space-y-3">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1 uppercase">Ordenamento</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1 uppercase">Ordenamento</Label>
                         <div className="flex flex-col gap-2">
                           <button 
                             onClick={() => setSortMode('date')}
                             className={cn(
                               "w-full py-3.5 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                              sortMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                              sortMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                             )}
                           >
                             Por data (mais antigos primeiro)
@@ -4460,7 +4553,7 @@ export default function App() {
                             onClick={() => setSortMode('min')}
                             className={cn(
                               "w-full py-3.5 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                              sortMode === 'min' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                              sortMode === 'min' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                             )}
                           >
                             Menor valor
@@ -4469,7 +4562,7 @@ export default function App() {
                             onClick={() => setSortMode('max')}
                             className={cn(
                               "w-full py-3.5 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                              sortMode === 'max' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                              sortMode === 'max' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                             )}
                           >
                             Maior valor
@@ -4483,17 +4576,17 @@ export default function App() {
 
               {Object.entries(groupedTransactions as Record<string, Transaction[]>).map(([date, items], groupIndex) => (
                 <div key={date} className="space-y-3">
-                  <h3 className={cn("text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-2", groupIndex > 0 && "md:hidden")}>
+                  <h3 className={cn("text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-2", groupIndex > 0 && "md:hidden")}>
                     {sortMode !== 'date' || groupMode === 'category' || groupMode === 'person' ? date : format(parseISO(date), "dd 'de' MMMM", { locale: ptBR })}
                   </h3>
                   <ShadcnCard className="border-none shadow-sm rounded-[1.25rem] md:rounded-2xl overflow-hidden py-0 md:py-4">
                     {/* Mobile: card list */}
-                    <div className="md:hidden divide-y divide-slate-50 dark:divide-[#3f3f3f]">
+                    <div className="md:hidden divide-y divide-slate-50 dark:divide-[#3A3745]">
                       {items.map(t => {
                         const person = people.find(p => p.id === t.payerPayee);
                         const card = cards.find(c => c.id === t.cardId);
                         return (
-                          <div key={t.id} className="p-1 hover:bg-slate-50 dark:hover:bg-[#333333] transition-colors">
+                          <div key={t.id} className="p-1 hover:bg-slate-50 dark:hover:bg-[#28262F] transition-colors">
                             <TransactionItem
                               transaction={t}
                               personName={person?.name}
@@ -4511,14 +4604,14 @@ export default function App() {
                     {/* Desktop: table */}
                     <Table className="hidden md:table">
                       <TableHeader>
-                        <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#454545]">
+                        <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#423F4E]">
                           <TableHead className="w-10 pl-6"></TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Data</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Descrição</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Categoria</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Cartão</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B]">Pessoa</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9C958B] text-right pr-6">Valor</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Data</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Descrição</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Categoria</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Cartão</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8]">Pessoa</TableHead>
+                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#9E97B8] text-right pr-6">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -4529,7 +4622,7 @@ export default function App() {
                             <TableRow
                               key={t.id}
                               onClick={() => handleTransactionClick(t)}
-                              className="cursor-pointer border-slate-50 dark:border-[#3f3f3f] hover:bg-slate-50 dark:hover:bg-[#333333]"
+                              className="cursor-pointer border-slate-50 dark:border-[#3A3745] hover:bg-slate-50 dark:hover:bg-[#28262F]"
                             >
                               <TableCell className="pl-6">
                                 {t.status === 'actual' ? (
@@ -4541,16 +4634,16 @@ export default function App() {
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handleQuickConfirm(t); }}
                                     title="Marcar como pago"
-                                    className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#4f4f4f] hover:border-primary hover:bg-primary/10 active:scale-90 transition-all flex items-center justify-center text-transparent hover:text-primary"
+                                    className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#4A4658] hover:border-primary hover:bg-primary/10 active:scale-90 transition-all flex items-center justify-center text-transparent hover:text-primary"
                                   >
                                     <CheckCircle2 size={14} strokeWidth={3} />
                                   </button>
                                 )}
                               </TableCell>
-                              <TableCell className="text-xs font-normal text-slate-400 dark:text-[#9C958B]">{format(parseISO(t.date), 'dd/MM/yyyy')}</TableCell>
-                              <TableCell className="font-normal text-slate-700 dark:text-[#E5E1DB] max-w-xs truncate">{t.description}</TableCell>
-                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B5AFA6]">{t.category}</TableCell>
-                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B5AFA6]">
+                              <TableCell className="text-xs font-normal text-slate-400 dark:text-[#9E97B8]">{format(parseISO(t.date), 'dd/MM/yyyy')}</TableCell>
+                              <TableCell className="font-normal text-slate-700 dark:text-[#E7E3EF] max-w-xs truncate">{t.description}</TableCell>
+                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B4AFC9]">{t.category}</TableCell>
+                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B4AFC9]">
                                 {card && (
                                   <span className="inline-flex items-center gap-1.5">
                                     <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: card.color }} />
@@ -4558,7 +4651,7 @@ export default function App() {
                                   </span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B5AFA6]">{person?.name || '—'}</TableCell>
+                              <TableCell className="text-xs font-normal text-slate-500 dark:text-[#B4AFC9]">{person?.name || '—'}</TableCell>
                               <TableCell className="text-right font-bold font-heading tracking-tight text-rose-400 pr-6">
                                 R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </TableCell>
@@ -4577,16 +4670,16 @@ export default function App() {
 
       {/* Pessoas Management Modal */}
       <Dialog open={isPessoasOpen} onOpenChange={(open) => { setIsPessoasOpen(open); if (!open) handleCancelEditPerson(); }}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none overflow-hidden flex flex-col p-0 border-none shadow-deep z-[60] bg-white dark:bg-[#3A3A3A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
-          <div className="p-8 bg-white dark:bg-[#3A3A3A] flex flex-col h-full overflow-hidden">
+        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none overflow-hidden flex flex-col p-0 border-none shadow-deep z-[60] bg-white dark:bg-[#302D3A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+          <div className="p-8 bg-white dark:bg-[#302D3A] flex flex-col h-full overflow-hidden">
             <DialogHeader className="shrink-0 mb-6">
               <DialogTitle className="text-2xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Gerenciar pessoas</DialogTitle>
-              <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#9C958B] tracking-tight mt-1">Sua rede de contatos</DialogDescription>
+              <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#9E97B8] tracking-tight mt-1">Sua rede de contatos</DialogDescription>
             </DialogHeader>
 
             <ScrollArea className="flex-1 -mx-2 px-2 overflow-y-auto">
               <div className="space-y-8 pr-2 pb-10">
-                <div className="space-y-5 p-6 bg-slate-50 dark:bg-[#333333] rounded-[2rem] border-none shadow-inner">
+                <div className="space-y-5 p-6 bg-slate-50 dark:bg-[#28262F] rounded-[2rem] border-none shadow-inner">
                   {editingPerson && (
                     <div className="flex items-center justify-between bg-primary/10 text-primary text-xs font-medium rounded-xl px-4 py-2.5">
                       <span>Editando "{editingPerson.name}"</span>
@@ -4598,12 +4691,12 @@ export default function App() {
                   <div className="flex gap-6 items-center">
                     <button 
                       onClick={() => fileInputRef.current?.click()}
-                      className="w-20 h-20 rounded-3xl bg-white dark:bg-[#3A3A3A] border-2 border-dashed border-slate-200 dark:border-[#4f4f4f] flex items-center justify-center overflow-hidden hover:border-primary transition-all group shrink-0 shadow-sm"
+                      className="w-20 h-20 rounded-3xl bg-white dark:bg-[#302D3A] border-2 border-dashed border-slate-200 dark:border-[#4A4658] flex items-center justify-center overflow-hidden hover:border-primary transition-all group shrink-0 shadow-sm"
                     >
                       {newPersonImage ? (
                         <img src={newPersonImage} alt="Preview" className="w-full h-full object-cover" />
                       ) : (
-                        <Users size={32} className="text-slate-300 dark:text-[#7D766C] group-hover:text-primary" />
+                        <Users size={32} className="text-slate-300 dark:text-[#7A7390] group-hover:text-primary" />
                       )}
                     </button>
                     <input 
@@ -4614,10 +4707,10 @@ export default function App() {
                       onChange={handleImageChange} 
                     />
                     <div className="flex-1 space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Nome</Label>
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Nome</Label>
                       <Input 
                         placeholder="Ex: Edson" 
-                        className="h-12 rounded-2xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-sm px-5"
+                        className="h-12 rounded-2xl border-none bg-white dark:bg-[#302D3A] font-normal text-sm px-5"
                         value={newPersonName || ''}
                         onChange={(e) => setNewPersonName(e.target.value)}
                       />
@@ -4626,19 +4719,19 @@ export default function App() {
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">E-mail</Label>
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">E-mail</Label>
                       <Input 
                         placeholder="contato@edson.com" 
-                        className="h-12 rounded-2xl border-none bg-white dark:bg-[#3A3A3A] font-medium text-xs px-5 shadow-sm"
+                        className="h-12 rounded-2xl border-none bg-white dark:bg-[#302D3A] font-medium text-xs px-5 shadow-sm"
                         value={newPersonEmail || ''}
                         onChange={(e) => setNewPersonEmail(e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Telefone</Label>
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Telefone</Label>
                       <Input 
                         placeholder="(00) 00000-0000" 
-                        className="h-12 rounded-2xl border-none bg-white dark:bg-[#3A3A3A] font-medium text-xs px-5 shadow-sm"
+                        className="h-12 rounded-2xl border-none bg-white dark:bg-[#302D3A] font-medium text-xs px-5 shadow-sm"
                         value={newPersonPhone || ''}
                         onChange={(e) => setNewPersonPhone(e.target.value)}
                       />
@@ -4646,49 +4739,49 @@ export default function App() {
                   </div>
 
                   <div className="space-y-2 relative">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Vincular a um usuário do app (opcional)</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Vincular a um usuário do app (opcional)</Label>
                     {personLinkSelected ? (
-                      <div className="h-12 rounded-2xl bg-white dark:bg-[#3A3A3A] shadow-sm flex items-center justify-between px-5">
+                      <div className="h-12 rounded-2xl bg-white dark:bg-[#302D3A] shadow-sm flex items-center justify-between px-5">
                         <span className="flex items-center gap-2 font-normal text-sm text-primary">
                           <UserCheck size={16} />
                           @{personLinkSelected.username}
                         </span>
-                        <button type="button" onClick={() => { setPersonLinkSelected(null); setPersonLinkQuery(''); }} className="text-slate-300 dark:text-[#7D766C] hover:text-rose-400">
+                        <button type="button" onClick={() => { setPersonLinkSelected(null); setPersonLinkQuery(''); }} className="text-slate-300 dark:text-[#7A7390] hover:text-rose-400">
                           <Trash2 size={14} />
                         </button>
                       </div>
                     ) : (
                       <div className="relative">
-                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9C958B] font-medium text-sm pointer-events-none">@</span>
+                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9E97B8] font-medium text-sm pointer-events-none">@</span>
                         <Input
                           placeholder="usuario"
-                          className="h-12 rounded-2xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-sm pl-9 pr-5 shadow-sm"
+                          className="h-12 rounded-2xl border-none bg-white dark:bg-[#302D3A] font-normal text-sm pl-9 pr-5 shadow-sm"
                           value={personLinkQuery}
                           onChange={(e) => setPersonLinkQuery(e.target.value.replace(/^@+/, ''))}
                         />
                       </div>
                     )}
                     {!personLinkSelected && personLinkQuery.trim() && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#3A3A3A] rounded-2xl shadow-deep border border-slate-50 dark:border-[#3f3f3f] z-20 overflow-hidden max-h-48 overflow-y-auto">
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#302D3A] rounded-2xl shadow-deep border border-slate-50 dark:border-[#3A3745] z-20 overflow-hidden max-h-48 overflow-y-auto">
                         {personLinkSearching && (
-                          <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#7D766C] text-center">Buscando...</p>
+                          <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#7A7390] text-center">Buscando...</p>
                         )}
                         {!personLinkSearching && personLinkResults.length === 0 && (
-                          <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#7D766C] text-center">Nenhum usuário encontrado.</p>
+                          <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#7A7390] text-center">Nenhum usuário encontrado.</p>
                         )}
                         {personLinkResults.map(p => (
                           <button
                             key={p.id}
                             type="button"
                             onClick={() => { setPersonLinkSelected(p); setPersonLinkQuery(''); }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#333333] text-left"
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#28262F] text-left"
                           >
                             <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-xs shrink-0">
                               {(p.firstName || p.username || '?').charAt(0).toUpperCase()}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-xs font-medium text-slate-700 dark:text-[#E5E1DB] truncate">{[p.firstName, p.lastName].filter(Boolean).join(' ') || p.nickname}</p>
-                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B] truncate">@{p.username}</p>
+                              <p className="text-xs font-medium text-slate-700 dark:text-[#E7E3EF] truncate">{[p.firstName, p.lastName].filter(Boolean).join(' ') || p.nickname}</p>
+                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8] truncate">@{p.username}</p>
                             </div>
                           </button>
                         ))}
@@ -4703,33 +4796,33 @@ export default function App() {
                 </div>
 
                 <div className="space-y-4">
-                  <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Pessoas cadastradas ({people.length})</p>
+                  <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Pessoas cadastradas ({people.length})</p>
                   <div className="grid grid-cols-1 gap-3">
                     {people.map(p => (
-                      <div key={p.id} className="flex items-center gap-4 p-4 bg-white dark:bg-[#3A3A3A] rounded-2xl border border-slate-50 dark:border-[#3f3f3f] shadow-soft group hover:bg-slate-50 dark:hover:bg-[#333333] transition-colors">
+                      <div key={p.id} className="flex items-center gap-4 p-4 bg-white dark:bg-[#302D3A] rounded-2xl border border-slate-50 dark:border-[#3A3745] shadow-soft group hover:bg-slate-50 dark:hover:bg-[#28262F] transition-colors">
                         <img src={p.image} alt="" className="w-12 h-12 rounded-2xl object-cover shadow-sm transition-transform group-hover:scale-105" />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-slate-800 dark:text-[#EDE9E3] text-sm truncate flex items-center gap-1.5">
                             {p.name}
                             {p.linkedUserId && <UserCheck size={12} className="text-primary shrink-0" />}
                           </p>
-                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B] truncate tracking-tight">{p.email || 'Sem e-mail'}</p>
+                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8] truncate tracking-tight">{p.email || 'Sem e-mail'}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleTogglePersonVisibility(p)}
                             className={cn(
                               "h-10 px-3 rounded-xl text-[9px] font-medium transition-all flex flex-col items-center justify-center gap-0.5 shrink-0",
-                              p.visible !== false ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-slate-100 dark:bg-[#3f3f3f] text-slate-400 dark:text-[#9C958B] border border-slate-200 dark:border-[#4f4f4f]"
+                              p.visible !== false ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20" : "bg-slate-100 dark:bg-[#3A3745] text-slate-400 dark:text-[#9E97B8] border border-slate-200 dark:border-[#4A4658]"
                             )}
                           >
                             <div className={cn("w-1.5 h-1.5 rounded-full", p.visible !== false ? "bg-emerald-500" : "bg-slate-400 dark:bg-[#555555]")} />
                             {p.visible !== false ? 'Visível' : 'Oculto'}
                           </button>
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-300 dark:text-[#7D766C] hover:text-primary rounded-xl transition-all" onClick={() => handleEditPersonClick(p)}>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-300 dark:text-[#7A7390] hover:text-primary rounded-xl transition-all" onClick={() => handleEditPersonClick(p)}>
                             <Settings size={14} strokeWidth={2.5} />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 dark:text-[#676057] hover:text-rose-400 hover:bg-rose-50 rounded-xl transition-all" onClick={() => handleDeletePerson(p.id)}>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 dark:text-[#6B6480] hover:text-rose-400 hover:bg-rose-50 rounded-xl transition-all" onClick={() => setPersonToDelete(p)}>
                             <Trash2 size={16} strokeWidth={2.5} />
                           </Button>
                         </div>
@@ -4744,143 +4837,236 @@ export default function App() {
       </Dialog>
 
       {/* Cartões Management Modal */}
-      <Dialog open={isCartoesOpen} onOpenChange={setIsCartoesOpen}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-white dark:bg-[#3A3A3A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
-          <div className="p-6 border-b border-slate-50 dark:border-[#3f3f3f] shrink-0">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Gerenciar cartões</DialogTitle>
-              <DialogDescription className="font-normal text-[10px] text-slate-400 dark:text-[#9C958B] tracking-tight mt-1">Sua carteira de cartões</DialogDescription>
-            </DialogHeader>
-          </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide pb-20">
-            <div className="space-y-4 p-5 bg-slate-50 dark:bg-[#333333] rounded-2xl border-none">
-              {editingCard && (
-                <div className="flex items-center justify-between bg-primary/10 text-primary text-xs font-medium rounded-xl px-4 py-2.5">
-                  <span>Editando "{editingCard.name}"</span>
-                  <button
-                    type="button"
-                    onClick={() => { setEditingCard(null); setNewCardName(''); setLimitInput('0,00'); setNewCardClosingDay(''); setNewCardDueDay(''); setNewCardColor('#9BC4B4'); }}
-                    className="hover:text-primary/70"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Nome do cartão</Label>
-                  <Input 
-                    placeholder="Ex: Nubank" 
-                    className="h-11 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-sm shadow-sm"
-                    value={newCardName || ''}
-                    onChange={(e) => setNewCardName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Limite</Label>
-                  <Input 
-                    placeholder="0,00" 
-                    className="h-11 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-medium text-sm px-4 shadow-sm"
-                    value={limitInput || ''}
-                    onChange={(e) => setLimitInput(maskCurrency(e.target.value))}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Fechamento</Label>
-                  <Input 
-                    type="number"
-                    placeholder="1" 
-                    className="h-11 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-sm shadow-sm"
-                    value={newCardClosingDay || ''}
-                    onChange={(e) => setNewCardClosingDay(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Vencimento</Label>
-                  <Input 
-                    type="number"
-                    placeholder="10" 
-                    className="h-11 rounded-xl border-none bg-white dark:bg-[#3A3A3A] font-normal text-sm shadow-sm"
-                    value={newCardDueDay || ''}
-                    onChange={(e) => setNewCardDueDay(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Visual do cartão</Label>
-                <div
-                  className="rounded-2xl h-24 shadow-sm flex items-end p-4 transition-colors duration-300 relative overflow-hidden"
-                  style={{ backgroundColor: newCardColor }}
+      <Dialog open={isCartoesOpen} onOpenChange={(open) => {
+        setIsCartoesOpen(open);
+        if (!open) { setManageCardId(null); setShowCardForm(false); setEditingCard(null); }
+      }}>
+        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-white dark:bg-[#302D3A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+          <div className="p-6 border-b border-slate-50 dark:border-[#3A3745] shrink-0 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              {(manageCardId || showCardForm) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full shrink-0 -ml-1"
+                  onClick={() => {
+                    if (showCardForm) {
+                      setShowCardForm(false);
+                      setEditingCard(null);
+                    } else {
+                      setManageCardId(null);
+                    }
+                  }}
                 >
-                  <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 dark:bg-[#3A3A3A]/10" />
-                  <span className="text-white font-medium text-sm drop-shadow-sm truncate relative z-10">{newCardName || 'Novo cartão'}</span>
+                  <ChevronLeft size={20} />
+                </Button>
+              )}
+              <DialogHeader className="min-w-0">
+                <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight truncate">
+                  {showCardForm ? (editingCard ? 'Editar cartão' : 'Novo cartão') : manageCardId ? cards.find(c => c.id === manageCardId)?.name : 'Gerenciar cartões'}
+                </DialogTitle>
+                {!showCardForm && !manageCardId && (
+                  <DialogDescription className="font-normal text-[10px] text-slate-400 dark:text-[#9E97B8] tracking-tight mt-1">Sua carteira de cartões</DialogDescription>
+                )}
+              </DialogHeader>
+            </div>
+            {!showCardForm && !manageCardId && (
+              <Button
+                size="icon"
+                className="h-10 w-10 rounded-full bg-primary text-white shrink-0"
+                onClick={() => {
+                  setEditingCard(null);
+                  setNewCardName('');
+                  setLimitInput('0,00');
+                  setNewCardClosingDay('');
+                  setNewCardDueDay('');
+                  setNewCardColor('#9BC4B4');
+                  setShowCardForm(true);
+                }}
+              >
+                <Plus size={18} strokeWidth={3} />
+              </Button>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide pb-20">
+            {showCardForm ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Nome do cartão</Label>
+                    <Input
+                      placeholder="Ex: Nubank"
+                      className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#28262F] font-normal text-sm shadow-sm"
+                      value={newCardName || ''}
+                      onChange={(e) => setNewCardName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Limite</Label>
+                    <Input
+                      placeholder="0,00"
+                      className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#28262F] font-medium text-sm px-4 shadow-sm"
+                      value={limitInput || ''}
+                      onChange={(e) => setLimitInput(maskCurrency(e.target.value))}
+                    />
+                  </div>
                 </div>
-                <div className="grid grid-cols-6 gap-2 bg-white dark:bg-[#3A3A3A] p-3 rounded-2xl shadow-sm">
-                  {CARD_COLOR_PRESETS.map(color => (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Fechamento</Label>
+                    <Input
+                      type="number"
+                      placeholder="1"
+                      className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#28262F] font-normal text-sm shadow-sm"
+                      value={newCardClosingDay || ''}
+                      onChange={(e) => setNewCardClosingDay(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Vencimento</Label>
+                    <Input
+                      type="number"
+                      placeholder="10"
+                      className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#28262F] font-normal text-sm shadow-sm"
+                      value={newCardDueDay || ''}
+                      onChange={(e) => setNewCardDueDay(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9E97B8] ml-1">Visual do cartão</Label>
+                  <div
+                    className="rounded-2xl h-24 shadow-sm flex items-end p-4 transition-colors duration-300 relative overflow-hidden"
+                    style={{ backgroundColor: newCardColor }}
+                  >
+                    <div className="absolute -right-6 -top-6 w-24 h-24 rounded-full bg-white/10 dark:bg-[#302D3A]/10" />
+                    <span className="text-white font-medium text-sm drop-shadow-sm truncate relative z-10">{newCardName || 'Novo cartão'}</span>
+                  </div>
+                  <div className="grid grid-cols-6 gap-2 bg-slate-50 dark:bg-[#28262F] p-3 rounded-2xl shadow-sm">
+                    {CARD_COLOR_PRESETS.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setNewCardColor(color)}
+                        className={cn(
+                          "aspect-square rounded-xl transition-all relative flex items-center justify-center",
+                          newCardColor === color ? "ring-2 ring-offset-2 ring-primary scale-105" : "hover:scale-105 opacity-80 hover:opacity-100"
+                        )}
+                        style={{ backgroundColor: color }}
+                      >
+                        {newCardColor === color && <CheckCircle2 size={14} className="text-white drop-shadow" strokeWidth={3} />}
+                      </button>
+                    ))}
                     <button
-                      key={color}
                       type="button"
-                      onClick={() => setNewCardColor(color)}
+                      onClick={() => colorInputRef.current?.click()}
                       className={cn(
-                        "aspect-square rounded-xl transition-all relative flex items-center justify-center",
-                        newCardColor === color ? "ring-2 ring-offset-2 ring-primary scale-105" : "hover:scale-105 opacity-80 hover:opacity-100"
+                        "aspect-square rounded-xl border-2 border-dashed flex items-center justify-center transition-all",
+                        !CARD_COLOR_PRESETS.includes(newCardColor) ? "border-primary text-primary ring-2 ring-offset-2 ring-primary" : "border-slate-200 dark:border-[#4A4658] text-slate-400 dark:text-[#9E97B8] hover:border-primary hover:text-primary"
                       )}
-                      style={{ backgroundColor: color }}
+                      style={{ backgroundColor: !CARD_COLOR_PRESETS.includes(newCardColor) ? newCardColor : undefined }}
                     >
-                      {newCardColor === color && <CheckCircle2 size={14} className="text-white drop-shadow" strokeWidth={3} />}
+                      <Palette size={14} className={cn(!CARD_COLOR_PRESETS.includes(newCardColor) && "text-white")} />
                     </button>
-                  ))}
+                    <input type="color" ref={colorInputRef} className="sr-only" value={newCardColor} onChange={(e) => setNewCardColor(e.target.value)} />
+                  </div>
+                </div>
+                <Button onClick={handleAddCard} className="w-full h-12 rounded-xl font-medium shadow-lg shadow-primary/20 bg-primary text-white hover:bg-primary/95 active:scale-95 transition-all">
+                  {editingCard ? 'Salvar alterações' : 'Adicionar cartão'}
+                </Button>
+              </div>
+            ) : manageCardId ? (() => {
+              const card = cards.find(c => c.id === manageCardId);
+              if (!card) return null;
+              const bill = computeCardBill(card, currentDate);
+              return (
+                <div className="space-y-6">
+                  <div
+                    className="rounded-2xl h-28 shadow-sm flex items-end p-5 relative overflow-hidden"
+                    style={{ backgroundColor: card.color }}
+                  >
+                    <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10 dark:bg-[#302D3A]/10" />
+                    <span className="text-white font-medium text-base drop-shadow-sm truncate relative z-10">{card.name}</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="p-4 bg-slate-50 dark:bg-[#28262F] rounded-2xl text-center">
+                      <p className="text-[9px] font-medium text-slate-400 dark:text-[#9E97B8] uppercase tracking-wider mb-1">Limite</p>
+                      <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">R$ {card.limit.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 dark:bg-[#28262F] rounded-2xl text-center">
+                      <p className="text-[9px] font-medium text-slate-400 dark:text-[#9E97B8] uppercase tracking-wider mb-1">Fechamento</p>
+                      <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">{card.closingDay ? `Dia ${card.closingDay}` : '—'}</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 dark:bg-[#28262F] rounded-2xl text-center">
+                      <p className="text-[9px] font-medium text-slate-400 dark:text-[#9E97B8] uppercase tracking-wider mb-1">Vencimento</p>
+                      <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">{card.dueDay ? `Dia ${card.dueDay}` : '—'}</p>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => colorInputRef.current?.click()}
-                    className={cn(
-                      "aspect-square rounded-xl border-2 border-dashed flex items-center justify-center transition-all",
-                      !CARD_COLOR_PRESETS.includes(newCardColor) ? "border-primary text-primary ring-2 ring-offset-2 ring-primary" : "border-slate-200 dark:border-[#4f4f4f] text-slate-400 dark:text-[#9C958B] hover:border-primary hover:text-primary"
-                    )}
-                    style={{ backgroundColor: !CARD_COLOR_PRESETS.includes(newCardColor) ? newCardColor : undefined }}
+                    onClick={() => { setViewingBill(bill); setIsCartoesOpen(false); }}
+                    className="w-full flex items-center justify-between p-5 bg-slate-50 dark:bg-[#28262F] rounded-2xl hover:bg-slate-100 dark:hover:bg-[#3A3745] transition-colors"
                   >
-                    <Palette size={14} className={cn(!CARD_COLOR_PRESETS.includes(newCardColor) && "text-white")} />
-                  </button>
-                  <input type="color" ref={colorInputRef} className="sr-only" value={newCardColor} onChange={(e) => setNewCardColor(e.target.value)} />
-                </div>
-              </div>
-              <Button onClick={handleAddCard} className="w-full h-12 rounded-xl font-medium shadow-lg shadow-primary/20 bg-primary text-white hover:bg-primary/95 active:scale-95 transition-all">
-                <Plus size={18} className="mr-2" strokeWidth={3} />
-                Confirmar
-              </Button>
-            </div>
-            
-            <div className="space-y-3">
-              <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9C958B] ml-1">Cadastros ({cards.length})</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {cards.map(card => (
-                  <div key={card.id} className="flex items-center gap-3 p-3 bg-white dark:bg-[#3A3A3A] rounded-xl border border-slate-50 dark:border-[#3f3f3f] shadow-soft group hover:bg-slate-50 dark:hover:bg-[#333333] transition-colors">
-                    <div className="w-10 h-6 rounded-lg shadow-sm" style={{ backgroundColor: card.color }}></div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-800 dark:text-[#EDE9E3] text-sm truncate">{card.name}</p>
-                      <p className="text-[9px] font-normal text-slate-400 dark:text-[#9C958B] tracking-wider">Limite: R$ {card.limit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <div className="text-left">
+                      <p className="text-[10px] font-medium text-slate-400 dark:text-[#9E97B8] uppercase tracking-wider">Fatura de {format(currentDate, "MMMM", { locale: ptBR })}</p>
+                      <p className="text-lg font-heading font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">R$ {bill.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 dark:text-[#7D766C] hover:text-primary rounded-full" onClick={() => {
+                    <ChevronRight size={18} className="text-slate-300 dark:text-[#7A7390]" />
+                  </button>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      className="h-12 rounded-xl font-medium border-none bg-slate-50 dark:bg-[#28262F] hover:bg-slate-100 dark:hover:bg-[#3A3745]"
+                      onClick={() => {
                         setEditingCard(card);
                         setNewCardName(card.name);
                         setLimitInput(maskCurrency(String(card.limit * 100)));
                         setNewCardClosingDay(String(card.closingDay));
                         setNewCardDueDay(String(card.dueDay));
                         setNewCardColor(card.color);
-                      }}>
-                        <Settings size={14} strokeWidth={2.5} />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-300 dark:text-[#7D766C] hover:text-rose-400 rounded-full" onClick={() => handleDeleteCard(card.id)}>
-                        <Trash2 size={14} strokeWidth={2.5} />
-                      </Button>
-                    </div>
+                        setShowCardForm(true);
+                      }}
+                    >
+                      <Settings size={16} className="mr-2" strokeWidth={2.5} />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-12 rounded-xl font-medium border-none bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20"
+                      onClick={() => handleDeleteCard(card.id)}
+                    >
+                      <Trash2 size={16} className="mr-2" strokeWidth={2.5} />
+                      Excluir
+                    </Button>
                   </div>
+                </div>
+              );
+            })() : (
+              <div className="space-y-3">
+                {cards.length === 0 && (
+                  <p className="text-sm font-normal text-slate-300 dark:text-[#7A7390] text-center py-12">Nenhum cartão cadastrado ainda.</p>
+                )}
+                {cards.map(card => (
+                  <button
+                    key={card.id}
+                    type="button"
+                    onClick={() => setManageCardId(card.id)}
+                    className="w-full flex items-center gap-3 p-3 bg-white dark:bg-[#302D3A] rounded-xl border border-slate-50 dark:border-[#3A3745] shadow-soft hover:bg-slate-50 dark:hover:bg-[#28262F] transition-colors text-left"
+                  >
+                    <div className="w-10 h-6 rounded-lg shadow-sm shrink-0" style={{ backgroundColor: card.color }}></div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-800 dark:text-[#EDE9E3] text-sm truncate">{card.name}</p>
+                      <p className="text-[9px] font-normal text-slate-400 dark:text-[#9E97B8] tracking-wider">Limite: R$ {card.limit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                    <ChevronRight size={16} className="text-slate-300 dark:text-[#7A7390] shrink-0" />
+                  </button>
                 ))}
               </div>
-            </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -4890,8 +5076,8 @@ export default function App() {
         setIsPessoasSummaryOpen(open);
         if (!open) setSelectedPersonId(null);
       }}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-white dark:bg-[#3A3A3A] sm:top-auto sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-full sm:max-w-4xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl">
-          <div className="p-6 md:p-8 border-b border-slate-50 dark:border-[#3f3f3f] shrink-0 flex items-center justify-between gap-3">
+        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-white dark:bg-[#302D3A] sm:top-auto sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-full sm:max-w-4xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl">
+          <div className="p-6 md:p-8 border-b border-slate-50 dark:border-[#3A3745] shrink-0 flex items-center justify-between gap-3">
             <div className="flex items-center gap-4 min-w-0">
               {selectedPersonId && (
                 <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full shrink-0" onClick={() => setSelectedPersonId(null)}>
@@ -4902,7 +5088,7 @@ export default function App() {
                 <DialogTitle className="text-2xl md:text-3xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] leading-none truncate">
                   {selectedPersonId ? people.find(p => p.id === selectedPersonId)?.name : 'Cobrar pessoas'}
                 </DialogTitle>
-                <p className="text-xs md:text-sm font-normal text-slate-400 dark:text-[#9C958B] mt-1 capitalize">
+                <p className="text-xs md:text-sm font-normal text-slate-400 dark:text-[#9E97B8] mt-1 capitalize">
                   {selectedPersonId ? format(currentDate, "MMMM 'de' yyyy", { locale: ptBR }) : `Pendências de ${format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}`}
                 </p>
               </div>
@@ -4911,7 +5097,7 @@ export default function App() {
               <Button
                 onClick={() => setIsPessoasOpen(true)}
                 variant="outline"
-                className="rounded-2xl h-11 border-none bg-slate-50 dark:bg-[#333333] shadow-soft font-medium text-xs gap-2 px-5 hover:bg-primary/5 hover:text-primary transition-all duration-300 active:scale-95 shrink-0"
+                className="rounded-2xl h-11 border-none bg-slate-50 dark:bg-[#28262F] shadow-soft font-medium text-xs gap-2 px-5 hover:bg-primary/5 hover:text-primary transition-all duration-300 active:scale-95 shrink-0"
               >
                 <Users size={16} />
                 <span className="hidden sm:inline">Gerenciar</span>
@@ -4919,21 +5105,21 @@ export default function App() {
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-[#333333] scrollbar-hide">
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-[#28262F] scrollbar-hide">
             {!selectedPersonId ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {people.length === 0 && (
-                  <p className="text-sm font-normal text-slate-300 dark:text-[#7D766C] text-center py-12 md:col-span-2">Nenhuma pessoa cadastrada ainda.</p>
+                  <p className="text-sm font-normal text-slate-300 dark:text-[#7A7390] text-center py-12 md:col-span-2">Nenhuma pessoa cadastrada ainda.</p>
                 )}
                 {people.map(p => {
                   const charges = getPersonMonthlyCharges(p.id, currentDate);
                   return (
-                    <div key={p.id} className="bg-white dark:bg-[#3A3A3A] rounded-[2rem] shadow-soft overflow-hidden">
+                    <div key={p.id} className="bg-white dark:bg-[#302D3A] rounded-[2rem] shadow-soft overflow-hidden">
                       <button
                         onClick={() => setSelectedPersonId(p.id)}
-                        className="w-full text-left p-5 flex items-center gap-4 group hover:bg-slate-50 dark:hover:bg-[#333333] transition-all"
+                        className="w-full text-left p-5 flex items-center gap-4 group hover:bg-slate-50 dark:hover:bg-[#28262F] transition-all"
                       >
-                        <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-slate-50 dark:border-[#3f3f3f] shadow-sm shrink-0">
+                        <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-slate-50 dark:border-[#3A3745] shadow-sm shrink-0">
                           <img src={p.image || `https://picsum.photos/seed/${p.name}/200/200`} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -4950,7 +5136,7 @@ export default function App() {
                               : 'Sem pendências'}
                           </p>
                         </div>
-                        <ChevronRight size={16} className="text-slate-300 dark:text-[#7D766C] group-hover:text-primary transition-colors shrink-0" />
+                        <ChevronRight size={16} className="text-slate-300 dark:text-[#7A7390] group-hover:text-primary transition-colors shrink-0" />
                       </button>
                       {charges.pendingTotal > 0 && (
                         <button
@@ -4971,37 +5157,37 @@ export default function App() {
 
               return (
                 <div className="space-y-6 max-w-2xl mx-auto">
-                  <div className="flex items-center gap-5 bg-white dark:bg-[#3A3A3A] p-6 rounded-[2rem] shadow-soft">
-                    <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-slate-50 dark:border-[#3f3f3f] shadow-sm shrink-0">
+                  <div className="flex items-center gap-5 bg-white dark:bg-[#302D3A] p-6 rounded-[2rem] shadow-soft">
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-slate-50 dark:border-[#3A3745] shadow-sm shrink-0">
                       <img src={p.image} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-medium text-slate-400 dark:text-[#9C958B] uppercase tracking-widest">Total do mês</p>
+                      <p className="text-[10px] font-medium text-slate-400 dark:text-[#9E97B8] uppercase tracking-widest">Total do mês</p>
                       <p className={cn("text-3xl font-bold tracking-tighter", charges.pendingTotal > 0 ? "text-rose-400" : "text-emerald-500")}>
                         R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       {charges.paidTotal > 0 && (
-                        <p className="text-[11px] font-normal text-slate-400 dark:text-[#9C958B] mt-0.5">
+                        <p className="text-[11px] font-normal text-slate-400 dark:text-[#9E97B8] mt-0.5">
                           + R$ {charges.paidTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} já confirmado
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="bg-white dark:bg-[#3A3A3A] rounded-[2rem] shadow-soft overflow-hidden">
-                    <div className="p-5 border-b border-slate-50 dark:border-[#3f3f3f]">
+                  <div className="bg-white dark:bg-[#302D3A] rounded-[2rem] shadow-soft overflow-hidden">
+                    <div className="p-5 border-b border-slate-50 dark:border-[#3A3745]">
                       <h3 className="font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight text-sm flex items-center gap-2">
                         <div className="w-1.5 h-4 rounded-full bg-primary" />
                         Despesas do mês ({charges.items.length})
                       </h3>
                     </div>
-                    <div className="divide-y divide-slate-50 dark:divide-[#3f3f3f]">
+                    <div className="divide-y divide-slate-50 dark:divide-[#3A3745]">
                       {charges.items.length > 0 ? (
                         charges.items.map(t => (
-                          <div key={t.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-[#333333] transition-colors">
+                          <div key={t.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-[#28262F] transition-colors">
                             <div className="min-w-0 flex-1 pr-4">
-                              <p className="font-normal text-slate-700 dark:text-[#E5E1DB] text-sm truncate">{t.description}</p>
-                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B] mt-0.5">{format(parseISO(t.date), 'dd/MM/yyyy')} • {t.category}</p>
+                              <p className="font-normal text-slate-700 dark:text-[#E7E3EF] text-sm truncate">{t.description}</p>
+                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8] mt-0.5">{format(parseISO(t.date), 'dd/MM/yyyy')} • {t.category}</p>
                             </div>
                             <div className="text-right shrink-0">
                               <p className="text-base font-bold font-heading tracking-tighter text-rose-400">
@@ -5009,7 +5195,7 @@ export default function App() {
                               </p>
                               <Badge variant="outline" className={cn(
                                 "mt-1 rounded-md text-[8px] border-none px-2 leading-none h-4 uppercase font-medium",
-                                t.status === 'actual' ? "bg-emerald-50 text-emerald-600" : "bg-slate-100 dark:bg-[#3f3f3f] text-slate-400 dark:text-[#9C958B]"
+                                t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#3A3745] text-slate-400 dark:text-[#9E97B8]"
                               )}>
                                 {t.status === 'actual' ? 'Pago' : 'Pendente'}
                               </Badge>
@@ -5018,7 +5204,7 @@ export default function App() {
                         ))
                       ) : (
                         <div className="p-10 text-center">
-                          <p className="text-slate-300 dark:text-[#7D766C] font-normal italic text-sm">Nenhuma despesa vinculada a {p.name.split(' ')[0]} neste mês.</p>
+                          <p className="text-slate-300 dark:text-[#7A7390] font-normal italic text-sm">Nenhuma despesa vinculada a {p.name.split(' ')[0]} neste mês.</p>
                         </div>
                       )}
                     </div>
@@ -5040,14 +5226,14 @@ export default function App() {
       </Dialog>
         {/* Alert Popup */}
         <Dialog open={alertConfig.open} onOpenChange={(open) => setAlertConfig({ ...alertConfig, open })}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#3A3A3A]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#302D3A]">
             <div className="p-8 space-y-6 text-center">
               <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center mx-auto text-rose-400">
                 <Info size={32} strokeWidth={2.5} />
               </div>
               <div className="space-y-2">
                 <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">{alertConfig.title}</h3>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#9C958B] leading-relaxed">{alertConfig.message}</p>
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9E97B8] leading-relaxed">{alertConfig.message}</p>
               </div>
               <Button onClick={() => setAlertConfig({ ...alertConfig, open: false })} className="w-full h-14 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white">
                 Entendi
@@ -5058,14 +5244,14 @@ export default function App() {
 
         {/* Delete Transaction Modal */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#3A3A3A]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#302D3A]">
             <div className="p-8 space-y-6 text-center">
               <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center mx-auto text-rose-500">
                 <Trash2 size={32} strokeWidth={2.5} />
               </div>
               <div className="space-y-2">
                 <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Excluir lançamento</h3>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#9C958B] leading-relaxed">
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9E97B8] leading-relaxed">
                   {(transactionToDelete?.recurrence && transactionToDelete?.recurrence !== 'none') || transactionToDelete?.installments
                     ? "Este lançamento é parcelado ou recorrente. Como deseja prosseguir?"
                     : "Tem certeza que deseja apagar este lançamento? Esta ação não pode ser desfeita."}
@@ -5090,7 +5276,7 @@ export default function App() {
                   <>
                     <Button 
                       onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, false)} 
-                      className="w-full h-14 rounded-2xl font-medium bg-slate-100 dark:bg-[#3f3f3f] text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-200 dark:hover:bg-[#454545]"
+                      className="w-full h-14 rounded-2xl font-medium bg-slate-100 dark:bg-[#3A3745] text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-200 dark:hover:bg-[#423F4E]"
                     >
                       Excluir somente este
                     </Button>
@@ -5109,10 +5295,41 @@ export default function App() {
                     Confirmar exclusão
                   </Button>
                 )}
-                <Button 
-                  variant="ghost" 
-                  onClick={() => setIsDeleteDialogOpen(false)} 
-                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9C958B]"
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsDeleteDialogOpen(false)}
+                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9E97B8]"
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!personToDelete} onOpenChange={(open) => !open && setPersonToDelete(null)}>
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#302D3A]">
+            <div className="p-8 space-y-6 text-center">
+              <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center mx-auto text-rose-500">
+                <Trash2 size={32} strokeWidth={2.5} />
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Excluir pessoa</h3>
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9E97B8] leading-relaxed">
+                  Tem certeza que deseja remover {personToDelete?.name}? Os lançamentos já atribuídos a ela não serão apagados.
+                </p>
+              </div>
+              <div className="space-y-3">
+                <Button
+                  onClick={() => personToDelete && handleDeletePerson(personToDelete.id)}
+                  className="w-full h-14 rounded-2xl font-medium bg-rose-400 text-white shadow-lg shadow-rose-200"
+                >
+                  Confirmar exclusão
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setPersonToDelete(null)}
+                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9E97B8]"
                 >
                   Cancelar
                 </Button>
@@ -5122,26 +5339,26 @@ export default function App() {
         </Dialog>
 
         <Dialog open={isDeleteAllConfirmOpen} onOpenChange={setIsDeleteAllConfirmOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#3A3A3A]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#302D3A]">
             <div className="p-8 space-y-6 text-center">
               <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center mx-auto text-rose-400">
                 <Trash2 size={32} strokeWidth={2.5} />
               </div>
               <div className="space-y-2">
                 <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Apagar tudo</h3>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#9C958B] leading-relaxed">
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9E97B8] leading-relaxed">
                   Tem certeza? Isso apagará TODOS os seus lançamentos para sempre.
                 </p>
                 <div className="pt-4 space-y-2 text-left">
-                  <Label className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-[#9C958B] ml-1">Para confirmar, digite:</Label>
-                  <p className="text-[11px] font-medium text-slate-800 dark:text-[#EDE9E3] bg-slate-50 dark:bg-[#333333] p-2 rounded-lg border border-slate-100 dark:border-[#454545]">
+                  <Label className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-[#9E97B8] ml-1">Para confirmar, digite:</Label>
+                  <p className="text-[11px] font-medium text-slate-800 dark:text-[#EDE9E3] bg-slate-50 dark:bg-[#28262F] p-2 rounded-lg border border-slate-100 dark:border-[#423F4E]">
                     Eu {userProfile?.nickname || 'usuário'}, sei que não é possível recuperar os dados apagados
                   </p>
                   <Input 
                     value={deleteConfirmText || ''}
                     onChange={(e) => setDeleteConfirmText(e.target.value)}
                     placeholder="Digite a frase acima..."
-                    className="h-12 rounded-xl border-slate-100 dark:border-[#454545] font-normal focus:border-rose-300"
+                    className="h-12 rounded-xl border-slate-100 dark:border-[#423F4E] font-normal focus:border-rose-300"
                   />
                 </div>
               </div>
@@ -5156,7 +5373,7 @@ export default function App() {
                 <Button 
                   variant="ghost" 
                   onClick={() => { setIsDeleteAllConfirmOpen(false); setDeleteConfirmText(''); }} 
-                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9C958B]"
+                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9E97B8]"
                 >
                   Cancelar
                 </Button>
@@ -5167,36 +5384,36 @@ export default function App() {
 
         {/* Data Options Modal */}
         <Dialog open={isDataModalOpen} onOpenChange={setIsDataModalOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#3A3A3A]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#302D3A]">
             <div className="p-8 space-y-6">
               <div className="text-center space-y-2">
                 <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto text-primary">
                   <Database size={32} strokeWidth={2.5} />
                 </div>
                 <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Opções de dados</h3>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#9C958B] leading-relaxed">Gerencie seus lançamentos e backups</p>
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9E97B8] leading-relaxed">Gerencie seus lançamentos e backups</p>
               </div>
 
               <div className="space-y-3 pt-2">
-                <Button variant="outline" className="w-full h-14 rounded-2xl font-medium bg-slate-50 dark:bg-[#333333] border-none hover:bg-slate-100 dark:hover:bg-[#3f3f3f] flex justify-between px-6" onClick={handleExportGlobalCSV}>
+                <Button variant="outline" className="w-full h-14 rounded-2xl font-medium bg-slate-50 dark:bg-[#28262F] border-none hover:bg-slate-100 dark:hover:bg-[#3A3745] flex justify-between px-6" onClick={handleExportGlobalCSV}>
                   <div className="flex items-center gap-3">
                     <Download size={20} className="text-primary" />
                     <span>Exportar CSV</span>
                   </div>
-                  <ChevronRight size={18} className="text-slate-300 dark:text-[#7D766C]" />
+                  <ChevronRight size={18} className="text-slate-300 dark:text-[#7A7390]" />
                 </Button>
 
-                <Button variant="outline" className="w-full h-14 rounded-2xl font-medium bg-slate-50 dark:bg-[#333333] border-none hover:bg-slate-100 dark:hover:bg-[#3f3f3f] flex justify-between px-6" onClick={handleSeedTestData}>
+                <Button variant="outline" className="w-full h-14 rounded-2xl font-medium bg-slate-50 dark:bg-[#28262F] border-none hover:bg-slate-100 dark:hover:bg-[#3A3745] flex justify-between px-6" onClick={handleSeedTestData}>
                   <div className="flex items-center gap-3">
                     <Sparkles size={20} className="text-primary" />
                     <span>Gerar dados de teste</span>
                   </div>
-                  <ChevronRight size={18} className="text-slate-300 dark:text-[#7D766C]" />
+                  <ChevronRight size={18} className="text-slate-300 dark:text-[#7A7390]" />
                 </Button>
 
                 <Button
                   variant="ghost" 
-                  className="w-full h-14 rounded-2xl font-medium text-rose-400 hover:bg-rose-50 hover:text-rose-500 flex justify-between px-6 mt-4"
+                  className="w-full h-14 rounded-2xl font-medium text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-500 flex justify-between px-6 mt-4"
                   onClick={() => { setIsDataModalOpen(false); setIsDeleteAllConfirmOpen(true); }}
                 >
                   <div className="flex items-center gap-3">
@@ -5207,7 +5424,7 @@ export default function App() {
                 </Button>
               </div>
 
-              <Button variant="ghost" onClick={() => setIsDataModalOpen(false)} className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9C958B] mt-2">
+              <Button variant="ghost" onClick={() => setIsDataModalOpen(false)} className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9E97B8] mt-2">
                 Voltar
               </Button>
             </div>
@@ -5216,7 +5433,7 @@ export default function App() {
 
         {/* Series Edit Choice Dialog */}
         <Dialog open={showSeriesEditDialog} onOpenChange={setShowSeriesEditDialog}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#3A3A3A]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#302D3A]">
             <div className="p-8 space-y-8">
               <div className="text-center space-y-4">
                 <div className="w-20 h-20 bg-primary/5 rounded-[2rem] flex items-center justify-center mx-auto text-primary animate-bounce-slow">
@@ -5224,7 +5441,7 @@ export default function App() {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-2xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight leading-tight">Lançamento em série</h3>
-                  <p className="text-sm font-normal text-slate-400 dark:text-[#9C958B] leading-relaxed px-4">
+                  <p className="text-sm font-normal text-slate-400 dark:text-[#9E97B8] leading-relaxed px-4">
                     Este lançamento faz parte de uma sequência. Como deseja aplicar as alterações?
                   </p>
                 </div>
@@ -5236,7 +5453,7 @@ export default function App() {
                     setShowSeriesEditDialog(false);
                     handleAddTransaction('single');
                   }} 
-                  className="w-full h-16 rounded-2xl font-medium text-lg bg-slate-100/80 dark:bg-[#3f3f3f]/80 text-slate-600 dark:text-[#D4CFC7] hover:bg-slate-200 dark:hover:bg-[#454545] transition-all border-none"
+                  className="w-full h-16 rounded-2xl font-medium text-lg bg-slate-100/80 dark:bg-[#3A3745]/80 text-slate-600 dark:text-[#D1CCE0] hover:bg-slate-200 dark:hover:bg-[#423F4E] transition-all border-none"
                 >
                   Editar somente este
                 </Button>
@@ -5255,7 +5472,7 @@ export default function App() {
                     setShowSeriesEditDialog(false);
                     setIsRegistrarOpen(true); 
                   }} 
-                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9C958B]"
+                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#9E97B8]"
                 >
                   Voltar e revisar
                 </Button>
@@ -5275,7 +5492,7 @@ function NavItem({ active, onClick, icon, label }: { active: boolean, onClick: (
         "w-full flex items-center gap-3 px-6 py-4 rounded-[1.75rem] transition-all duration-500 group relative overflow-hidden",
         active 
           ? "bg-primary text-white font-normal shadow-soft" 
-          : "text-slate-400 dark:text-[#9C958B] hover:bg-slate-50 dark:hover:bg-[#333333] hover:text-slate-600 dark:hover:text-[#D4CFC7]"
+          : "text-slate-400 dark:text-[#9E97B8] hover:bg-slate-50 dark:hover:bg-[#28262F] hover:text-slate-600 dark:hover:text-[#D1CCE0]"
       )}
     >
       {active && (
@@ -5292,7 +5509,7 @@ function NavItem({ active, onClick, icon, label }: { active: boolean, onClick: (
       {active && (
         <motion.div 
           layoutId="active-indicator" 
-          className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-white/80 dark:bg-[#3A3A3A]/80 shadow-[0_0_8px_rgba(255,255,255,0.6)]" 
+          className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-white/80 dark:bg-[#302D3A]/80 shadow-[0_0_8px_rgba(255,255,255,0.6)]" 
         />
       )}
     </button>
@@ -5305,7 +5522,7 @@ function MobileNavItem({ active, onClick, icon, label }: { active: boolean, onCl
       onClick={onClick}
       className={cn(
         "flex flex-col items-center justify-center gap-1 px-1.5 py-1 rounded-2xl transition-all duration-500 relative min-w-[44px]",
-        active ? "active:scale-90" : "text-slate-400 dark:text-[#9C958B]"
+        active ? "active:scale-90" : "text-slate-400 dark:text-[#9E97B8]"
       )}
     >
       {active && (
@@ -5315,10 +5532,10 @@ function MobileNavItem({ active, onClick, icon, label }: { active: boolean, onCl
           transition={{ type: "spring", stiffness: 400, damping: 30 }}
         />
       )}
-      <div className={cn("transition-all duration-500 relative z-10", active ? "text-primary scale-110" : "text-slate-400 dark:text-[#9C958B]")}>
+      <div className={cn("transition-all duration-500 relative z-10", active ? "text-primary scale-110" : "text-slate-400 dark:text-[#9E97B8]")}>
         {React.cloneElement(icon as React.ReactElement, { strokeWidth: active ? 3 : 2.2, size: 21 })}
       </div>
-      <span className={cn("text-[9px] font-normal tracking-tight transition-all relative z-10", active ? "text-primary opacity-100 mt-0.5" : "text-slate-400 dark:text-[#9C958B] opacity-60")}>
+      <span className={cn("text-[9px] font-normal tracking-tight transition-all relative z-10", active ? "text-primary opacity-100 mt-0.5" : "text-slate-400 dark:text-[#9E97B8] opacity-60")}>
         {label}
       </span>
     </button>
@@ -5327,7 +5544,7 @@ function MobileNavItem({ active, onClick, icon, label }: { active: boolean, onCl
 
 function StatCard({ title, value, icon, trend, subValue }: { title: string, value: number, icon: React.ReactNode, trend?: 'up' | 'down', subValue?: string }) {
   return (
-    <ShadcnCard className="border-none shadow-soft hover:shadow-deep transition-all duration-500 rounded-2xl group bg-white dark:bg-[#3A3A3A] overflow-hidden relative">
+    <ShadcnCard className="border-none shadow-soft hover:shadow-deep transition-all duration-500 rounded-2xl group bg-white dark:bg-[#302D3A] overflow-hidden relative">
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-125 duration-700"></div>
       <CardContent className="p-8 relative z-10">
         <div className="flex items-center gap-5">
@@ -5335,12 +5552,12 @@ function StatCard({ title, value, icon, trend, subValue }: { title: string, valu
             {React.cloneElement(icon as React.ReactElement, { strokeWidth: 2.5, size: 22 })}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="text-[11px] font-normal text-slate-400 dark:text-[#9C958B] tracking-tight truncate mb-1">{title}</p>
+            <p className="text-[11px] font-normal text-slate-400 dark:text-[#9E97B8] tracking-tight truncate mb-1">{title}</p>
             <p className="text-3xl font-heading font-bold tracking-tighter text-slate-800 dark:text-[#EDE9E3] truncate">R$ {value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           </div>
         </div>
         {subValue && (
-          <p className="text-[11px] font-normal text-slate-500 dark:text-[#B5AFA6] mt-6 flex items-center gap-2 truncate bg-slate-50 dark:bg-[#333333] px-4 py-2 rounded-full w-fit group-hover:bg-primary/5 group-hover:text-primary transition-colors">
+          <p className="text-[11px] font-normal text-slate-500 dark:text-[#B4AFC9] mt-6 flex items-center gap-2 truncate bg-slate-50 dark:bg-[#28262F] px-4 py-2 rounded-full w-fit group-hover:bg-primary/5 group-hover:text-primary transition-colors">
             <span className="w-2 h-2 rounded-full bg-primary/40"></span>
             {subValue}
           </p>
@@ -5370,41 +5587,24 @@ function TransactionItem({
   hideDate?: boolean
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
-  const canSwipe = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-');
-  const x = useMotionValue(0);
-  const revealOpacity = useTransform(x, [0, 90], [0, 1]);
-  const draggedRef = useRef(false);
-  const SWIPE_THRESHOLD = 90;
-
-  const handleDragEnd = (_e: unknown, info: { offset: { x: number } }) => {
-    if (Math.abs(info.offset.x) > 5) draggedRef.current = true;
-    if (info.offset.x > SWIPE_THRESHOLD) onQuickConfirm?.();
-  };
-
-  const handleClick = () => {
-    if (draggedRef.current) {
-      draggedRef.current = false;
-      return;
-    }
-    onClick?.();
-  };
+  const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-');
 
   const rowContent = (
     <>
       <div className="flex items-center gap-5 overflow-hidden flex-1">
         {!hideIcon && (
           <div className={cn(
-            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:rotate-6 shadow-soft bg-white dark:bg-[#3A3A3A] group-hover:scale-110 flex-shrink-0",
+            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:rotate-6 shadow-soft bg-white dark:bg-[#302D3A] group-hover:scale-110 flex-shrink-0",
             transaction.type === 'income' ? "text-primary" : "text-rose-400"
           )}>
             {transaction.type === 'income' ? <ArrowUpCircle size={24} strokeWidth={2.5} /> : <ArrowDownCircle size={24} strokeWidth={2.5} />}
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-base font-normal text-slate-700 dark:text-[#E5E1DB] group-hover:text-slate-900 dark:group-hover:text-[#F9F7F2] transition-colors tracking-tight truncate">{transaction.description}</p>
+          <p className="text-base font-normal text-slate-700 dark:text-[#E7E3EF] group-hover:text-slate-900 dark:group-hover:text-[#F9F7F2] transition-colors tracking-tight truncate">{transaction.description}</p>
           <div className="flex items-center gap-2 mt-1 overflow-hidden">
             {!hideDate && (
-              <span className="text-[10px] font-normal text-slate-400 dark:text-[#9C958B] tracking-tight flex items-center gap-1 flex-shrink-0">
+              <span className="text-[10px] font-normal text-slate-400 dark:text-[#9E97B8] tracking-tight flex items-center gap-1 flex-shrink-0">
                 <CalendarIcon size={10} strokeWidth={2.5} />
                 {formattedDate}
               </span>
@@ -5413,7 +5613,7 @@ function TransactionItem({
             {transaction.installments && (
               <span className={cn(
                 "text-[10px] font-medium px-1.5 py-0.5 rounded-md flex-shrink-0",
-                transaction.type === 'income' ? "text-emerald-500 bg-emerald-50" : "text-rose-400 bg-rose-50"
+                transaction.type === 'income' ? "text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10" : "text-rose-400 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/10"
               )}>
                 {transaction.installments.current}/{transaction.installments.total}
               </span>
@@ -5422,7 +5622,7 @@ function TransactionItem({
             {transaction.actualDate && (
               <span className={cn(
                 "text-[10px] font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 flex items-center gap-1",
-                transaction.type === 'income' ? "text-emerald-500 bg-emerald-50" : "text-rose-400 bg-rose-50"
+                transaction.type === 'income' ? "text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10" : "text-rose-400 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/10"
               )}>
                 <CheckCircle2 size={10} strokeWidth={3} />
                 {format(parseISO(transaction.actualDate), 'dd/MM/yyyy')}
@@ -5430,29 +5630,29 @@ function TransactionItem({
             )}
 
             {personName && (
-              <span className="text-[11px] font-medium text-slate-400 dark:text-[#9C958B] truncate flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-[#4a4a4a]"></span>
+              <span className="text-[11px] font-medium text-slate-400 dark:text-[#9E97B8] truncate flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-[#4A4658]"></span>
                 {personName}
               </span>
             )}
             
             {cardName && (
-              <span className="text-[11px] font-medium text-slate-400 dark:text-[#9C958B] truncate flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-[#4a4a4a]"></span>
+              <span className="text-[11px] font-medium text-slate-400 dark:text-[#9E97B8] truncate flex items-center gap-1.5">
+                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-[#4A4658]"></span>
                 <CreditCard size={10} strokeWidth={2.5} className="mr-0.5" />
                 {cardName}
               </span>
             )}
             
             {transaction.linkedToCard && transaction.type !== 'income' && (
-               <span className="text-[11px] font-medium text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+               <span className="text-[11px] font-medium text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
                  <CreditCard size={10} strokeWidth={3} />
                  Vinculado a cartão
                </span>
             )}
 
             {(hideDate || !hideIcon) && (
-              <p className="text-[11px] font-medium text-slate-300 dark:text-[#7D766C] truncate italic ml-1">
+              <p className="text-[11px] font-medium text-slate-300 dark:text-[#7A7390] truncate italic ml-1">
                 {transaction.category}
               </p>
             )}
@@ -5464,16 +5664,27 @@ function TransactionItem({
         hideIcon ? "gap-0" : "gap-5"
       )}>
         <div className="text-right flex items-center gap-3">
-          {transaction.status === 'actual' && (
-            <div className={cn(
-              "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
-              transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
+          {transaction.status === 'actual' ? (
+            <span className={cn(
+              "text-[9px] font-medium px-2 py-1 rounded-full shrink-0 whitespace-nowrap",
+              transaction.type === 'income' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400"
             )}>
-              <CheckCircle2 size={20} strokeWidth={3} />
-            </div>
+              {transaction.type === 'income' ? 'Recebido' : 'Pago'}
+            </span>
+          ) : canConfirm && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onQuickConfirm?.(); }}
+              title={transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
+              className="p-2 -m-2 rounded-full active:scale-90 transition-all group/confirm shrink-0"
+            >
+              <div className="w-6 h-6 rounded-full border-2 border-slate-200 dark:border-[#4A4658] group-hover/confirm:border-primary group-hover/confirm:bg-primary/10 transition-all flex items-center justify-center text-transparent group-hover/confirm:text-primary">
+                <CheckCircle2 size={16} strokeWidth={3} />
+              </div>
+            </button>
           )}
           <p className={cn(
-            "font-heading font-bold tracking-tighter whitespace-nowrap transition-colors",
+            "font-heading font-normal tracking-tighter whitespace-nowrap transition-colors",
             hideIcon ? "text-base" : "text-xl",
             transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
           )}>
@@ -5481,7 +5692,7 @@ function TransactionItem({
           </p>
         </div>
         {!hideIcon && (
-          <div className="w-10 h-10 rounded-full bg-white dark:bg-[#3A3A3A] shadow-soft flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0 group-hover:bg-primary group-hover:text-white flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-white dark:bg-[#302D3A] shadow-soft flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0 group-hover:bg-primary group-hover:text-white flex-shrink-0">
             <ChevronRight size={18} strokeWidth={3} />
           </div>
         )}
@@ -5489,50 +5700,16 @@ function TransactionItem({
     </>
   );
 
-  if (!canSwipe) {
-    return (
-      <div
-        onClick={onClick}
-        className={cn(
-          "flex items-center justify-between group cursor-pointer rounded-[1rem] hover:bg-primary/5 transition-all border border-transparent",
-          hideIcon ? "py-1 px-4" : "py-3 px-4",
-          isSimplified && "py-1"
-        )}
-      >
-        {rowContent}
-      </div>
-    );
-  }
-
   return (
-    <div className="relative overflow-hidden rounded-[1rem]">
-      <div className={cn(
-        "absolute inset-0 flex items-center px-5 rounded-[1rem]",
-        transaction.type === 'income' ? "bg-emerald-400" : "bg-rose-400"
-      )}>
-        <motion.div style={{ opacity: revealOpacity }} className="flex items-center gap-2 text-white">
-          <CheckCircle2 size={18} strokeWidth={3} />
-          <span className="text-xs font-medium">
-            {transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
-          </span>
-        </motion.div>
-      </div>
-      <motion.div
-        drag="x"
-        dragConstraints={{ left: 0, right: 130 }}
-        dragElastic={0.15}
-        dragSnapToOrigin
-        style={{ x }}
-        onDragEnd={handleDragEnd}
-        onClick={handleClick}
-        className={cn(
-          "relative flex items-center justify-between group cursor-pointer rounded-[1rem] bg-white dark:bg-[#3A3A3A] hover:bg-primary/5 transition-colors border border-transparent",
-          hideIcon ? "py-1 px-4" : "py-3 px-4",
-          isSimplified && "py-1"
-        )}
-      >
-        {rowContent}
-      </motion.div>
+    <div
+      onClick={onClick}
+      className={cn(
+        "flex items-center justify-between group cursor-pointer rounded-[1rem] hover:bg-primary/5 transition-all border border-transparent",
+        hideIcon ? "py-1 px-4" : "py-3 px-4",
+        isSimplified && "py-1"
+      )}
+    >
+      {rowContent}
     </div>
   );
 }

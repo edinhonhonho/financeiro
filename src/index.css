@@ -4,11 +4,36 @@
 @theme {
   --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-heading: "Outfit", ui-sans-serif, system-ui, sans-serif;
+
+  /* A UI usa muito a escala `slate` (cinza-azulado padrão do Tailwind) para
+     texto e superfícies no modo claro, o que destoava do resto da paleta
+     (creme/lavanda quentes) e deixava tudo parecendo cinza/chapado. Troca
+     por uma escala neutra quente (taupe), na mesma progressão de claridade,
+     pra combinar com --background/--border sem precisar editar cada classe. */
+  --color-slate-50: #F3EFE7;
+  --color-slate-100: #EAE4D6;
+  --color-slate-200: #DDD4C2;
+  --color-slate-300: #C7BBA5;
+  --color-slate-400: #A0947F;
+  --color-slate-500: #796D5D;
+  --color-slate-600: #5C5245;
+  --color-slate-700: #443C33;
+  --color-slate-800: #2C2721;
+  --color-slate-900: #191510;
 }
 
 @layer base {
   body {
     @apply font-sans antialiased;
+  }
+}
+
+/* Só como app instalado (PWA): a barra de status do iOS fica translúcida
+   (ver index.html), então o próprio fundo do app precisa "vazar" por trás
+   dela em vez de conteúdo ficar embaixo do recorte/status bar. */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
   }
 }
 @import "tw-animate-css";
@@ -136,24 +161,24 @@
 }
 
 .dark {
-    --background: #201F26;
+    --background: #1C1B22;
     --foreground: #EDE9E3;
-    --card: #2B2A33;
+    --card: #302D3A;
     --card-foreground: #EDE9E3;
-    --popover: #302F39;
+    --popover: #35323F;
     --popover-foreground: #EDE9E3;
     --primary: #A9B8E8; /* Same soft periwinkle as light mode, for a cohesive brand */
     --primary-foreground: #22263D;
-    --secondary: #38373F;
+    --secondary: #3A3745;
     --secondary-foreground: #EDE9E3;
-    --muted: #322F3A;
-    --muted-foreground: #A39DB0;
+    --muted: #28262F;
+    --muted-foreground: #9E97B8;
     --accent: #383B4A;
     --accent-foreground: #C3CDF0;
     --destructive: #D19A93;
-    --destructive-foreground: #2B2A33;
-    --border: #3D3B46;
-    --input: #3D3B46;
+    --destructive-foreground: #302D3A;
+    --border: #423F4E;
+    --input: #423F4E;
     --ring: #A9B8E8;
 }
 
