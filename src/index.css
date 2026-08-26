@@ -6,20 +6,46 @@
   --font-heading: "Outfit", ui-sans-serif, system-ui, sans-serif;
 
   /* A UI usa muito a escala `slate` (cinza-azulado padrão do Tailwind) para
-     texto e superfícies no modo claro, o que destoava do resto da paleta
-     (creme/lavanda quentes) e deixava tudo parecendo cinza/chapado. Troca
-     por uma escala neutra quente (taupe), na mesma progressão de claridade,
-     pra combinar com --background/--border sem precisar editar cada classe. */
-  --color-slate-50: #F3EFE7;
-  --color-slate-100: #EAE4D6;
-  --color-slate-200: #DDD4C2;
-  --color-slate-300: #C7BBA5;
-  --color-slate-400: #A0947F;
-  --color-slate-500: #796D5D;
-  --color-slate-600: #5C5245;
-  --color-slate-700: #443C33;
-  --color-slate-800: #2C2721;
-  --color-slate-900: #191510;
+     texto e superfícies no modo claro. Troca por uma escala neutra na mesma
+     progressão de claridade, com um leve matiz lavanda pra combinar com o
+     resto da paleta (fundo lavanda->branco, roxo #8A7FF5) sem precisar
+     editar cada classe individualmente. */
+  --color-slate-50: #F2F0FB;
+  --color-slate-100: #E9E6F8;
+  --color-slate-200: #DBD6F0;
+  --color-slate-300: #C2BAE3;
+  --color-slate-400: #9C93BE;
+  --color-slate-500: #766D9A;
+  --color-slate-600: #59517A;
+  --color-slate-700: #423C5C;
+  --color-slate-800: #2A2640;
+  --color-slate-900: #171526;
+
+  /* Receita/despesa usam `emerald`/`rose` do Tailwind por toda a base de
+     código. Troca pelos tons de menta e coral da referência (mesma
+     progressão de claridade, só muda o matiz) — de novo, sem editar cada
+     classe individualmente. */
+  --color-emerald-50: #E9FBF5;
+  --color-emerald-100: #CDF6E7;
+  --color-emerald-200: #9EEED0;
+  --color-emerald-300: #62E0B7;
+  --color-emerald-400: #37D6A3;
+  --color-emerald-500: #1EBE8C;
+  --color-emerald-600: #129973;
+  --color-emerald-700: #0F7A5D;
+  --color-emerald-800: #10614C;
+  --color-emerald-900: #0F503F;
+
+  --color-rose-50: #FFF1EE;
+  --color-rose-100: #FFE1DB;
+  --color-rose-200: #FFC4B8;
+  --color-rose-300: #FF9F8D;
+  --color-rose-400: #FF6F61;
+  --color-rose-500: #F5493A;
+  --color-rose-600: #D6362A;
+  --color-rose-700: #B02B21;
+  --color-rose-800: #8C231B;
+  --color-rose-900: #6E1C16;
 }
 
 @layer base {
@@ -99,31 +125,44 @@
 }
 
 :root {
-    --background: #FAF7F2; /* Soft warm cream */
-    --foreground: #5C5650; /* Warm charcoal, softer than near-black */
+    /* Paleta inspirada em light_tema.svg/dark_tema.svg: lavanda vibrante,
+       menta, coral e rosa sobre fundo claro que degrada de lavanda pro branco. */
+    --background: #F6F4FD;
+    --foreground: #221D3B; /* Roxo quase-preto */
     --card: #FFFFFF;
-    --card-foreground: #5C5650;
+    --card-foreground: #221D3B;
     --popover: #FFFFFF;
-    --popover-foreground: #5C5650;
-    --primary: #A9B8E8; /* Soft periwinkle blue */
-    --primary-foreground: #3B4266;
-    --secondary: #EDEBF7; /* Pale lavender */
-    --secondary-foreground: #6B6580;
-    --muted: #F1EEE8;
-    --muted-foreground: #948C83;
-    --accent: #E9EEFB;
-    --accent-foreground: #7C8CC7;
-    --destructive: #F4C2BA; /* Soft terracotta */
-    --destructive-foreground: #5C5650;
-    --border: #E9E3D9;
-    --input: #E9E3D9;
-    --ring: #A9B8E8;
-    --chart-1: #A9B8E8;
-    --chart-2: #B7D9BC; /* Soft sage for income */
-    --chart-3: #BFE3D8; /* Soft mint */
-    --chart-4: #F4C2BA; /* Soft terracotta for expenses */
-    --chart-5: #E3CDEE; /* Soft lilac */
+    --popover-foreground: #221D3B;
+    --primary: #8A7FF5; /* Roxo vibrante (botão "Send" da referência) */
+    --primary-foreground: #FFFFFF;
+    --secondary: #ECE9FB; /* Pílula lavanda clara ("Receive"/"Add") */
+    --secondary-foreground: #4B4570;
+    --muted: #F2F0FA;
+    --muted-foreground: #9A96AC;
+    --accent: #ECE9FB;
+    --accent-foreground: #6B62D6;
+    --destructive: #FF6F61; /* Coral vibrante */
+    --destructive-foreground: #FFFFFF;
+    --border: #ECE7F9;
+    --input: #ECE7F9;
+    --ring: #8A7FF5;
+    --chart-1: #8A7FF5; /* Roxo */
+    --chart-2: #37D6A3; /* Menta */
+    --chart-3: #FF6F61; /* Coral */
+    --chart-4: #FDB8D7; /* Rosa */
+    --chart-5: #6FA8FF; /* Azul */
     --radius: 1.5rem;
+}
+
+/* Fundo da página degrade lavanda -> branco, como nas telas de referência.
+   Fica só no `body` (não em --background, que outros componentes usam como
+   cor sólida) e some no modo escuro, onde a referência usa um azul-marinho
+   praticamente liso. */
+body {
+  background: linear-gradient(180deg, #DAD3FA 0%, #F6F4FD 55%, #F6F4FD 100%) fixed;
+}
+.dark body {
+  background: #0B0A2E;
 }
 
 @layer utilities {
@@ -134,7 +173,7 @@
     box-shadow: 0 2px 6px rgba(76, 60, 96, 0.08), 0 20px 48px -12px rgba(76, 60, 96, 0.18);
   }
   .shadow-bubbly {
-    box-shadow: 0 1px 2px rgba(169, 184, 232, 0.15), 0 14px 28px -8px rgba(169, 184, 232, 0.35);
+    box-shadow: 0 1px 2px rgba(138, 127, 245, 0.15), 0 14px 28px -8px rgba(138, 127, 245, 0.35);
   }
 
   .dark .shadow-soft {
@@ -144,7 +183,7 @@
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 20px 48px -12px rgba(0, 0, 0, 0.5);
   }
   .dark .shadow-bubbly {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 28px -8px rgba(169, 184, 232, 0.22);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 14px 28px -8px rgba(138, 127, 245, 0.3);
   }
 
   .scrollbar-hide::-webkit-scrollbar {
@@ -161,25 +200,27 @@
 }
 
 .dark {
-    --background: #1C1B22;
-    --foreground: #EDE9E3;
-    --card: #302D3A;
-    --card-foreground: #EDE9E3;
-    --popover: #35323F;
-    --popover-foreground: #EDE9E3;
-    --primary: #A9B8E8; /* Same soft periwinkle as light mode, for a cohesive brand */
-    --primary-foreground: #22263D;
-    --secondary: #3A3745;
-    --secondary-foreground: #EDE9E3;
-    --muted: #28262F;
-    --muted-foreground: #9E97B8;
-    --accent: #383B4A;
-    --accent-foreground: #C3CDF0;
-    --destructive: #D19A93;
-    --destructive-foreground: #302D3A;
-    --border: #423F4E;
-    --input: #423F4E;
-    --ring: #A9B8E8;
+    /* Azul-marinho profundo, como em dark_tema.svg — quase sólido, sem o
+       degrade lavanda do modo claro. */
+    --background: #0B0A2E;
+    --foreground: #F2F1FC;
+    --card: #100E3D;
+    --card-foreground: #F2F1FC;
+    --popover: #14124A;
+    --popover-foreground: #F2F1FC;
+    --primary: #8A7FF5; /* Mesmo roxo do claro, pra manter a marca coesa */
+    --primary-foreground: #FFFFFF;
+    --secondary: #ECE9FB; /* A referência mantém essa pílula clara mesmo no escuro */
+    --secondary-foreground: #322C5C;
+    --muted: #16133F;
+    --muted-foreground: #8D89AC;
+    --accent: #1C1852;
+    --accent-foreground: #C3BBFF;
+    --destructive: #FF6F61;
+    --destructive-foreground: #0B0A2E;
+    --border: #201C56;
+    --input: #201C56;
+    --ring: #8A7FF5;
 }
 
 @layer base {
