@@ -2242,31 +2242,32 @@ export default function App() {
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/20 md:pl-80">
       {/* Onboarding / Nickname Modal */}
       <Dialog open={isNicknameModalOpen} onOpenChange={setIsNicknameModalOpen}>
-        <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#100E3D] flex flex-col">
-          <div className="p-4 shrink-0">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Quase lá! ✨</DialogTitle>
-              <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#8D89AC] tracking-tight mt-1"></DialogDescription>
-            </DialogHeader>
-          </div>
-          <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-            <div className="flex gap-4 items-center">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 border-2 border-white dark:border-[#100E3D] shadow-soft flex items-center justify-center overflow-hidden shrink-0 text-primary font-medium text-xl">
+        <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#0B0A2E] flex flex-col">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Quase lá</DialogTitle>
+            <DialogDescription>Escolha como quer ser chamado</DialogDescription>
+          </DialogHeader>
+          <div className="p-7 space-y-7">
+            <div className="flex flex-col items-center text-center gap-3">
+              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden shrink-0 text-primary font-heading font-medium text-2xl">
                 {(tempNickname || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
-                <div className="flex-1 space-y-1.5">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Como quer ser chamado?</Label>
-                  <Input 
-                    placeholder="Ex: Edson" 
-                    className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm"
-                    value={tempNickname || ''}
-                    onChange={(e) => setTempNickname(e.target.value)}
-                  />
-                </div>
+              <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Quase lá</h1>
+              <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Como você quer ser chamado?</p>
             </div>
-            <Button onClick={handleSaveNickname} className="w-full h-12 rounded-xl font-medium shadow-lg shadow-primary/20 bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all">
+            <Input
+              placeholder="Ex: Edson"
+              className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6 text-center"
+              value={tempNickname || ''}
+              onChange={(e) => setTempNickname(e.target.value)}
+              autoFocus
+            />
+            <button
+              onClick={handleSaveNickname}
+              className="w-full h-14 rounded-full bg-primary text-white hover:bg-primary/90 font-medium text-base transition-all active:scale-95"
+            >
               Salvar e continuar
-            </Button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
@@ -2438,10 +2439,10 @@ export default function App() {
 
       {/* Month/Year Picker */}
       <Dialog open={isMonthPickerOpen} onOpenChange={setIsMonthPickerOpen}>
-        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D]">
-          <div className="p-6 space-y-5">
+        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <div className="p-7 space-y-5">
             <DialogHeader>
-              <DialogTitle className="text-lg font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Ir para o mês</DialogTitle>
+              <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Ir para o mês</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-3">
               <Select value={pickerMonth} onValueChange={setPickerMonth}>
@@ -2465,15 +2466,15 @@ export default function App() {
                 </SelectContent>
               </Select>
             </div>
-            <Button
+            <button
               onClick={() => {
                 setCurrentDate(new Date(Number(pickerYear), Number(pickerMonth) - 1, 1));
                 setIsMonthPickerOpen(false);
               }}
-              className="w-full h-12 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white"
+              className="w-full h-14 rounded-full font-medium bg-primary text-white hover:bg-primary/90 transition-all active:scale-95"
             >
               Ir para esse mês
-            </Button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
@@ -3862,95 +3863,99 @@ export default function App() {
 
       {/* iOS Install Instructions */}
       <Dialog open={showIOSInstallHelp} onOpenChange={setShowIOSInstallHelp}>
-        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D]">
-          <div className="p-8 space-y-6 text-center">
-            <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto text-primary">
-              <Smartphone size={32} strokeWidth={2.5} />
+        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Instalar no iPhone/iPad</DialogTitle>
+            <DialogDescription>Passos para adicionar o app à tela de início</DialogDescription>
+          </DialogHeader>
+          <div className="p-7 space-y-6 text-center">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
+              <Smartphone size={28} strokeWidth={2.5} />
             </div>
-            <div className="space-y-2">
-              <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Instalar no iPhone/iPad</h3>
+            <div className="space-y-1.5">
+              <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Instalar no iPhone/iPad</h1>
               <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
                 O iOS não permite instalar apps direto pelo navegador. Siga os passos:
               </p>
             </div>
-            <div className="text-left space-y-3 bg-slate-50 dark:bg-[#16133F] rounded-2xl p-5">
+            <div className="text-left space-y-3 bg-card rounded-[1.75rem] p-5 shadow-soft">
               <p className="text-sm font-normal text-slate-700 dark:text-[#EDEAF9]">1. Toque no ícone de compartilhar (□↑) na barra do Safari.</p>
               <p className="text-sm font-normal text-slate-700 dark:text-[#EDEAF9]">2. Escolha "Adicionar à Tela de Início".</p>
               <p className="text-sm font-normal text-slate-700 dark:text-[#EDEAF9]">3. Toque em "Adicionar" no canto superior direito.</p>
             </div>
-            <Button onClick={() => setShowIOSInstallHelp(false)} className="w-full h-14 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white">
+            <button onClick={() => setShowIOSInstallHelp(false)} className="w-full h-14 rounded-full font-medium bg-primary text-white hover:bg-primary/90 transition-all active:scale-95">
               Entendi
-            </Button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Account Edit Dialog */}
       <Dialog open={isAccountEditOpen} onOpenChange={setIsAccountEditOpen}>
-        <DialogContent className="max-w-none sm:max-w-md rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D] max-h-[85vh] flex flex-col">
-          <div className="p-6 shrink-0">
+        <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E] max-h-[85vh] flex flex-col">
+          <div className="p-6 pb-2 shrink-0">
             <DialogHeader>
-              <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Editar informações</DialogTitle>
-              <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#8D89AC]">Atualize seus dados de conta</DialogDescription>
+              <DialogTitle className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Editar informações</DialogTitle>
+              <DialogDescription className="font-normal text-sm text-slate-400 dark:text-[#8D89AC] mt-1">Atualize seus dados de conta</DialogDescription>
             </DialogHeader>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome</Label>
+                <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Nome</Label>
                 <Input
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
+                  className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6"
                   value={editFirstName}
                   onChange={(e) => setEditFirstName(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Sobrenome</Label>
+                <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Sobrenome</Label>
                 <Input
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
+                  className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6"
                   value={editLastName}
                   onChange={(e) => setEditLastName(e.target.value)}
                 />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Usuário</Label>
+              <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Usuário</Label>
               <div className="relative">
-                <AtSign size={15} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#6B679C]" />
+                <AtSign size={15} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#6B679C]" />
                 <Input
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm pl-11 pr-5"
+                  className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm pl-12 pr-6"
                   value={editUsername}
                   onChange={(e) => setEditUsername(e.target.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
                 />
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Apelido</Label>
+              <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Apelido</Label>
               <Input
                 placeholder="Como quer ser chamado no app"
-                className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
+                className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6"
                 value={editNickname}
                 onChange={(e) => setEditNickname(e.target.value)}
               />
             </div>
 
-            <div className="pt-2 border-t border-slate-50 dark:border-[#1C1852] space-y-4">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-[#8D89AC] pt-4">Trocar senha (opcional)</p>
+            <div className="pt-4 space-y-3">
+              <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-[#8D89AC] ml-4">Trocar senha (opcional)</p>
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nova senha</Label>
+                <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Nova senha</Label>
                 <div className="relative">
-                  <KeyRound size={15} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#6B679C]" />
+                  <KeyRound size={15} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#6B679C]" />
                   <Input
                     type={showEditPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm pl-11 pr-12"
+                    className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm pl-12 pr-12"
                     value={editNewPassword}
                     onChange={(e) => setEditNewPassword(e.target.value)}
                   />
                   <button
                     type="button"
                     onClick={() => setShowEditPassword(v => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] hover:text-primary transition-colors"
+                    className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] hover:text-primary transition-colors"
                   >
                     {showEditPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -3958,11 +3963,11 @@ export default function App() {
               </div>
               {editNewPassword && (
                 <div className="space-y-1.5">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Confirmar nova senha</Label>
+                  <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Confirmar nova senha</Label>
                   <Input
                     type={showEditPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
+                    className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6"
                     value={editConfirmPassword}
                     onChange={(e) => setEditConfirmPassword(e.target.value)}
                   />
@@ -3971,31 +3976,31 @@ export default function App() {
             </div>
 
             {editError && (
-              <p className="text-xs font-normal text-rose-500 bg-rose-50 rounded-xl px-4 py-3">{editError}</p>
+              <p className="text-xs font-normal text-rose-500 bg-rose-50 rounded-2xl px-5 py-3">{editError}</p>
             )}
           </div>
-          <div className="p-6 border-t border-slate-50 dark:border-[#1C1852] shrink-0 space-y-2">
-            <Button
+          <div className="p-6 shrink-0 space-y-2">
+            <button
               onClick={handleUpdateAccountInfo}
               disabled={editSubmitting}
-              className="w-full h-14 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white hover:bg-primary/90 disabled:opacity-50"
+              className="w-full h-14 rounded-full font-medium bg-primary text-white hover:bg-primary/90 disabled:opacity-50 transition-all active:scale-95"
             >
               Salvar alterações
-            </Button>
-            <Button variant="ghost" onClick={() => setIsAccountEditOpen(false)} className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#8D89AC]">
+            </button>
+            <button onClick={() => setIsAccountEditOpen(false)} className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
               Cancelar
-            </Button>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex flex-col fixed left-4 top-4 bottom-4 w-72 bg-white dark:bg-[#100E3D] rounded-[3rem] border border-slate-100 dark:border-[#2A2566] shadow-bubbly p-8 z-50">
+      <aside className="hidden md:flex flex-col fixed left-4 top-4 bottom-4 w-72 bg-card rounded-[3rem] shadow-bubbly p-8 z-50">
     <div className="flex items-center gap-4 mb-12 px-2 transition-transform hover:scale-105 duration-500">
-      <div className="w-14 h-14 bg-primary rounded-[1.75rem] flex items-center justify-center text-white shadow-bubbly rotate-3">
-        <Wallet size={28} strokeWidth={2.5} />
+      <div className="w-14 h-14 bg-primary rounded-full flex items-center justify-center text-white shadow-bubbly">
+        <Wallet size={26} strokeWidth={2.5} />
       </div>
-      <h1 className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Financeiro</h1>
+      <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Financeiro</h1>
     </div>
 
       <nav className="space-y-2 flex-1">
@@ -4025,16 +4030,16 @@ export default function App() {
           />
         </nav>
 
-        <div className="mt-auto pt-6 border-t border-slate-100 dark:border-[#201C56] flex flex-col gap-6">
-          <div className="flex items-center gap-3 p-2 group cursor-pointer" onClick={() => setIsProfileOpen(true)}>
-            <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white shadow-soft group-hover:rotate-6 transition-all font-medium text-lg">
+        <div className="mt-auto pt-6 flex flex-col gap-2">
+          <button className="w-full flex items-center gap-3 p-2 rounded-[1.75rem] hover:bg-slate-50 dark:hover:bg-[#16133F] transition-colors group" onClick={() => setIsProfileOpen(true)}>
+            <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg shrink-0">
               {(userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()}
             </div>
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden text-left">
               <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3] truncate tracking-tight">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
-              <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] truncate tracking-tight">{user?.email}</p>
+              <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] truncate tracking-tight">{user?.email}</p>
             </div>
-          </div>
+          </button>
         </div>
       </aside>
 
@@ -5147,59 +5152,61 @@ export default function App() {
         setIsPessoasSummaryOpen(open);
         if (!open) setSelectedPersonId(null);
       }}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-white dark:bg-[#100E3D] sm:top-auto sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-full sm:max-w-4xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl">
+        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-auto sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-full sm:max-w-4xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl">
           <div className="p-6 md:p-8 shrink-0 flex items-center justify-between gap-3">
             <div className="flex items-center gap-4 min-w-0">
               {selectedPersonId && (
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full shrink-0" onClick={() => setSelectedPersonId(null)}>
-                  <ChevronLeft size={24} />
-                </Button>
+                <button
+                  className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] shrink-0"
+                  onClick={() => setSelectedPersonId(null)}
+                >
+                  <ChevronLeft size={20} />
+                </button>
               )}
               <div className="min-w-0">
-                <DialogTitle className="text-2xl md:text-3xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] leading-none truncate">
-                  {selectedPersonId ? people.find(p => p.id === selectedPersonId)?.name : 'Cobrar pessoas'}
+                <DialogTitle className="text-3xl md:text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] leading-none truncate">
+                  {selectedPersonId ? people.find(p => p.id === selectedPersonId)?.name : 'Pessoas'}
                 </DialogTitle>
-                <p className="text-xs md:text-sm font-normal text-slate-400 dark:text-[#8D89AC] mt-1 capitalize">
+                <p className="text-sm font-normal text-slate-500 dark:text-[#A8A4CC] mt-1.5 capitalize">
                   {selectedPersonId ? format(currentDate, "MMMM 'de' yyyy", { locale: ptBR }) : `Pendências de ${format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}`}
                 </p>
               </div>
             </div>
             {!selectedPersonId && (
-              <Button
+              <button
                 onClick={() => setIsPessoasOpen(true)}
-                variant="outline"
-                className="rounded-2xl h-11 border-none bg-slate-50 dark:bg-[#16133F] shadow-soft font-medium text-xs gap-2 px-5 hover:bg-primary/5 hover:text-primary transition-all duration-300 active:scale-95 shrink-0"
+                className="w-11 h-11 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
+                aria-label="Gerenciar pessoas"
               >
-                <Users size={16} />
-                <span className="hidden sm:inline">Gerenciar</span>
-              </Button>
+                <Users size={18} strokeWidth={2.5} />
+              </button>
             )}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50 dark:bg-[#16133F] scrollbar-hide">
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 scrollbar-hide">
             {!selectedPersonId ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2 max-w-2xl mx-auto">
                 {people.length === 0 && (
-                  <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12 md:col-span-2">Nenhuma pessoa cadastrada ainda.</p>
+                  <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">Nenhuma pessoa cadastrada ainda.</p>
                 )}
                 {people.map(p => {
                   const charges = getPersonMonthlyCharges(p.id, currentDate);
                   return (
-                    <div key={p.id} className="bg-white dark:bg-[#100E3D] rounded-[2rem] shadow-soft overflow-hidden">
+                    <div key={p.id} className="bg-card rounded-full pl-2 pr-2 py-2 shadow-soft flex items-center gap-3">
                       <button
                         onClick={() => setSelectedPersonId(p.id)}
-                        className="w-full text-left p-5 flex items-center gap-4 group hover:bg-slate-50 dark:hover:bg-[#16133F] transition-all"
+                        className="flex-1 min-w-0 text-left flex items-center gap-3"
                       >
-                        <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-slate-50 dark:border-[#1C1852] shadow-sm shrink-0">
+                        <div className="w-11 h-11 rounded-full overflow-hidden shrink-0">
                           <img src={p.image || `https://picsum.photos/seed/${p.name}/200/200`} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-base font-medium text-slate-800 dark:text-[#EDE9E3] truncate tracking-tight flex items-center gap-1.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] truncate tracking-tight flex items-center gap-1.5">
                             {p.name}
                             {p.linkedUserId && <UserCheck size={12} className="text-primary shrink-0" />}
-                          </h3>
+                          </p>
                           <p className={cn(
-                            "text-xs font-medium tracking-tight mt-0.5",
+                            "text-xs font-normal tracking-tight",
                             charges.pendingTotal > 0 ? "text-rose-400" : "text-emerald-500"
                           )}>
                             {charges.pendingTotal > 0
@@ -5207,15 +5214,22 @@ export default function App() {
                               : 'Sem pendências'}
                           </p>
                         </div>
-                        <ChevronRight size={16} className="text-slate-300 dark:text-[#6B679C] group-hover:text-primary transition-colors shrink-0" />
                       </button>
-                      {charges.pendingTotal > 0 && (
+                      {charges.pendingTotal > 0 ? (
                         <button
                           onClick={() => shareChargeOnWhatsApp(p, charges)}
-                          className="w-full flex items-center justify-center gap-2 h-11 bg-emerald-50 text-emerald-600 font-medium text-xs hover:bg-emerald-100 transition-colors"
+                          className="w-11 h-11 rounded-full bg-emerald-400 text-white flex items-center justify-center shrink-0"
+                          aria-label="Cobrar no WhatsApp"
                         >
-                          <MessageCircle size={14} />
-                          Cobrar no WhatsApp
+                          <MessageCircle size={16} strokeWidth={2.5} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => setSelectedPersonId(p.id)}
+                          className="w-11 h-11 rounded-full flex items-center justify-center text-slate-300 dark:text-[#6B679C] shrink-0"
+                          aria-label="Ver detalhes"
+                        >
+                          <ChevronRight size={18} />
                         </button>
                       )}
                     </div>
@@ -5228,67 +5242,60 @@ export default function App() {
 
               return (
                 <div className="space-y-6 max-w-2xl mx-auto">
-                  <div className="flex items-center gap-5 bg-white dark:bg-[#100E3D] p-6 rounded-[2rem] shadow-soft">
-                    <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-slate-50 dark:border-[#1C1852] shadow-sm shrink-0">
+                  <div className="flex items-center gap-5 bg-card p-6 rounded-[2rem] shadow-soft">
+                    <div className="w-16 h-16 rounded-full overflow-hidden shrink-0">
                       <img src={p.image} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] uppercase tracking-widest">Total do mês</p>
-                      <p className={cn("text-3xl font-bold tracking-tighter", charges.pendingTotal > 0 ? "text-rose-400" : "text-emerald-500")}>
+                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Total do mês</p>
+                      <p className={cn("text-3xl font-heading font-medium tracking-tighter", charges.pendingTotal > 0 ? "text-rose-400" : "text-emerald-500")}>
                         R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       {charges.paidTotal > 0 && (
-                        <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">
+                        <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">
                           + R$ {charges.paidTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} já confirmado
                         </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="bg-white dark:bg-[#100E3D] rounded-[2rem] shadow-soft overflow-hidden">
-                    <div className="p-5 border-b border-slate-50 dark:border-[#1C1852]">
-                      <h3 className="font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight text-sm flex items-center gap-2">
-                        <div className="w-1.5 h-4 rounded-full bg-primary" />
-                        Despesas do mês ({charges.items.length})
-                      </h3>
-                    </div>
-                    <div className="divide-y divide-slate-50 dark:divide-[#1C1852]">
-                      {charges.items.length > 0 ? (
-                        charges.items.map(t => (
-                          <div key={t.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-[#16133F] transition-colors">
-                            <div className="min-w-0 flex-1 pr-4">
-                              <p className="font-normal text-slate-700 dark:text-[#EDEAF9] text-sm truncate">{t.description}</p>
-                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">{format(parseISO(t.date), 'dd/MM/yyyy')} • {t.category}</p>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <p className="text-base font-bold font-heading tracking-tighter text-rose-400">
-                                R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </p>
-                              <Badge variant="outline" className={cn(
-                                "mt-1 rounded-md text-[8px] border-none px-2 leading-none h-4 uppercase font-medium",
-                                t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#1C1852] text-slate-400 dark:text-[#8D89AC]"
-                              )}>
-                                {t.status === 'actual' ? 'Pago' : 'Pendente'}
-                              </Badge>
-                            </div>
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] px-2 uppercase tracking-widest">Despesas do mês ({charges.items.length})</p>
+                    {charges.items.length > 0 ? (
+                      charges.items.map(t => (
+                        <div key={t.id} className="flex items-center justify-between gap-3 bg-card rounded-full pl-3 pr-4 py-3 shadow-soft">
+                          <div className="min-w-0 flex-1 pr-2">
+                            <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] truncate tracking-tight">{t.description}</p>
+                            <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">{format(parseISO(t.date), 'dd/MM/yyyy')} · {t.category}</p>
                           </div>
-                        ))
-                      ) : (
-                        <div className="p-10 text-center">
-                          <p className="text-slate-300 dark:text-[#6B679C] font-normal italic text-sm">Nenhuma despesa vinculada a {p.name.split(' ')[0]} neste mês.</p>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant="outline" className={cn(
+                              "rounded-md text-[8px] border-none px-2 leading-none h-4 uppercase font-medium",
+                              t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#1C1852] text-slate-400 dark:text-[#8D89AC]"
+                            )}>
+                              {t.status === 'actual' ? 'Pago' : 'Pendente'}
+                            </Badge>
+                            <p className="text-base font-heading font-medium tracking-tighter text-rose-400 whitespace-nowrap">
+                              R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      ))
+                    ) : (
+                      <div className="py-12 text-center">
+                        <p className="text-slate-300 dark:text-[#6B679C] font-normal italic text-sm">Nenhuma despesa vinculada a {p.name.split(' ')[0]} neste mês.</p>
+                      </div>
+                    )}
                   </div>
 
-                  <Button
+                  <button
                     onClick={() => shareChargeOnWhatsApp(p, charges)}
                     disabled={charges.items.length === 0}
-                    className="w-full h-14 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white font-medium gap-2 shadow-lg shadow-emerald-500/20 disabled:opacity-40"
+                    className="w-full h-14 rounded-full bg-emerald-400 hover:bg-emerald-500 text-white font-medium gap-2 flex items-center justify-center transition-all active:scale-95 disabled:opacity-40"
                   >
                     <MessageCircle size={18} />
                     Cobrar no WhatsApp
-                  </Button>
+                  </button>
                 </div>
               );
             })()}
@@ -5297,31 +5304,31 @@ export default function App() {
       </Dialog>
         {/* Alert Popup */}
         <Dialog open={alertConfig.open} onOpenChange={(open) => setAlertConfig({ ...alertConfig, open })}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D]">
-            <div className="p-8 space-y-6 text-center">
-              <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center mx-auto text-rose-400">
-                <Info size={32} strokeWidth={2.5} />
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+            <div className="p-7 space-y-6 text-center">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
+                <Info size={28} strokeWidth={2.5} />
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">{alertConfig.title}</h3>
+              <div className="space-y-1.5">
+                <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{alertConfig.title}</h1>
                 <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">{alertConfig.message}</p>
               </div>
-              <Button onClick={() => setAlertConfig({ ...alertConfig, open: false })} className="w-full h-14 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white">
+              <button onClick={() => setAlertConfig({ ...alertConfig, open: false })} className="w-full h-14 rounded-full font-medium bg-primary text-white hover:bg-primary/90 transition-all active:scale-95">
                 Entendi
-              </Button>
+              </button>
             </div>
           </DialogContent>
         </Dialog>
 
         {/* Delete Transaction Modal */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D]">
-            <div className="p-8 space-y-6 text-center">
-              <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center mx-auto text-rose-500">
-                <Trash2 size={32} strokeWidth={2.5} />
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+            <div className="p-7 space-y-6 text-center">
+              <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 rounded-full flex items-center justify-center mx-auto text-rose-400">
+                <Trash2 size={28} strokeWidth={2.5} />
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Excluir lançamento</h3>
+              <div className="space-y-1.5">
+                <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Excluir lançamento</h1>
                 <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
                   {(transactionToDelete?.recurrence && transactionToDelete?.recurrence !== 'none') || transactionToDelete?.installments
                     ? "Este lançamento é parcelado ou recorrente. Como deseja prosseguir?"
@@ -5330,11 +5337,11 @@ export default function App() {
               </div>
 
               {transactionToDelete && transactions.some(tx => tx.linkedTransactionId === transactionToDelete.id) && (
-                <div className="flex items-center gap-3 justify-center p-4 bg-rose-50/50 rounded-2xl border border-rose-100/50">
-                  <input 
-                    type="checkbox" 
-                    id="del-linked" 
-                    checked={deleteLinked} 
+                <div className="flex items-center gap-3 justify-center p-4 bg-rose-50/50 dark:bg-rose-500/5 rounded-2xl">
+                  <input
+                    type="checkbox"
+                    id="del-linked"
+                    checked={deleteLinked}
                     onChange={e => setDeleteLinked(e.target.checked)}
                     className="w-5 h-5 rounded-lg border-2 border-rose-200 text-rose-500 focus:ring-rose-500 cursor-pointer"
                   />
@@ -5342,112 +5349,109 @@ export default function App() {
                 </div>
               )}
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {(transactionToDelete?.recurrence && transactionToDelete?.recurrence !== 'none') || transactionToDelete?.installments ? (
                   <>
-                    <Button 
-                      onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, false)} 
-                      className="w-full h-14 rounded-2xl font-medium bg-slate-100 dark:bg-[#1C1852] text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-200 dark:hover:bg-[#201C56]"
+                    <button
+                      onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, false)}
+                      className="w-full h-14 rounded-full font-medium bg-secondary text-secondary-foreground hover:bg-secondary/70 transition-all active:scale-95"
                     >
                       Excluir somente este
-                    </Button>
-                    <Button 
-                      onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, true)} 
-                      className="w-full h-14 rounded-2xl font-medium bg-rose-400 text-white shadow-lg shadow-rose-200"
+                    </button>
+                    <button
+                      onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, true)}
+                      className="w-full h-14 rounded-full font-medium bg-rose-400 hover:bg-rose-500 text-white transition-all active:scale-95"
                     >
                       Excluir todos os seguintes
-                    </Button>
+                    </button>
                   </>
                 ) : (
-                  <Button 
-                    onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, false)} 
-                    className="w-full h-14 rounded-2xl font-medium bg-rose-400 text-white shadow-lg shadow-rose-200"
+                  <button
+                    onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, false)}
+                    className="w-full h-14 rounded-full font-medium bg-rose-400 hover:bg-rose-500 text-white transition-all active:scale-95"
                   >
                     Confirmar exclusão
-                  </Button>
+                  </button>
                 )}
-                <Button
-                  variant="ghost"
+                <button
                   onClick={() => setIsDeleteDialogOpen(false)}
-                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#8D89AC]"
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Cancelar
-                </Button>
+                </button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
 
         <Dialog open={!!personToDelete} onOpenChange={(open) => !open && setPersonToDelete(null)}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D]">
-            <div className="p-8 space-y-6 text-center">
-              <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center mx-auto text-rose-500">
-                <Trash2 size={32} strokeWidth={2.5} />
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+            <div className="p-7 space-y-6 text-center">
+              <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 rounded-full flex items-center justify-center mx-auto text-rose-400">
+                <Trash2 size={28} strokeWidth={2.5} />
               </div>
-              <div className="space-y-2">
-                <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Excluir pessoa</h3>
+              <div className="space-y-1.5">
+                <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Excluir pessoa</h1>
                 <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
                   Tem certeza que deseja remover {personToDelete?.name}? Os lançamentos já atribuídos a ela não serão apagados.
                 </p>
               </div>
-              <div className="space-y-3">
-                <Button
+              <div className="space-y-2">
+                <button
                   onClick={() => personToDelete && handleDeletePerson(personToDelete.id)}
-                  className="w-full h-14 rounded-2xl font-medium bg-rose-400 text-white shadow-lg shadow-rose-200"
+                  className="w-full h-14 rounded-full font-medium bg-rose-400 hover:bg-rose-500 text-white transition-all active:scale-95"
                 >
                   Confirmar exclusão
-                </Button>
-                <Button
-                  variant="ghost"
+                </button>
+                <button
                   onClick={() => setPersonToDelete(null)}
-                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#8D89AC]"
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Cancelar
-                </Button>
+                </button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
 
         <Dialog open={isDeleteAllConfirmOpen} onOpenChange={setIsDeleteAllConfirmOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D]">
-            <div className="p-8 space-y-6 text-center">
-              <div className="w-16 h-16 bg-rose-50 rounded-3xl flex items-center justify-center mx-auto text-rose-400">
-                <Trash2 size={32} strokeWidth={2.5} />
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+            <div className="p-7 space-y-6 text-center">
+              <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 rounded-full flex items-center justify-center mx-auto text-rose-400">
+                <Trash2 size={28} strokeWidth={2.5} />
               </div>
               <div className="space-y-2">
-                <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Apagar tudo</h3>
+                <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Apagar tudo</h1>
                 <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
                   Tem certeza? Isso apagará TODOS os seus lançamentos para sempre.
                 </p>
                 <div className="pt-4 space-y-2 text-left">
-                  <Label className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-[#8D89AC] ml-1">Para confirmar, digite:</Label>
-                  <p className="text-[11px] font-medium text-slate-800 dark:text-[#EDE9E3] bg-slate-50 dark:bg-[#16133F] p-2 rounded-lg border border-slate-100 dark:border-[#201C56]">
+                  <Label className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-[#8D89AC] ml-1">Para confirmar, digite:</Label>
+                  <p className="text-xs font-medium text-slate-700 dark:text-[#EDE9E3] bg-card p-3 rounded-2xl shadow-soft">
                     Eu {userProfile?.nickname || 'usuário'}, sei que não é possível recuperar os dados apagados
                   </p>
-                  <Input 
+                  <Input
                     value={deleteConfirmText || ''}
                     onChange={(e) => setDeleteConfirmText(e.target.value)}
                     placeholder="Digite a frase acima..."
-                    className="h-12 rounded-xl border-slate-100 dark:border-[#201C56] font-normal focus:border-rose-300"
+                    className="h-12 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 font-normal px-5 focus:border-rose-300"
                   />
                 </div>
               </div>
-              <div className="space-y-3">
-                <Button 
+              <div className="space-y-2">
+                <button
                   disabled={deleteConfirmText !== `Eu ${userProfile?.nickname || 'usuário'}, sei que não é possível recuperar os dados apagados`}
-                  onClick={handleDeleteAllTransactions} 
-                  className="w-full h-14 rounded-2xl font-medium bg-rose-400 text-white shadow-lg shadow-rose-200 disabled:opacity-30"
+                  onClick={handleDeleteAllTransactions}
+                  className="w-full h-14 rounded-full font-medium bg-rose-400 hover:bg-rose-500 text-white transition-all active:scale-95 disabled:opacity-30"
                 >
                   Confirmar exclusão total
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  onClick={() => { setIsDeleteAllConfirmOpen(false); setDeleteConfirmText(''); }} 
-                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#8D89AC]"
+                </button>
+                <button
+                  onClick={() => { setIsDeleteAllConfirmOpen(false); setDeleteConfirmText(''); }}
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Cancelar
-                </Button>
+                </button>
               </div>
             </div>
           </DialogContent>
@@ -5455,49 +5459,48 @@ export default function App() {
 
         {/* Data Options Modal */}
         <Dialog open={isDataModalOpen} onOpenChange={setIsDataModalOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D]">
-            <div className="p-8 space-y-6">
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto text-primary">
-                  <Database size={32} strokeWidth={2.5} />
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+            <div className="p-7 space-y-6">
+              <div className="text-center space-y-1.5">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
+                  <Database size={28} strokeWidth={2.5} />
                 </div>
-                <h3 className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Opções de dados</h3>
+                <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Opções de dados</h1>
                 <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">Gerencie seus lançamentos e backups</p>
               </div>
 
-              <div className="space-y-3 pt-2">
-                <Button variant="outline" className="w-full h-14 rounded-2xl font-medium bg-slate-50 dark:bg-[#16133F] border-none hover:bg-slate-100 dark:hover:bg-[#1C1852] flex justify-between px-6" onClick={handleExportGlobalCSV}>
+              <div className="space-y-2 pt-2">
+                <button className="w-full h-14 rounded-full font-medium bg-card shadow-soft hover:bg-slate-50 dark:hover:bg-[#16133F] flex items-center justify-between px-6 transition-colors" onClick={handleExportGlobalCSV}>
                   <div className="flex items-center gap-3">
-                    <Download size={20} className="text-primary" />
+                    <Download size={18} className="text-primary" />
                     <span>Exportar CSV</span>
                   </div>
                   <ChevronRight size={18} className="text-slate-300 dark:text-[#6B679C]" />
-                </Button>
+                </button>
 
-                <Button variant="outline" className="w-full h-14 rounded-2xl font-medium bg-slate-50 dark:bg-[#16133F] border-none hover:bg-slate-100 dark:hover:bg-[#1C1852] flex justify-between px-6" onClick={handleSeedTestData}>
+                <button className="w-full h-14 rounded-full font-medium bg-card shadow-soft hover:bg-slate-50 dark:hover:bg-[#16133F] flex items-center justify-between px-6 transition-colors" onClick={handleSeedTestData}>
                   <div className="flex items-center gap-3">
-                    <Sparkles size={20} className="text-primary" />
+                    <Sparkles size={18} className="text-primary" />
                     <span>Gerar dados de teste</span>
                   </div>
                   <ChevronRight size={18} className="text-slate-300 dark:text-[#6B679C]" />
-                </Button>
+                </button>
 
-                <Button
-                  variant="ghost" 
-                  className="w-full h-14 rounded-2xl font-medium text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-500 flex justify-between px-6 mt-4"
+                <button
+                  className="w-full h-14 rounded-full font-medium text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center justify-between px-6 mt-2 transition-colors"
                   onClick={() => { setIsDataModalOpen(false); setIsDeleteAllConfirmOpen(true); }}
                 >
                   <div className="flex items-center gap-3">
-                    <Trash2 size={20} />
+                    <Trash2 size={18} />
                     <span>Apagar tudo</span>
                   </div>
                   <ChevronRight size={18} />
-                </Button>
+                </button>
               </div>
 
-              <Button variant="ghost" onClick={() => setIsDataModalOpen(false)} className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#8D89AC] mt-2">
+              <button onClick={() => setIsDataModalOpen(false)} className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors mt-2">
                 Voltar
-              </Button>
+              </button>
             </div>
           </DialogContent>
         </Dialog>
