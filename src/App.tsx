@@ -1638,7 +1638,7 @@ export default function App() {
     }
   };
 
-  const handleOpenRegistrar = () => {
+  const handleOpenRegistrar = (typeOverride?: TransactionType) => {
     setEditingTransaction(null);
     setAssignmentMode('single');
     setPersonSplits([]);
@@ -1650,6 +1650,7 @@ export default function App() {
     let initialType: TransactionType = 'expense';
     if (activeTab === 'receitas') initialType = 'income';
     if (activeTab === 'cartoes') initialType = 'card_purchase';
+    if (typeOverride) initialType = typeOverride;
     
     setNewTransaction({
       type: initialType,
@@ -4095,7 +4096,97 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Hero de saldo (mobile) — no estilo "Your Balance" da referência */}
+              <div className="md:hidden space-y-5">
+                <div>
+                  <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight">Saldo do mês</p>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    {(() => {
+                      const [intPart, decPart] = Math.abs(stats.balance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                      return (
+                        <p className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
+                          {stats.balance < 0 && '-'}R$ {intPart}<span className="text-slate-300 dark:text-[#5C5686]">,{decPart}</span>
+                        </p>
+                      );
+                    })()}
+                    <span className={cn(
+                      "text-[11px] font-medium px-2.5 py-1 rounded-full",
+                      stats.balance >= 0 ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400"
+                    )}>
+                      {stats.balance >= 0 ? '↑ Positivo' : '↓ Negativo'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenRegistrar('income')}
+                    className="flex-1 h-12 rounded-full bg-primary text-white font-medium text-sm flex items-center justify-center gap-1.5 shadow-bubbly active:scale-95 transition-transform"
+                  >
+                    <ArrowUpCircle size={16} strokeWidth={2.5} /> Receita
+                  </button>
+                  <button
+                    onClick={() => handleOpenRegistrar('expense')}
+                    className="flex-1 h-12 rounded-full bg-secondary text-secondary-foreground font-medium text-sm flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+                  >
+                    <ArrowDownCircle size={16} strokeWidth={2.5} /> Despesa
+                  </button>
+                  <button
+                    onClick={() => handleOpenRegistrar('card_purchase')}
+                    className="flex-1 h-12 rounded-full bg-secondary text-secondary-foreground font-medium text-sm flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
+                  >
+                    <Plus size={16} strokeWidth={2.5} /> Cartão
+                  </button>
+                </div>
+
+                {people.filter(p => p.visible !== false).length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight mb-3">Pessoas</p>
+                    <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide pb-1">
+                      <button
+                        onClick={() => setIsPessoasOpen(true)}
+                        className="w-12 h-12 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
+                      >
+                        <Plus size={18} strokeWidth={2.5} />
+                      </button>
+                      {people.filter(p => p.visible !== false).map(p => (
+                        <button
+                          key={p.id}
+                          onClick={() => { setIsPessoasSummaryOpen(true); setSelectedPersonId(p.id); }}
+                          className="w-12 h-12 rounded-full overflow-hidden shrink-0 shadow-soft"
+                        >
+                          <img src={p.image || `https://picsum.photos/seed/${p.name}/100/100`} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  {(() => {
+                    const [ii, id] = stats.incomeActual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                    const [ei, ed] = stats.expensesActual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                    return (
+                      <>
+                        <div className="bg-secondary rounded-2xl p-4">
+                          <p className="text-[10px] font-medium text-secondary-foreground/70 tracking-tight truncate">Receitas confirmadas</p>
+                          <p className="text-lg font-heading font-normal tracking-tighter text-secondary-foreground truncate mt-0.5">
+                            R$ {ii}<span className="opacity-50">,{id}</span>
+                          </p>
+                        </div>
+                        <div className="bg-secondary rounded-2xl p-4">
+                          <p className="text-[10px] font-medium text-secondary-foreground/70 tracking-tight truncate">Despesas confirmadas</p>
+                          <p className="text-lg font-heading font-normal tracking-tighter text-secondary-foreground truncate mt-0.5">
+                            R$ {ei}<span className="opacity-50">,{ed}</span>
+                          </p>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
                   title="Receitas confirmadas"
                   value={stats.incomeActual}
