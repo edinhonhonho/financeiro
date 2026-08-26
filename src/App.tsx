@@ -2000,42 +2000,44 @@ export default function App() {
 
   if (isPasswordRecovery) {
     return (
-      <div className="min-h-screen bg-[#F6F4FD] dark:bg-[#0B0A2E] flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-sm w-full">
-          <div className="w-20 h-20 bg-primary rounded-[1.75rem] flex items-center justify-center text-white shadow-bubbly mx-auto mb-6 rotate-3">
-            <KeyRound size={40} strokeWidth={2.5} />
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-sm w-full text-left">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-white mx-auto mb-5">
+              <KeyRound size={28} strokeWidth={2.5} />
+            </div>
+            <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
+              Defina sua nova senha
+            </h1>
+            <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] mt-2">Escolha uma nova senha para entrar no Financeiro.</p>
           </div>
-          <h1 className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] leading-[0.9] mb-2">
-            Defina sua nova senha
-          </h1>
-          <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] mb-8">Escolha uma nova senha para entrar no Financeiro.</p>
 
-          <div className="bg-white dark:bg-[#100E3D] p-8 rounded-[3rem] shadow-soft space-y-4 text-left">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nova senha</Label>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-500 dark:text-[#A8A4CC] ml-4">Nova senha</Label>
               <div className="relative">
                 <Input
                   type={showRecoveryPassword ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm pl-5 pr-12"
+                  className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm pl-6 pr-14"
                   value={recoveryPassword}
                   onChange={(e) => setRecoveryPassword(e.target.value)}
                 />
                 <button
                   type="button"
                   onClick={() => setShowRecoveryPassword(v => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] hover:text-primary transition-colors"
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] hover:text-primary transition-colors"
                 >
                   {showRecoveryPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Confirmar nova senha</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-500 dark:text-[#A8A4CC] ml-4">Confirmar nova senha</Label>
               <Input
                 type={showRecoveryPassword ? 'text' : 'password'}
                 placeholder="••••••••"
-                className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
+                className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6"
                 value={recoveryConfirmPassword}
                 onChange={(e) => setRecoveryConfirmPassword(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleRecoveryPasswordSubmit()}
@@ -2043,16 +2045,16 @@ export default function App() {
             </div>
 
             {recoveryError && (
-              <p className="text-xs font-normal text-rose-500 bg-rose-50 rounded-xl px-4 py-3">{recoveryError}</p>
+              <p className="text-xs font-normal text-rose-500 bg-rose-50 rounded-2xl px-5 py-3">{recoveryError}</p>
             )}
 
-            <Button
+            <button
               onClick={handleRecoveryPasswordSubmit}
               disabled={recoverySubmitting}
-              className="w-full h-14 rounded-2xl bg-primary text-white hover:bg-primary/90 font-medium text-base disabled:opacity-50"
+              className="w-full h-14 rounded-full bg-primary text-white hover:bg-primary/90 font-medium text-base disabled:opacity-50 transition-all active:scale-95"
             >
               Salvar nova senha
-            </Button>
+            </button>
           </div>
         </div>
       </div>
@@ -2390,7 +2392,7 @@ export default function App() {
               <span className="text-xl font-heading font-bold text-slate-800 dark:text-[#EDE9E3]">R$ {(viewingBill?.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <Button
-              className="w-full h-14 rounded-2xl font-medium text-base bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+              className="w-full h-14 rounded-full font-medium text-base bg-primary text-white hover:bg-primary/90 transition-all active:scale-95"
               onClick={() => {
                 if (viewingBill) {
                   setConfirmingTransaction(viewingBill);
@@ -3025,12 +3027,12 @@ export default function App() {
                         setIsDeleteDialogOpen(true);
                       }}
                       variant="outline"
-                      className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/20 border-none text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-all flex items-center justify-center shrink-0"
+                      className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-950/20 border-none text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-all flex items-center justify-center shrink-0"
                     >
                       <Trash2 size={18} />
                     </Button>
                   )}
-                  <Button onClick={() => handleAddTransaction()} className="flex-1 h-12 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white hover:bg-primary/95 active:scale-95 transition-all">
+                  <Button onClick={() => handleAddTransaction()} className="flex-1 h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all">
                     Salvar lançamento
                   </Button>
                 </div>
@@ -3715,12 +3717,12 @@ export default function App() {
                         setIsDeleteDialogOpen(true);
                       }}
                       variant="outline"
-                      className="w-16 h-16 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border-none text-rose-400 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all flex items-center justify-center shrink-0"
+                      className="w-16 h-16 rounded-full bg-rose-50 dark:bg-rose-500/10 border-none text-rose-400 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all flex items-center justify-center shrink-0"
                     >
                       <Trash2 size={24} />
                     </Button>
                   )}
-                  <Button onClick={() => handleAddTransaction()} className="flex-1 h-16 rounded-2xl font-medium text-lg shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/95 transition-all active:scale-95">
+                  <Button onClick={() => handleAddTransaction()} className="flex-1 h-16 rounded-full font-medium text-lg bg-primary text-white hover:bg-primary/90 transition-all active:scale-95">
                       Salvar lançamento
                   </Button>
                 </div>
@@ -4863,7 +4865,7 @@ export default function App() {
                     )}
                   </div>
 
-                  <Button onClick={handleAddPerson} className="w-full h-14 rounded-2xl font-medium text-base shadow-xl shadow-primary/20 bg-primary text-white hover:bg-primary/95 active:scale-95 transition-all">
+                  <Button onClick={handleAddPerson} className="w-full h-14 rounded-full font-medium text-base bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all">
                     {editingPerson ? <Settings size={20} className="mr-2" strokeWidth={3} /> : <Plus size={20} className="mr-2" strokeWidth={4} />}
                     {editingPerson ? 'Salvar alterações' : 'Adicionar Pessoa'}
                   </Button>
@@ -5504,49 +5506,50 @@ export default function App() {
 
         {/* Series Edit Choice Dialog */}
         <Dialog open={showSeriesEditDialog} onOpenChange={setShowSeriesEditDialog}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D]">
-            <div className="p-8 space-y-8">
-              <div className="text-center space-y-4">
-                <div className="w-20 h-20 bg-primary/5 rounded-[2rem] flex items-center justify-center mx-auto text-primary animate-bounce-slow">
-                  <Repeat size={40} strokeWidth={2.5} />
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Lançamento em série</DialogTitle>
+              <DialogDescription>Escolha como aplicar as alterações</DialogDescription>
+            </DialogHeader>
+            <div className="p-7 space-y-6">
+              <div className="text-center space-y-1.5">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
+                  <Repeat size={28} strokeWidth={2.5} />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight leading-tight">Lançamento em série</h3>
-                  <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed px-4">
-                    Este lançamento faz parte de uma sequência. Como deseja aplicar as alterações?
-                  </p>
-                </div>
+                <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Lançamento em série</h1>
+                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed px-2">
+                  Este lançamento faz parte de uma sequência. Como deseja aplicar as alterações?
+                </p>
               </div>
 
-              <div className="space-y-3">
-                <Button 
+              <div className="space-y-2">
+                <button
                   onClick={() => {
                     setShowSeriesEditDialog(false);
                     handleAddTransaction('single');
-                  }} 
-                  className="w-full h-16 rounded-2xl font-medium text-lg bg-slate-100/80 dark:bg-[#1C1852]/80 text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-200 dark:hover:bg-[#201C56] transition-all border-none"
+                  }}
+                  className="w-full h-14 rounded-full font-medium bg-secondary text-secondary-foreground hover:bg-secondary/70 transition-all active:scale-95"
                 >
                   Editar somente este
-                </Button>
-                <Button 
+                </button>
+                <button
                   onClick={() => {
                     setShowSeriesEditDialog(false);
                     handleAddTransaction('future');
-                  }} 
-                  className="w-full h-16 rounded-2xl font-medium text-lg bg-primary text-white shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95 border-none"
+                  }}
+                  className="w-full h-14 rounded-full font-medium bg-primary text-white hover:bg-primary/90 transition-all active:scale-95"
                 >
                   Editar sequência
-                </Button>
-                <Button 
-                  variant="ghost" 
+                </button>
+                <button
                   onClick={() => {
                     setShowSeriesEditDialog(false);
-                    setIsRegistrarOpen(true); 
-                  }} 
-                  className="w-full h-12 rounded-xl font-normal text-slate-400 dark:text-[#8D89AC]"
+                    setIsRegistrarOpen(true);
+                  }}
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Voltar e revisar
-                </Button>
+                </button>
               </div>
             </div>
           </DialogContent>
