@@ -39,6 +39,7 @@ import {
   KeyRound,
   AtSign,
   UserCog,
+  Pencil,
   Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -2059,191 +2060,179 @@ export default function App() {
   }
 
   if (!user) {
+    const pillInput = "h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6 placeholder:text-slate-400 dark:placeholder:text-[#6B679C]";
+    const fieldLabel = "text-[11px] font-medium text-slate-500 dark:text-[#A8A4CC] ml-1";
+
     return (
-      <div className="min-h-screen bg-[#F6F4FD] dark:bg-[#0B0A2E] flex flex-col items-center justify-center p-6 text-center">
-        <div className="max-w-sm w-full">
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-20 h-20 bg-primary rounded-[1.75rem] flex items-center justify-center text-white shadow-bubbly mx-auto mb-6 rotate-3"
-          >
-            <Wallet size={40} strokeWidth={2.5} />
-          </motion.div>
+      <div className="min-h-screen bg-[#F6F4FD] dark:bg-[#0B0A2E] flex flex-col p-6">
+        <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto">
+          <div className="flex items-center gap-3 mb-10">
+            <div className="w-11 h-11 bg-primary rounded-2xl flex items-center justify-center text-white shadow-bubbly rotate-3 shrink-0">
+              <Wallet size={20} strokeWidth={2.5} />
+            </div>
+            <span className="text-lg font-heading font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Financeiro</span>
+          </div>
 
-          <h1 className="text-3xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] leading-[0.9] mb-10">
-            Financeiro
-          </h1>
-
-          <div className="bg-white dark:bg-[#100E3D] p-8 rounded-[3rem] border border-white dark:border-[#100E3D] shadow-soft space-y-4 text-left">
           {showForgotPassword ? (
             forgotSent ? (
-              <div className="text-center space-y-4 py-4">
-                <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto text-emerald-500">
+              <div className="space-y-6">
+                <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center text-emerald-500 dark:text-emerald-400">
                   <Mail size={26} strokeWidth={2.5} />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-800 dark:text-[#EDE9E3]">Link enviado!</p>
-                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-1">Verifique seu e-mail ({forgotEmail}) e clique no link para definir uma nova senha.</p>
+                  <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mb-2">Link enviado!</h1>
+                  <p className="text-sm font-normal text-slate-500 dark:text-[#A8A4CC]">Verifique seu e-mail ({forgotEmail}) e clique no link para definir uma nova senha.</p>
                 </div>
-                <Button
+                <button
                   onClick={() => { setShowForgotPassword(false); setForgotSent(false); }}
-                  variant="ghost"
-                  className="w-full h-12 rounded-xl font-normal text-primary"
+                  className="text-sm font-medium text-primary hover:underline"
                 >
                   Voltar para o login
-                </Button>
+                </button>
               </div>
             ) : (
               <>
-                <div>
-                  <p className="font-medium text-slate-800 dark:text-[#EDE9E3]">Esqueceu sua senha?</p>
-                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-1">Informe seu e-mail e enviaremos um link para você redefinir a senha.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">E-mail</Label>
-                  <Input
-                    type="email"
-                    placeholder="voce@email.com"
-                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
-                    value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleForgotPasswordSubmit()}
-                  />
-                </div>
-                {forgotError && (
-                  <p className="text-xs font-normal text-rose-500 bg-rose-50 rounded-xl px-4 py-3">{forgotError}</p>
-                )}
-                <Button
-                  onClick={handleForgotPasswordSubmit}
-                  disabled={forgotSubmitting}
-                  className="w-full h-14 rounded-2xl bg-primary text-white hover:bg-primary/90 font-medium text-base disabled:opacity-50"
-                >
-                  Enviar link de recuperação
-                </Button>
-                <Button
+                <button
+                  type="button"
                   onClick={() => { setShowForgotPassword(false); setForgotError(''); }}
-                  variant="ghost"
-                  className="w-full h-11 rounded-xl font-normal text-slate-400 dark:text-[#8D89AC]"
+                  className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] mb-8"
                 >
-                  Voltar
-                </Button>
+                  <ChevronLeft size={20} />
+                </button>
+                <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mb-2">Recuperar senha</h1>
+                <p className="text-sm font-normal text-slate-500 dark:text-[#A8A4CC] mb-8">Informe seu e-mail e enviaremos um link para redefinir a senha.</p>
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <Label className={fieldLabel}>E-mail</Label>
+                    <Input
+                      type="email"
+                      placeholder="voce@email.com"
+                      className={pillInput}
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleForgotPasswordSubmit()}
+                    />
+                  </div>
+                  {forgotError && (
+                    <p className="text-xs font-normal text-rose-500 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400 rounded-2xl px-5 py-3">{forgotError}</p>
+                  )}
+                  <Button
+                    onClick={handleForgotPasswordSubmit}
+                    disabled={forgotSubmitting}
+                    className="w-full h-14 rounded-full bg-primary text-white hover:bg-primary/90 font-medium text-base disabled:opacity-50"
+                  >
+                    Enviar link de recuperação
+                  </Button>
+                </div>
               </>
             )
           ) : (
             <>
-            <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-2xl p-1">
-              <button
-                type="button"
-                onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthInfo(''); }}
-                className={cn("flex-1 h-11 rounded-xl font-medium text-sm transition-all", authMode === 'signin' ? "bg-white dark:bg-[#100E3D] shadow-soft text-primary" : "text-slate-400 dark:text-[#8D89AC]")}
-              >
-                Entrar
-              </button>
-              <button
-                type="button"
-                onClick={() => { setAuthMode('signup'); setAuthError(''); setAuthInfo(''); }}
-                className={cn("flex-1 h-11 rounded-xl font-medium text-sm transition-all", authMode === 'signup' ? "bg-white dark:bg-[#100E3D] shadow-soft text-primary" : "text-slate-400 dark:text-[#8D89AC]")}
-              >
-                Criar conta
-              </button>
-            </div>
+              <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mb-5">
+                {authMode === 'signin' ? 'Entrar' : 'Criar conta'}
+              </h1>
+              <div className="flex items-center gap-6 mb-8 border-b border-slate-200/70 dark:border-white/10">
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthInfo(''); }}
+                  className={cn("text-sm pb-3 -mb-px border-b-2 transition-colors", authMode === 'signin' ? "font-medium text-slate-800 dark:text-[#EDE9E3] border-primary" : "text-slate-400 dark:text-[#8D89AC] border-transparent")}
+                >
+                  Entrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('signup'); setAuthError(''); setAuthInfo(''); }}
+                  className={cn("text-sm pb-3 -mb-px border-b-2 transition-colors", authMode === 'signup' ? "font-medium text-slate-800 dark:text-[#EDE9E3] border-primary" : "text-slate-400 dark:text-[#8D89AC] border-transparent")}
+                >
+                  Criar conta
+                </button>
+              </div>
 
-            {authMode === 'signup' && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome</Label>
-                    <Input
-                      placeholder="Edson"
-                      className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
-                      value={authFirstName}
-                      onChange={(e) => setAuthFirstName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Sobrenome</Label>
-                    <Input
-                      placeholder="Vargas"
-                      className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
-                      value={authLastName}
-                      onChange={(e) => setAuthLastName(e.target.value)}
-                    />
-                  </div>
+              <div className="space-y-5">
+                {authMode === 'signup' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label className={fieldLabel}>Nome</Label>
+                        <Input placeholder="Edson" className={pillInput} value={authFirstName} onChange={(e) => setAuthFirstName(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className={fieldLabel}>Sobrenome</Label>
+                        <Input placeholder="Vargas" className={pillInput} value={authLastName} onChange={(e) => setAuthLastName(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className={fieldLabel}>Usuário</Label>
+                      <Input
+                        placeholder="edson"
+                        className={pillInput}
+                        value={authUsername}
+                        onChange={(e) => setAuthUsername(e.target.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-2">
+                  <Label className={fieldLabel}>E-mail</Label>
+                  <Input type="email" placeholder="voce@email.com" className={pillInput} value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Usuário</Label>
-                  <Input
-                    placeholder="edson"
-                    className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
-                    value={authUsername}
-                    onChange={(e) => setAuthUsername(e.target.value.trim().toLowerCase().replace(/[^a-z0-9_.]/g, ''))}
-                  />
+                  <Label className={fieldLabel}>Senha</Label>
+                  <div className="relative">
+                    <Input
+                      type={showAuthPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      className={cn(pillInput, "pr-12")}
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAuthSubmit()}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAuthPassword(v => !v)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] hover:text-primary transition-colors"
+                      aria-label={showAuthPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                    >
+                      {showAuthPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
-              </>
-            )}
 
-            <div className="space-y-2">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">E-mail</Label>
-              <Input
-                type="email"
-                placeholder="voce@email.com"
-                className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-5"
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Senha</Label>
-              <div className="relative">
-                <Input
-                  type={showAuthPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm pl-5 pr-12"
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAuthSubmit()}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowAuthPassword(v => !v)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] hover:text-primary transition-colors"
-                  aria-label={showAuthPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                {authMode === 'signin' && (
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => { setShowForgotPassword(true); setForgotEmail(authEmail); setForgotSent(false); setForgotError(''); }}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
+                )}
+
+                {authError && (
+                  <p className="text-xs font-normal text-rose-500 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400 rounded-2xl px-5 py-3">{authError}</p>
+                )}
+                {authInfo && (
+                  <p className="text-xs font-normal text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl px-5 py-3">{authInfo}</p>
+                )}
+
+                <Button
+                  onClick={handleAuthSubmit}
+                  disabled={authSubmitting}
+                  className="w-full h-14 rounded-full bg-primary text-white hover:bg-primary/90 gap-2 transition-all active:scale-95 font-medium text-base disabled:opacity-50 flex items-center justify-center"
                 >
-                  {showAuthPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+                  <LogIn size={18} strokeWidth={2.5} />
+                  <span>{authMode === 'signin' ? 'Entrar' : 'Criar conta'}</span>
+                </Button>
+
+                <p className="text-[11px] font-normal text-slate-400 dark:text-[#6B679C] text-center leading-relaxed pt-2">
+                  Ao continuar, você concorda com os Termos de Uso e a Política de Privacidade.
+                </p>
               </div>
-            </div>
-
-            {authMode === 'signin' && (
-              <div className="text-right">
-                <button
-                  type="button"
-                  onClick={() => { setShowForgotPassword(true); setForgotEmail(authEmail); setForgotSent(false); setForgotError(''); }}
-                  className="text-xs font-normal text-primary hover:underline"
-                >
-                  Esqueci minha senha
-                </button>
-              </div>
-            )}
-
-            {authError && (
-              <p className="text-xs font-normal text-rose-500 bg-rose-50 rounded-xl px-4 py-3">{authError}</p>
-            )}
-            {authInfo && (
-              <p className="text-xs font-normal text-emerald-600 bg-emerald-50 rounded-xl px-4 py-3">{authInfo}</p>
-            )}
-
-            <Button
-              onClick={handleAuthSubmit}
-              disabled={authSubmitting}
-              className="w-full h-14 rounded-2xl bg-primary text-white hover:bg-primary/90 gap-2 transition-all active:scale-95 font-medium text-base disabled:opacity-50 flex items-center justify-center"
-            >
-              <LogIn size={18} strokeWidth={2.5} />
-              <span>{authMode === 'signin' ? 'Entrar' : 'Criar conta'}</span>
-            </Button>
             </>
           )}
-          </div>
         </div>
       </div>
     );
@@ -2254,7 +2243,7 @@ export default function App() {
       {/* Onboarding / Nickname Modal */}
       <Dialog open={isNicknameModalOpen} onOpenChange={setIsNicknameModalOpen}>
         <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#100E3D] flex flex-col">
-          <div className="p-4 border-b border-slate-50 dark:border-[#1C1852] shrink-0">
+          <div className="p-4 shrink-0">
             <DialogHeader>
               <DialogTitle className="text-2xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Quase lá! ✨</DialogTitle>
               <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#8D89AC] tracking-tight mt-1"></DialogDescription>
@@ -2284,7 +2273,7 @@ export default function App() {
 
       <Dialog open={!!confirmingTransaction} onOpenChange={(open) => !open && setConfirmingTransaction(null)}>
         <DialogContent className="rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep max-w-sm max-h-[90vh] p-0 overflow-hidden bg-white dark:bg-[#100E3D] flex flex-col">
-          <div className="p-6 border-b border-slate-50 dark:border-[#1C1852] shrink-0">
+          <div className="p-6 shrink-0">
             <DialogHeader>
               <DialogTitle className="text-xl font-heading font-medium text-slate-800 dark:text-[#EDE9E3] leading-tight">
                 {confirmingTransaction?.id.startsWith('bill-') ? 'Fatura do cartão' : 'Confirmar recebimento'}
@@ -2365,7 +2354,7 @@ export default function App() {
       {/* Bill Details Modal */}
       <Dialog open={!!viewingBill} onOpenChange={(open) => !open && setViewingBill(null)}>
         <DialogContent className="max-w-none sm:max-w-lg max-h-[85vh] p-0 border-none shadow-deep rounded-t-[2rem] rounded-b-none md:rounded-[2rem] overflow-hidden flex flex-col bg-white dark:bg-[#100E3D]">
-          <div className="p-6 border-b border-slate-50 dark:border-[#1C1852] shrink-0">
+          <div className="p-6 shrink-0">
             <DialogHeader>
               <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">
                 Fatura {cards.find(c => c.id === viewingBill?.cardId)?.name || ''}
@@ -2376,7 +2365,7 @@ export default function App() {
             </DialogHeader>
           </div>
           <ScrollArea className="flex-1 overflow-y-auto">
-            <div className="divide-y divide-slate-100 dark:divide-[#201C56] px-2">
+            <div className="space-y-2 p-4">
               {billTransactions.length === 0 && (
                 <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#6B679C]">Nenhum lançamento nessa fatura.</p>
               )}
@@ -2388,8 +2377,6 @@ export default function App() {
                       transaction={t}
                       personName={person?.name}
                       onClick={() => { setViewingBill(null); handleEditClick(t); }}
-                      hideIcon
-                      isSimplified
                     />
                   </div>
                 );
@@ -2505,9 +2492,9 @@ export default function App() {
             }
           />
           <DialogContent className="max-w-none sm:max-w-lg h-[85vh] flex flex-col p-0 border-none shadow-deep rounded-t-[2.5rem] rounded-b-none overflow-hidden bg-white dark:bg-[#100E3D]">
-            <div className="px-6 py-4 border-b border-slate-50 dark:border-[#1C1852] shrink-0 flex items-center justify-between">
+            <div className="px-6 pt-6 pb-2 shrink-0">
               <DialogHeader>
-                <DialogTitle className="text-lg font-medium tracking-tight text-slate-800 dark:text-[#EDE9E3]">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
+                <DialogTitle className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
               </DialogHeader>
             </div>
           <div className="flex-1 overflow-y-auto p-5 pb-10 space-y-6 scrollbar-hide">
@@ -3052,11 +3039,11 @@ export default function App() {
 
         {/* Categories Management Modal */}
         <Dialog open={isCategoriasOpen} onOpenChange={setIsCategoriasOpen}>
-          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep flex flex-col overflow-hidden bg-white dark:bg-[#100E3D] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
-            <div className="p-6 border-b border-slate-50 dark:border-[#1C1852] shrink-0">
+          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep flex flex-col overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+            <div className="p-6 shrink-0">
               <DialogHeader>
-                <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Gerenciar categorias</DialogTitle>
-                <DialogDescription className="font-normal text-[10px] text-slate-400 dark:text-[#8D89AC] tracking-tight mt-1">Personalize sua organização</DialogDescription>
+                <DialogTitle className="text-3xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter">Categorias</DialogTitle>
+                <DialogDescription className="font-normal text-sm text-slate-500 dark:text-[#A8A4CC] tracking-tight mt-1">Personalize sua organização</DialogDescription>
               </DialogHeader>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
@@ -3168,9 +3155,9 @@ export default function App() {
             }
           />
           <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none flex flex-col p-0 overflow-hidden border-none shadow-deep bg-white dark:bg-[#100E3D] sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-xl sm:h-auto sm:max-h-[85vh] sm:rounded-[1.75rem]">
-            <div className="px-8 py-5 border-b border-slate-50 dark:border-[#1C1852] shrink-0 flex items-center justify-between">
+            <div className="px-8 pt-8 pb-2 shrink-0">
               <DialogHeader>
-                <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
+                <DialogTitle className="text-4xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
               </DialogHeader>
             </div>
 
@@ -3780,29 +3767,34 @@ export default function App() {
             }
           />
           <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:w-screen sm:max-w-none sm:translate-x-0 sm:rounded-none">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-[#201C56] shrink-0 bg-white dark:bg-[#100E3D] flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white font-medium text-sm shrink-0">
-                {(userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()}
-              </div>
-              <DialogHeader className="min-w-0">
-                <DialogTitle className="text-base font-medium text-slate-800 dark:text-[#EDE9E3] truncate">Minha conta</DialogTitle>
-                <DialogDescription className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">
-                  {userProfile?.username ? `@${userProfile.username} · ` : ''}{user?.email}
-                </DialogDescription>
+            <div className="px-6 pt-6 pb-2 shrink-0">
+              <DialogHeader className="sr-only">
+                <DialogTitle>Minha conta</DialogTitle>
+                <DialogDescription>{userProfile?.username ? `@${userProfile.username} · ` : ''}{user?.email}</DialogDescription>
               </DialogHeader>
+              <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mb-6">Minha conta</h1>
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-medium text-xl shrink-0">
+                  {(userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-slate-800 dark:text-[#EDE9E3] truncate">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
+                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] truncate">
+                    {userProfile?.username ? `@${userProfile.username} · ` : ''}{user?.email}
+                  </p>
+                </div>
+                <button
+                  onClick={handleOpenAccountEdit}
+                  className="w-11 h-11 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
+                  aria-label="Editar informações"
+                >
+                  <Pencil size={16} strokeWidth={2.5} />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 md:p-10">
               <div className="max-w-2xl mx-auto w-full space-y-8">
-
-                <AccountSection label="Conta">
-                  <AccountRow
-                    icon={<UserCog size={18} />}
-                    title="Editar informações"
-                    description="Nome, sobrenome, usuário e apelido"
-                    onClick={handleOpenAccountEdit}
-                  />
-                </AccountSection>
 
                 <AccountSection label="Gerenciamento">
                   <AccountRow
@@ -3896,7 +3888,7 @@ export default function App() {
       {/* Account Edit Dialog */}
       <Dialog open={isAccountEditOpen} onOpenChange={setIsAccountEditOpen}>
         <DialogContent className="max-w-none sm:max-w-md rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep p-0 overflow-hidden bg-white dark:bg-[#100E3D] max-h-[85vh] flex flex-col">
-          <div className="p-6 border-b border-slate-50 dark:border-[#1C1852] shrink-0">
+          <div className="p-6 shrink-0">
             <DialogHeader>
               <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Editar informações</DialogTitle>
               <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#8D89AC]">Atualize seus dados de conta</DialogDescription>
@@ -4303,8 +4295,7 @@ export default function App() {
 
               <div>
                 <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4 ml-2">Lançamentos recentes</h3>
-                <ShadcnCard className="border-none shadow-soft rounded-2xl overflow-hidden bg-white dark:bg-[#100E3D]">
-                  <div className="divide-y divide-slate-100 dark:divide-[#201C56]">
+                <div className="space-y-2">
                     {((groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'] || []).map(t => {
                       const person = people.find(p => p.id === t.payerPayee);
                       const card = cards.find(c => c.id === t.cardId);
@@ -4321,10 +4312,9 @@ export default function App() {
                       );
                     })}
                     {(!(groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'] || (groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'].length === 0) && (
-                      <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#6B679C]">Nenhum lançamento ainda.</p>
+                      <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#6B679C] bg-card rounded-3xl">Nenhum lançamento ainda.</p>
                     )}
                   </div>
-                </ShadcnCard>
               </div>
             </motion.div>
           )}
@@ -4478,25 +4468,20 @@ export default function App() {
                       {sortMode !== 'date' || groupMode === 'category' || groupMode === 'person' || activeTab === 'visao-geral' ? date : format(parseISO(date), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                     </h3>
                   </div>
-                  <ShadcnCard className="border-none shadow-soft rounded-[1.25rem] md:rounded-2xl overflow-hidden py-0 md:py-4 bg-white dark:bg-[#100E3D]">
+                  <ShadcnCard className="border-none shadow-none md:shadow-soft rounded-[1.25rem] md:rounded-2xl overflow-visible md:overflow-hidden py-0 md:py-4 bg-transparent md:bg-white dark:bg-transparent md:dark:bg-[#100E3D]">
                     {/* Mobile: card list */}
-                    <div className="md:hidden divide-y divide-slate-100 dark:divide-[#201C56]">
+                    <div className="md:hidden space-y-2">
                       {items.map(t => {
                         const person = people.find(p => p.id === t.payerPayee);
                         const card = cards.find(c => c.id === t.cardId);
                         return (
-                          <div
-                            key={t.id}
-                            className="hover:bg-white dark:hover:bg-[#100E3D]/80 transition-all duration-300"
-                          >
+                          <div key={t.id}>
                             <TransactionItem
                               transaction={t}
                               personName={person?.name}
                               cardName={card?.name}
                               onClick={() => handleTransactionClick(t)}
                               onQuickConfirm={() => handleQuickConfirm(t)}
-                              hideIcon={true}
-                              isSimplified={true}
                               hideDate={groupMode === 'date'}
                             />
                           </div>
@@ -4665,21 +4650,20 @@ export default function App() {
                   <h3 className={cn("text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-2", groupIndex > 0 && "md:hidden")}>
                     {sortMode !== 'date' || groupMode === 'category' || groupMode === 'person' ? date : format(parseISO(date), "dd 'de' MMMM", { locale: ptBR })}
                   </h3>
-                  <ShadcnCard className="border-none shadow-sm rounded-[1.25rem] md:rounded-2xl overflow-hidden py-0 md:py-4">
+                  <ShadcnCard className="border-none shadow-none md:shadow-sm rounded-[1.25rem] md:rounded-2xl overflow-visible md:overflow-hidden py-0 md:py-4 bg-transparent md:bg-card">
                     {/* Mobile: card list */}
-                    <div className="md:hidden divide-y divide-slate-50 dark:divide-[#1C1852]">
+                    <div className="md:hidden space-y-2">
                       {items.map(t => {
                         const person = people.find(p => p.id === t.payerPayee);
                         const card = cards.find(c => c.id === t.cardId);
                         return (
-                          <div key={t.id} className="p-1 hover:bg-slate-50 dark:hover:bg-[#16133F] transition-colors">
+                          <div key={t.id}>
                             <TransactionItem
                               transaction={t}
                               personName={person?.name}
                               cardName={card?.name}
                               onClick={() => handleTransactionClick(t)}
                               onQuickConfirm={() => handleQuickConfirm(t)}
-                              hideIcon={true}
                               hideDate={groupMode === 'date'}
                             />
                           </div>
@@ -4756,11 +4740,11 @@ export default function App() {
 
       {/* Pessoas Management Modal */}
       <Dialog open={isPessoasOpen} onOpenChange={(open) => { setIsPessoasOpen(open); if (!open) handleCancelEditPerson(); }}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none overflow-hidden flex flex-col p-0 border-none shadow-deep z-[60] bg-white dark:bg-[#100E3D] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none overflow-hidden flex flex-col p-0 border-none shadow-deep z-[60] bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
           <div className="p-8 bg-white dark:bg-[#100E3D] flex flex-col h-full overflow-hidden">
             <DialogHeader className="shrink-0 mb-6">
-              <DialogTitle className="text-2xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Gerenciar pessoas</DialogTitle>
-              <DialogDescription className="font-normal text-xs text-slate-400 dark:text-[#8D89AC] tracking-tight mt-1">Sua rede de contatos</DialogDescription>
+              <DialogTitle className="text-3xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter">Pessoas</DialogTitle>
+              <DialogDescription className="font-normal text-sm text-slate-500 dark:text-[#A8A4CC] tracking-tight mt-1">Sua rede de contatos</DialogDescription>
             </DialogHeader>
 
             <ScrollArea className="flex-1 -mx-2 px-2 overflow-y-auto">
@@ -4927,14 +4911,16 @@ export default function App() {
         setIsCartoesOpen(open);
         if (!open) { setManageCardId(null); setShowCardForm(false); setEditingCard(null); }
       }}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-white dark:bg-[#100E3D] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
-          <div className="p-6 border-b border-slate-50 dark:border-[#1C1852] shrink-0 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              {(manageCardId || showCardForm) && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-9 w-9 rounded-full shrink-0 -ml-1"
+        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+          <div className="p-6 shrink-0">
+            <DialogHeader className="sr-only">
+              <DialogTitle>{showCardForm ? (editingCard ? 'Editar cartão' : 'Novo cartão') : manageCardId ? cards.find(c => c.id === manageCardId)?.name : 'Cartões'}</DialogTitle>
+              <DialogDescription>Sua carteira de cartões</DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              {(manageCardId || showCardForm) ? (
+                <button
+                  className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] shrink-0"
                   onClick={() => {
                     if (showCardForm) {
                       setShowCardForm(false);
@@ -4945,33 +4931,30 @@ export default function App() {
                   }}
                 >
                   <ChevronLeft size={20} />
-                </Button>
+                </button>
+              ) : <span />}
+              {!showCardForm && !manageCardId && (
+                <button
+                  className="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0"
+                  onClick={() => {
+                    setEditingCard(null);
+                    setNewCardName('');
+                    setLimitInput('0,00');
+                    setNewCardClosingDay('');
+                    setNewCardDueDay('');
+                    setNewCardColor('#8A7FF5');
+                    setShowCardForm(true);
+                  }}
+                >
+                  <Plus size={18} strokeWidth={3} />
+                </button>
               )}
-              <DialogHeader className="min-w-0">
-                <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight truncate">
-                  {showCardForm ? (editingCard ? 'Editar cartão' : 'Novo cartão') : manageCardId ? cards.find(c => c.id === manageCardId)?.name : 'Gerenciar cartões'}
-                </DialogTitle>
-                {!showCardForm && !manageCardId && (
-                  <DialogDescription className="font-normal text-[10px] text-slate-400 dark:text-[#8D89AC] tracking-tight mt-1">Sua carteira de cartões</DialogDescription>
-                )}
-              </DialogHeader>
             </div>
+            <h1 className="text-3xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter truncate">
+              {showCardForm ? (editingCard ? 'Editar cartão' : 'Novo cartão') : manageCardId ? cards.find(c => c.id === manageCardId)?.name : 'Cartões'}
+            </h1>
             {!showCardForm && !manageCardId && (
-              <Button
-                size="icon"
-                className="h-10 w-10 rounded-full bg-primary text-white shrink-0"
-                onClick={() => {
-                  setEditingCard(null);
-                  setNewCardName('');
-                  setLimitInput('0,00');
-                  setNewCardClosingDay('');
-                  setNewCardDueDay('');
-                  setNewCardColor('#8A7FF5');
-                  setShowCardForm(true);
-                }}
-              >
-                <Plus size={18} strokeWidth={3} />
-              </Button>
+              <p className="font-normal text-sm text-slate-500 dark:text-[#A8A4CC] tracking-tight mt-1">Sua carteira de cartões</p>
             )}
           </div>
 
@@ -5165,7 +5148,7 @@ export default function App() {
         if (!open) setSelectedPersonId(null);
       }}>
         <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-white dark:bg-[#100E3D] sm:top-auto sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-full sm:max-w-4xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl">
-          <div className="p-6 md:p-8 border-b border-slate-50 dark:border-[#1C1852] shrink-0 flex items-center justify-between gap-3">
+          <div className="p-6 md:p-8 shrink-0 flex items-center justify-between gap-3">
             <div className="flex items-center gap-4 min-w-0">
               {selectedPersonId && (
                 <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full shrink-0" onClick={() => setSelectedPersonId(null)}>
@@ -5656,8 +5639,6 @@ function TransactionItem({
   cardName,
   onClick,
   onQuickConfirm,
-  hideIcon = false,
-  isSimplified = false,
   hideDate = false
 }: {
   transaction: Transaction,
@@ -5665,134 +5646,68 @@ function TransactionItem({
   cardName?: string,
   onClick?: () => void,
   onQuickConfirm?: () => void,
-  hideIcon?: boolean,
-  isSimplified?: boolean,
   hideDate?: boolean
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
   const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-');
 
-  const rowContent = (
-    <>
-      <div className="flex items-center gap-5 overflow-hidden flex-1">
-        {!hideIcon && (
-          <div className={cn(
-            "w-12 h-12 rounded-2xl flex items-center justify-center transition-all group-hover:rotate-6 shadow-soft bg-white dark:bg-[#100E3D] group-hover:scale-110 flex-shrink-0",
-            transaction.type === 'income' ? "text-primary" : "text-rose-400"
-          )}>
-            {transaction.type === 'income' ? <ArrowUpCircle size={24} strokeWidth={2.5} /> : <ArrowDownCircle size={24} strokeWidth={2.5} />}
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <p className="text-base font-normal text-slate-700 dark:text-[#EDEAF9] group-hover:text-slate-900 dark:group-hover:text-[#F9F7F2] transition-colors tracking-tight truncate">{transaction.description}</p>
-          <div className="flex items-center gap-2 mt-1 overflow-hidden">
-            {!hideDate && (
-              <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight flex items-center gap-1 flex-shrink-0">
-                <CalendarIcon size={10} strokeWidth={2.5} />
-                {formattedDate}
-              </span>
-            )}
-            
-            {transaction.installments && (
-              <span className={cn(
-                "text-[10px] font-medium px-1.5 py-0.5 rounded-md flex-shrink-0",
-                transaction.type === 'income' ? "text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10" : "text-rose-400 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/10"
-              )}>
-                {transaction.installments.current}/{transaction.installments.total}
-              </span>
-            )}
-
-            {transaction.actualDate && (
-              <span className={cn(
-                "text-[10px] font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 flex items-center gap-1",
-                transaction.type === 'income' ? "text-emerald-500 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10" : "text-rose-400 bg-rose-50 dark:text-rose-400 dark:bg-rose-500/10"
-              )}>
-                <CheckCircle2 size={10} strokeWidth={3} />
-                {format(parseISO(transaction.actualDate), 'dd/MM/yyyy')}
-              </span>
-            )}
-
-            {personName && (
-              <span className="text-[11px] font-medium text-slate-400 dark:text-[#8D89AC] truncate flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-[#2A2566]"></span>
-                {personName}
-              </span>
-            )}
-            
-            {cardName && (
-              <span className="text-[11px] font-medium text-slate-400 dark:text-[#8D89AC] truncate flex items-center gap-1.5">
-                <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-[#2A2566]"></span>
-                <CreditCard size={10} strokeWidth={2.5} className="mr-0.5" />
-                {cardName}
-              </span>
-            )}
-            
-            {transaction.linkedToCard && transaction.type !== 'income' && (
-               <span className="text-[11px] font-medium text-indigo-500 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
-                 <CreditCard size={10} strokeWidth={3} />
-                 Vinculado a cartão
-               </span>
-            )}
-
-            {(hideDate || !hideIcon) && (
-              <p className="text-[11px] font-medium text-slate-300 dark:text-[#6B679C] truncate italic ml-1">
-                {transaction.category}
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className={cn(
-        "flex items-center gap-5 flex-shrink-0 ml-4",
-        hideIcon ? "gap-0" : "gap-5"
-      )}>
-        <div className="text-right flex items-center gap-3">
-          {transaction.status === 'actual' ? (
-            <span className={cn(
-              "text-[9px] font-medium px-2 py-1 rounded-full shrink-0 whitespace-nowrap",
-              transaction.type === 'income' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400"
-            )}>
-              {transaction.type === 'income' ? 'Recebido' : 'Pago'}
-            </span>
-          ) : canConfirm && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onQuickConfirm?.(); }}
-              title={transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
-              className="p-2 -m-2 rounded-full active:scale-90 transition-all group/confirm shrink-0"
-            >
-              <div className="w-6 h-6 rounded-full border-2 border-slate-200 dark:border-[#2A2566] group-hover/confirm:border-primary group-hover/confirm:bg-primary/10 transition-all flex items-center justify-center text-transparent group-hover/confirm:text-primary">
-                <CheckCircle2 size={16} strokeWidth={3} />
-              </div>
-            </button>
-          )}
-          <p className={cn(
-            "font-heading font-normal tracking-tighter whitespace-nowrap transition-colors",
-            hideIcon ? "text-base" : "text-xl",
-            transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
-          )}>
-            R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        </div>
-        {!hideIcon && (
-          <div className="w-10 h-10 rounded-full bg-white dark:bg-[#100E3D] shadow-soft flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0 group-hover:bg-primary group-hover:text-white flex-shrink-0">
-            <ChevronRight size={18} strokeWidth={3} />
-          </div>
-        )}
-      </div>
-    </>
-  );
-
   return (
     <div
       onClick={onClick}
-      className={cn(
-        "flex items-center justify-between group cursor-pointer rounded-[1rem] hover:bg-primary/5 transition-all border border-transparent",
-        hideIcon ? "py-1 px-4" : "py-3 px-4",
-        isSimplified && "py-1"
-      )}
+      className="flex items-center justify-between gap-3 bg-card rounded-full pl-3 pr-4 py-3 shadow-soft cursor-pointer active:scale-[0.99] transition-transform"
     >
-      {rowContent}
+      <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
+        <div className={cn(
+          "w-11 h-11 rounded-full flex items-center justify-center shrink-0",
+          transaction.type === 'income' ? "bg-emerald-400 text-white" : "bg-rose-400 text-white"
+        )}>
+          {transaction.type === 'income' ? <ArrowUpCircle size={20} strokeWidth={2.5} /> : <ArrowDownCircle size={20} strokeWidth={2.5} />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate">{transaction.description}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 overflow-hidden">
+            {!hideDate && (
+              <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight shrink-0">
+                {formattedDate}
+              </span>
+            )}
+            {transaction.installments && (
+              <span className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] shrink-0">
+                · {transaction.installments.current}/{transaction.installments.total}
+              </span>
+            )}
+            {personName && (
+              <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {personName}</span>
+            )}
+            {cardName && (
+              <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {cardName}</span>
+            )}
+            {transaction.linkedToCard && transaction.type !== 'income' && (
+              <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 shrink-0">· vinculado</span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {transaction.status === 'actual' ? (
+          <CheckCircle2 size={15} strokeWidth={2.5} className={transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"} />
+        ) : canConfirm && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onQuickConfirm?.(); }}
+            title={transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
+            className="p-2 -m-2 rounded-full active:scale-90 transition-all group/confirm"
+          >
+            <div className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#2A2566] group-hover/confirm:border-primary transition-all" />
+          </button>
+        )}
+        <p className={cn(
+          "font-heading font-medium tracking-tighter whitespace-nowrap text-base",
+          transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
+        )}>
+          R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </p>
+      </div>
     </div>
   );
 }
