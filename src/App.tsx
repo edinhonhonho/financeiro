@@ -40,7 +40,10 @@ import {
   AtSign,
   UserCog,
   Pencil,
-  Sparkles
+  Sparkles,
+  Home,
+  User as UserIcon,
+  Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -2481,19 +2484,9 @@ export default function App() {
         </DialogContent>
       </Dialog>
 
-      {/* FAB, positioned beside the bottom nav bar (not overlapping it) */}
-      <div className="fixed bottom-4 right-[5vw] z-40 md:hidden">
+      {/* Novo lançamento (mobile) — controlled dialog, triggered from the per-tab "+" buttons */}
+      <div className="md:hidden">
         <Dialog open={isRegistrarOpen && window.innerWidth < 768} onOpenChange={setIsRegistrarOpen}>
-          <DialogTrigger
-            render={
-              <Button
-                className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-[#B6ADFF] hover:scale-105 active:scale-95 shadow-bubbly shadow-primary/40 p-0 border-[5px] border-[#F6F4FD] dark:border-[#0B0A2E] transition-all duration-500 overflow-hidden group"
-                onClick={handleOpenRegistrar}
-              >
-                <Plus size={30} className="text-white relative z-10 transition-transform duration-500 group-hover:rotate-90" strokeWidth={3} />
-              </Button>
-            }
-          />
           <DialogContent className="max-w-none sm:max-w-lg h-[85vh] flex flex-col p-0 border-none shadow-deep rounded-t-[2.5rem] rounded-b-none overflow-hidden bg-white dark:bg-[#100E3D]">
             <div className="px-6 pt-6 pb-2 shrink-0">
               <DialogHeader>
@@ -3733,35 +3726,31 @@ export default function App() {
       </div>
 
       {/* Bottom Navigation - Mobile */}
-      <nav className="md:hidden fixed bottom-4 left-[5vw] w-[calc(90vw-5.75rem)] h-20 bg-white dark:bg-[#100E3D] shadow-bubbly flex items-center justify-around px-2 z-40 rounded-full border border-slate-100 dark:border-[#201C56]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-[#F6F4FD] dark:bg-[#0B0A2E] flex items-center justify-around px-4 pt-3 z-40 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <MobileNavItem
           active={activeTab === 'visao-geral'}
           onClick={() => setActiveTab('visao-geral')}
-          icon={<LayoutDashboard />}
+          icon={<Home />}
         />
         <MobileNavItem
-          active={activeTab === 'receitas'}
-          onClick={() => setActiveTab('receitas')}
-          icon={<ArrowUpCircle />}
-        />
-        <MobileNavItem
-          active={activeTab === 'despesas'}
+          active={activeTab === 'receitas' || activeTab === 'despesas'}
           onClick={() => setActiveTab('despesas')}
-          icon={<ArrowDownCircle />}
+          icon={<PieChartIcon />}
+        />
+        <MobileNavItem
+          active={activeTab === 'cartoes'}
+          onClick={() => setActiveTab('cartoes')}
+          icon={<CreditCard />}
         />
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
           <DialogTrigger
             render={
-              <button className="flex items-center justify-center h-12 w-12 rounded-full transition-all duration-300 relative shrink-0 active:scale-90">
-                {isProfileOpen && (
-                  <div className="absolute inset-0 bg-primary rounded-full" />
-                )}
-                <div className={cn(
-                  "relative z-10 w-7 h-7 rounded-full overflow-hidden flex items-center justify-center font-medium text-[11px] transition-colors",
-                  isProfileOpen ? "bg-white/20 text-white" : "bg-primary/10 text-primary"
-                )}>
-                  {(userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()}
-                </div>
+              <button className="flex items-center justify-center h-11 w-11 shrink-0 active:scale-90 transition-transform">
+                <UserIcon
+                  size={26}
+                  strokeWidth={isProfileOpen ? 2.25 : 1.75}
+                  className={isProfileOpen ? "text-slate-800 dark:text-white" : "text-slate-400 dark:text-[#6B679C]"}
+                />
               </button>
             }
           />
@@ -4052,7 +4041,7 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-8 pb-32"
             >
-              <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="hidden md:flex items-center justify-between flex-wrap gap-4">
                 <div>
                   <h2 className="text-3xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
                     Olá, {userProfile?.nickname || 'de novo'} 👋
@@ -4093,8 +4082,42 @@ export default function App() {
 
               {/* Hero de saldo (mobile) — no estilo "Your Balance" da referência */}
               <div className="md:hidden space-y-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium shrink-0 overflow-hidden">
+                      {userProfile?.nickname ? userProfile.nickname.charAt(0).toUpperCase() : (user?.email || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <p className="text-lg text-slate-500 dark:text-[#A8A4CC] font-normal truncate">
+                      Oi, <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{userProfile?.nickname || 'de novo'}</span>!
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPickerMonth(format(currentDate, 'MM'));
+                        setPickerYear(format(currentDate, 'yyyy'));
+                        setIsMonthPickerOpen(true);
+                      }}
+                      className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
+                      aria-label="Selecionar mês"
+                    >
+                      <CalendarIcon size={18} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsProfileOpen(true)}
+                      className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
+                      aria-label="Minha conta"
+                    >
+                      <Bell size={18} />
+                    </button>
+                  </div>
+                </div>
+
                 <div>
-                  <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight">Saldo do mês</p>
+                  <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight capitalize">{format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}</p>
+                  <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">Seu saldo</h1>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     {(() => {
                       const [intPart, decPart] = Math.abs(stats.balance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
@@ -4332,6 +4355,19 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32"
             >
+              <div className="md:hidden flex items-center justify-between">
+                <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
+                  {activeTab === 'receitas' ? 'Receitas' : 'Despesas'}
+                </h1>
+                <button
+                  onClick={() => handleOpenRegistrar(activeTab === 'receitas' ? 'income' : 'expense')}
+                  className="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0"
+                  aria-label="Novo lançamento"
+                >
+                  <Plus size={20} strokeWidth={2.5} />
+                </button>
+              </div>
+
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-2 flex-1 relative">
                   <div className="flex bg-slate-100 dark:bg-[#1C1852] p-1 rounded-full shadow-inner">
@@ -4577,9 +4613,20 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32"
             >
+              <div className="md:hidden flex items-center justify-between">
+                <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Cartões</h1>
+                <button
+                  onClick={() => handleOpenRegistrar('card_purchase')}
+                  className="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0"
+                  aria-label="Novo lançamento"
+                >
+                  <Plus size={20} strokeWidth={2.5} />
+                </button>
+              </div>
+
               <div className="flex items-center gap-2 w-full overflow-hidden px-1">
                 <div className="flex gap-2.5 items-center overflow-x-auto pb-2 pt-1 scrollbar-hide flex-1 relative fade-edge-x px-4 -mx-4">
-                  <button 
+                  <button
                     onClick={() => setSelectedCard(null)}
                     className={cn(
                       "px-5 py-2.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0",
@@ -5594,17 +5641,10 @@ function MobileNavItem({ active, onClick, icon }: { active: boolean, onClick: ()
   return (
     <button
       onClick={onClick}
-      className="flex items-center justify-center h-12 w-12 rounded-full transition-all duration-300 relative shrink-0 active:scale-90"
+      className="flex items-center justify-center h-11 w-11 shrink-0 active:scale-90 transition-transform"
     >
-      {active && (
-        <motion.div
-          layoutId="mobile-indicator"
-          className="absolute inset-0 bg-primary rounded-full z-0"
-          transition={{ type: "spring", stiffness: 400, damping: 30 }}
-        />
-      )}
-      <div className={cn("relative z-10 transition-colors duration-300", active ? "text-white" : "text-slate-400 dark:text-[#8D89AC]")}>
-        {React.cloneElement(icon as React.ReactElement, { strokeWidth: active ? 2.5 : 2, size: 20 })}
+      <div className={cn("transition-colors duration-300", active ? "text-slate-800 dark:text-white" : "text-slate-400 dark:text-[#6B679C]")}>
+        {React.cloneElement(icon as React.ReactElement, { strokeWidth: active ? 2.25 : 1.75, size: 26 })}
       </div>
     </button>
   );
