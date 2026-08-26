@@ -2586,7 +2586,7 @@ export default function App() {
                         type="button"
                         onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
                         className={cn(
-                          "h-9 px-3 rounded-xl text-xs font-medium border-2 transition-all",
+                          "h-9 px-3 rounded-full text-xs font-medium border-2 transition-all",
                           !newTransaction.cardId ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC]"
                         )}
                       >
@@ -2598,7 +2598,7 @@ export default function App() {
                           type="button"
                           onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
                           className={cn(
-                            "h-9 px-3 rounded-xl text-xs font-medium border-2 transition-all flex items-center gap-2",
+                            "h-9 px-3 rounded-full text-xs font-medium border-2 transition-all flex items-center gap-2",
                             newTransaction.cardId === card.id ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC]"
                           )}
                         >
@@ -2678,7 +2678,7 @@ export default function App() {
                               }
                             }}
                             className={cn(
-                              "h-10 px-3 rounded-xl font-normal text-xs transition-all flex items-center gap-2 border-2",
+                              "h-10 px-3 rounded-full font-normal text-xs transition-all flex items-center gap-2 border-2",
                               isSelected
                                 ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm"
                                 : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC] hover:border-slate-200 dark:hover:border-[#2A2566]"
@@ -3097,25 +3097,23 @@ export default function App() {
                     </button>
                   </div>
                 </div>
-                <Button onClick={handleAddCategory} className="w-full h-12 rounded-2xl font-medium shadow-lg shadow-primary/20 bg-primary text-white">
+                <button onClick={handleAddCategory} className="w-full h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 transition-all active:scale-95">
                   {editingCategory ? 'Salvar alterações' : 'Adicionar categoria'}
-                </Button>
+                </button>
               </div>
 
               <div className="space-y-3">
-                <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Suas categorias ({categories.length})</p>
-                <div className="flex flex-col gap-3">
+                <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 uppercase tracking-widest">Suas categorias ({categories.length})</p>
+                <div className="space-y-2">
                   {categories.map(cat => (
-                    <div key={cat.id} className="flex items-center gap-4 p-4 bg-white dark:bg-[#100E3D] rounded-2xl border border-slate-50 dark:border-[#1C1852] shadow-soft group hover:bg-slate-50 dark:hover:bg-[#16133F] transition-all">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm shrink-0" style={{ backgroundColor: cat.color }}>
-                        <PieChartIcon size={18} />
+                    <div key={cat.id} className="flex items-center gap-3 pl-3 pr-2 py-2 bg-card rounded-full shadow-soft group">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0" style={{ backgroundColor: cat.color }}>
+                        <PieChartIcon size={16} />
                       </div>
-                      <span className="flex-1 font-normal text-slate-700 dark:text-[#EDEAF9] text-sm leading-tight">{cat.name}</span>
-                      <div className="flex items-center gap-1">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-9 w-9 text-slate-300 dark:text-[#6B679C] hover:text-primary rounded-full transition-all" 
+                      <span className="flex-1 font-medium text-slate-700 dark:text-[#EDEAF9] text-sm truncate tracking-tight">{cat.name}</span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          className="h-9 w-9 flex items-center justify-center text-slate-300 dark:text-[#6B679C] hover:text-primary rounded-full transition-all"
                           onClick={() => {
                             setEditingCategory(cat);
                             setNewCategoryName(cat.name);
@@ -3123,15 +3121,13 @@ export default function App() {
                           }}
                         >
                           <Settings size={14} strokeWidth={2.5} />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-9 w-9 text-slate-300 dark:text-[#6B679C] hover:text-rose-400 rounded-full transition-all" 
+                        </button>
+                        <button
+                          className="h-9 w-9 flex items-center justify-center text-slate-300 dark:text-[#6B679C] hover:text-rose-400 rounded-full transition-all"
                           onClick={() => handleDeleteCategory(cat.id)}
                         >
                           <Trash2 size={14} strokeWidth={2.5} />
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -3250,7 +3246,7 @@ export default function App() {
                             type="button"
                             onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
                             className={cn(
-                              "h-11 px-4 rounded-xl text-sm font-medium border-2 transition-all",
+                              "h-11 px-4 rounded-full text-sm font-medium border-2 transition-all",
                               !newTransaction.cardId ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC]"
                             )}
                           >
@@ -3262,7 +3258,7 @@ export default function App() {
                               type="button"
                               onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
                               className={cn(
-                                "h-11 px-4 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-2",
+                                "h-11 px-4 rounded-full text-sm font-medium border-2 transition-all flex items-center gap-2",
                                 newTransaction.cardId === card.id ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC]"
                               )}
                             >
@@ -5047,9 +5043,9 @@ export default function App() {
                     <input type="color" ref={colorInputRef} className="sr-only" value={newCardColor} onChange={(e) => setNewCardColor(e.target.value)} />
                   </div>
                 </div>
-                <Button onClick={handleAddCard} className="w-full h-12 rounded-xl font-medium shadow-lg shadow-primary/20 bg-primary text-white hover:bg-primary/95 active:scale-95 transition-all">
+                <button onClick={handleAddCard} className="w-full h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all">
                   {editingCard ? 'Salvar alterações' : 'Adicionar cartão'}
-                </Button>
+                </button>
               </div>
             ) : manageCardId ? (() => {
               const card = cards.find(c => c.id === manageCardId);
@@ -5094,9 +5090,8 @@ export default function App() {
                   </button>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <Button
-                      variant="outline"
-                      className="h-12 rounded-xl font-medium border-none bg-slate-50 dark:bg-[#16133F] hover:bg-slate-100 dark:hover:bg-[#1C1852]"
+                    <button
+                      className="h-12 rounded-full font-medium bg-secondary text-secondary-foreground hover:bg-secondary/70 flex items-center justify-center gap-2 transition-colors"
                       onClick={() => {
                         setEditingCard(card);
                         setNewCardName(card.name);
@@ -5107,17 +5102,16 @@ export default function App() {
                         setShowCardForm(true);
                       }}
                     >
-                      <Settings size={16} className="mr-2" strokeWidth={2.5} />
+                      <Settings size={16} strokeWidth={2.5} />
                       Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-12 rounded-xl font-medium border-none bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20"
+                    </button>
+                    <button
+                      className="h-12 rounded-full font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center justify-center gap-2 transition-colors"
                       onClick={() => handleDeleteCard(card.id)}
                     >
-                      <Trash2 size={16} className="mr-2" strokeWidth={2.5} />
+                      <Trash2 size={16} strokeWidth={2.5} />
                       Excluir
-                    </Button>
+                    </button>
                   </div>
                 </div>
               );
@@ -5131,12 +5125,12 @@ export default function App() {
                     key={card.id}
                     type="button"
                     onClick={() => setManageCardId(card.id)}
-                    className="w-full flex items-center gap-3 p-3 bg-white dark:bg-[#100E3D] rounded-xl border border-slate-50 dark:border-[#1C1852] shadow-soft hover:bg-slate-50 dark:hover:bg-[#16133F] transition-colors text-left"
+                    className="w-full flex items-center gap-3 pl-3 pr-4 py-3 bg-card rounded-full shadow-soft transition-colors text-left"
                   >
-                    <div className="w-10 h-6 rounded-lg shadow-sm shrink-0" style={{ backgroundColor: card.color }}></div>
+                    <div className="w-11 h-7 rounded-lg shrink-0" style={{ backgroundColor: card.color }}></div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-800 dark:text-[#EDE9E3] text-sm truncate">{card.name}</p>
-                      <p className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-wider">Limite: R$ {card.limit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      <p className="font-medium text-slate-800 dark:text-[#EDE9E3] text-sm truncate tracking-tight">{card.name}</p>
+                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Limite: R$ {card.limit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                     </div>
                     <ChevronRight size={16} className="text-slate-300 dark:text-[#6B679C] shrink-0" />
                   </button>
