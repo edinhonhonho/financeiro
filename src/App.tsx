@@ -4261,37 +4261,40 @@ export default function App() {
 
               <div>
                 <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4 ml-2">Devedores do mês</h3>
-                <ShadcnCard className="border-none shadow-soft rounded-2xl overflow-hidden bg-white dark:bg-[#100E3D]">
-                  {(() => {
-                    const debtors = people
-                      .map(p => ({ person: p, charges: getPersonMonthlyCharges(p.id, currentDate) }))
-                      .filter(d => d.charges.pendingTotal > 0)
-                      .sort((a, b) => b.charges.pendingTotal - a.charges.pendingTotal);
-                    if (debtors.length === 0) {
-                      return <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#6B679C]">Ninguém deve nada neste mês. 🎉</p>;
-                    }
+                {(() => {
+                  const debtors = people
+                    .map(p => ({ person: p, charges: getPersonMonthlyCharges(p.id, currentDate) }))
+                    .filter(d => d.charges.pendingTotal > 0)
+                    .sort((a, b) => b.charges.pendingTotal - a.charges.pendingTotal);
+                  if (debtors.length === 0) {
                     return (
-                      <div className="divide-y divide-slate-100 dark:divide-[#201C56]">
-                        {debtors.map(({ person, charges }) => (
-                          <button
-                            key={person.id}
-                            onClick={() => { setIsPessoasSummaryOpen(true); setSelectedPersonId(person.id); }}
-                            className="w-full flex items-center gap-4 p-4 hover:bg-slate-50 dark:hover:bg-[#16133F] transition-colors text-left"
-                          >
-                            <img src={person.image || `https://picsum.photos/seed/${person.name}/100/100`} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0" />
-                            <span className="flex-1 min-w-0 font-normal text-slate-700 dark:text-[#EDEAF9] text-sm truncate">{person.name}</span>
-                            <span className="font-bold text-rose-400 text-sm shrink-0">R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            <MessageCircle
-                              size={16}
-                              className="text-emerald-500 shrink-0 hover:scale-110 transition-transform"
-                              onClick={(e) => { e.stopPropagation(); shareChargeOnWhatsApp(person, charges); }}
-                            />
-                          </button>
-                        ))}
+                      <div className="bg-card rounded-[1.75rem] shadow-soft p-10 text-center">
+                        <p className="text-xs font-normal text-slate-300 dark:text-[#6B679C]">Ninguém deve nada neste mês. 🎉</p>
                       </div>
                     );
-                  })()}
-                </ShadcnCard>
+                  }
+                  return (
+                    <div className="space-y-2">
+                      {debtors.map(({ person, charges }) => (
+                        <button
+                          key={person.id}
+                          onClick={() => { setIsPessoasSummaryOpen(true); setSelectedPersonId(person.id); }}
+                          className="w-full flex items-center gap-3 bg-card rounded-full pl-2 pr-4 py-2 shadow-soft transition-transform active:scale-[0.99] text-left"
+                        >
+                          <img src={person.image || `https://picsum.photos/seed/${person.name}/100/100`} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
+                          <span className="flex-1 min-w-0 font-medium text-slate-700 dark:text-[#EDEAF9] text-sm truncate tracking-tight">{person.name}</span>
+                          <span className="font-heading font-medium text-rose-400 text-base tracking-tighter shrink-0">R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <div
+                            className="w-9 h-9 rounded-full bg-emerald-400 text-white flex items-center justify-center shrink-0"
+                            onClick={(e) => { e.stopPropagation(); shareChargeOnWhatsApp(person, charges); }}
+                          >
+                            <MessageCircle size={14} strokeWidth={2.5} />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <div>
