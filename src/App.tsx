@@ -2313,7 +2313,7 @@ export default function App() {
             </div>
 
             <div className="pt-4 space-y-3">
-              <Button className="w-full h-14 rounded-2xl font-medium text-lg bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 transition-all active:scale-95" onClick={() => {
+              <Button className="w-full h-14 rounded-full font-medium text-lg bg-primary hover:bg-primary/90 transition-all active:scale-95" onClick={() => {
                 if (confirmingTransaction) {
                   handleConfirmTransaction(confirmingTransaction.id, confirmAmount, confirmDate);
                   setConfirmingTransaction(null);
@@ -4334,11 +4334,11 @@ export default function App() {
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex items-center gap-2 flex-1 relative">
-                  <div className="flex bg-slate-100 dark:bg-[#1C1852] p-1 rounded-2xl shadow-inner">
+                  <div className="flex bg-slate-100 dark:bg-[#1C1852] p-1 rounded-full shadow-inner">
                     <button 
                       onClick={() => setTransactionFilter('all')}
                       className={cn(
-                        "px-6 py-2.5 rounded-xl text-[10px] font-medium transition-all",
+                        "px-6 py-2.5 rounded-full text-xs font-medium transition-all",
                         transactionFilter === 'all' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
                       )}
                     >
@@ -4347,7 +4347,7 @@ export default function App() {
                     <button 
                       onClick={() => setTransactionFilter('pending')}
                       className={cn(
-                        "px-6 py-2.5 rounded-xl text-[10px] font-medium transition-all",
+                        "px-6 py-2.5 rounded-full text-xs font-medium transition-all",
                         transactionFilter === 'pending' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
                       )}
                     >
@@ -4582,19 +4582,19 @@ export default function App() {
                   <button 
                     onClick={() => setSelectedCard(null)}
                     className={cn(
-                      "px-5 py-2.5 rounded-xl text-[10px] font-medium whitespace-nowrap transition-all shrink-0",
-                      !selectedCard ? "bg-primary text-white shadow-lg shadow-primary/20 scale-105" : "bg-white dark:bg-[#100E3D] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-50 dark:hover:bg-[#16133F] border border-slate-100 dark:border-[#201C56] shadow-sm"
+                      "px-5 py-2.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0",
+                      !selectedCard ? "bg-primary text-white scale-105" : "bg-card text-slate-400 dark:text-[#8D89AC] hover:bg-slate-50 dark:hover:bg-[#16133F] shadow-soft"
                     )}
                   >
                     Meus Cartões
                   </button>
                   {cards.map(card => (
-                    <button 
+                    <button
                       key={card.id}
                       onClick={() => setSelectedCard(card.id)}
                       className={cn(
-                        "px-5 py-2.5 rounded-xl text-[10px] font-medium whitespace-nowrap transition-all shrink-0",
-                        selectedCard === card.id ? "text-white shadow-lg shadow-primary/10 scale-105" : "bg-white dark:bg-[#100E3D] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-50 dark:hover:bg-[#16133F] border border-slate-100 dark:border-[#201C56] shadow-sm"
+                        "px-5 py-2.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0",
+                        selectedCard === card.id ? "text-white scale-105" : "bg-card text-slate-400 dark:text-[#8D89AC] hover:bg-slate-50 dark:hover:bg-[#16133F] shadow-soft"
                       )}
                       style={{ 
                         backgroundColor: selectedCard === card.id ? card.color : undefined,
