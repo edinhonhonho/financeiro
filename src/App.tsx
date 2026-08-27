@@ -45,7 +45,9 @@ import {
   Bell,
   ArrowUp,
   ArrowDown,
-  Camera
+  Camera,
+  Clock,
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
 import {
@@ -1008,18 +1010,18 @@ export default function App() {
   const [selectedBillDate, setSelectedBillDate] = useState<Date>(currentDate);
   useEffect(() => { setSelectedBillDate(currentDate); }, [currentDate, selectedCard]);
 
-  const [billHistoryOffset, setBillHistoryOffset] = useState(0);
-  useEffect(() => { setBillHistoryOffset(0); }, [selectedCard, currentDate]);
+  const CHART_MONTHS_HISTORY = 24;
+  const CHART_BAR_WIDTH = 48;
 
   const cardBillHistory = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
     if (!activeCard) return [];
-    const points = Array.from({ length: 6 }).map((_, i) => {
-      const monthDate = subMonths(currentDate, 5 - i + billHistoryOffset);
+    const points = Array.from({ length: CHART_MONTHS_HISTORY }).map((_, i) => {
+      const monthDate = subMonths(currentDate, CHART_MONTHS_HISTORY - 1 - i);
       const bill = computeCardBill(activeCard, monthDate);
       return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: bill.amount };
     });
-    // Linha de tendência: regressão linear simples sobre os pontos visíveis,
+    // Linha de tendência: regressão linear simples sobre todo o histórico,
     // não um traçado dos valores reais — mostra a direção da projeção de gastos.
     const n = points.length;
     const sumX = points.reduce((acc, _, i) => acc + i, 0);
@@ -1030,13 +1032,13 @@ export default function App() {
     const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
     const intercept = (sumY - slope * sumX) / n;
     return points.map((p, i) => ({ ...p, trend: Math.max(0, intercept + slope * i) }));
-  }, [cards, selectedCard, currentDate, billHistoryOffset]);
+  }, [cards, selectedCard, currentDate]);
 
-  const chartDragX = useMotionValue(0);
-  const handleChartDragEnd = (_: unknown, info: { offset: { x: number } }) => {
-    if (info.offset.x < -40) setBillHistoryOffset(prev => Math.min(30, prev + 1));
-    else if (info.offset.x > 40) setBillHistoryOffset(prev => Math.max(0, prev - 1));
-  };
+  const billChartScrollRef = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = billChartScrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [selectedCard, currentDate]);
 
   const cardBillItems = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
@@ -4264,12 +4266,6 @@ export default function App() {
                   >
                     <ArrowDownCircle size={16} strokeWidth={2.5} /> Despesa
                   </button>
-                  <button
-                    onClick={() => handleOpenRegistrar('card_purchase')}
-                    className="flex-1 h-12 rounded-full bg-secondary text-secondary-foreground font-medium text-sm flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
-                  >
-                    <Plus size={16} strokeWidth={2.5} /> Cartão
-                  </button>
                 </div>
 
                 {people.filter(p => p.visible !== false).length > 0 && (
@@ -4472,9 +4468,40 @@ export default function App() {
             >
               <div className="md:hidden space-y-5">
                 {mobileTopHeader}
-                <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
-                  Movimentações
-                </h1>
+                <div className="flex items-center justify-between gap-3">
+                  <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
+                    Movimentações
+                  </h1>
+                  <div className="flex items-center gap-0.5 bg-secondary rounded-full p-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={prevMonth}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-secondary-foreground active:scale-90 transition-transform"
+                      aria-label="Mês anterior"
+                    >
+                      <ChevronLeft size={16} strokeWidth={3} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPickerMonth(format(currentDate, 'MM'));
+                        setPickerYear(format(currentDate, 'yyyy'));
+                        setIsMonthPickerOpen(true);
+                      }}
+                      className="px-1 text-[11px] font-medium text-secondary-foreground capitalize whitespace-nowrap"
+                    >
+                      {format(currentDate, 'MMM yyyy', { locale: ptBR })}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={nextMonth}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-secondary-foreground active:scale-90 transition-transform"
+                      aria-label="Próximo mês"
+                    >
+                      <ChevronRight size={16} strokeWidth={3} />
+                    </button>
+                  </div>
+                </div>
                 <div className="flex items-center gap-5">
                   <button
                     onClick={() => setMovTab('movimentacoes')}
@@ -5155,17 +5182,9 @@ export default function App() {
                         <>
                           <div className="space-y-3">
                             <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Evolução da fatura</p>
-                            <motion.div
-                              className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2"
-                              drag="x"
-                              dragConstraints={{ left: 0, right: 0 }}
-                              dragElastic={0.6}
-                              dragMomentum={false}
-                              style={{ x: chartDragX }}
-                              onDragEnd={handleChartDragEnd}
-                            >
-                              <ResponsiveContainer width="100%" height={130}>
-                                <ComposedChart data={cardBillHistory}>
+                            <div className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2 overflow-hidden">
+                              <div ref={billChartScrollRef} className="overflow-x-auto scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
+                                <ComposedChart width={cardBillHistory.length * CHART_BAR_WIDTH} height={130} data={cardBillHistory}>
                                   <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: '#9C93BE' }} />
                                   <Bar
                                     dataKey="amount"
@@ -5179,8 +5198,8 @@ export default function App() {
                                   </Bar>
                                   <Line type="monotone" dataKey="trend" stroke="#B9B2EA" strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive={false} />
                                 </ComposedChart>
-                              </ResponsiveContainer>
-                            </motion.div>
+                              </div>
+                            </div>
                           </div>
 
                           <div className="space-y-3">
@@ -6068,12 +6087,12 @@ function SwipeToConfirm({
 
   return (
     <div className="relative">
-      <div className={cn("absolute inset-0 rounded-full flex items-center pl-6 overflow-hidden", colorClass)}>
-        <motion.div style={{ opacity: revealOpacity, scale: revealScale }} className="flex items-center gap-2 text-white font-medium text-sm">
+      <motion.div style={{ opacity: revealOpacity }} className={cn("absolute inset-0 rounded-full flex items-center pl-6 overflow-hidden", colorClass)}>
+        <motion.div style={{ scale: revealScale }} className="flex items-center gap-2 text-white font-medium text-sm">
           <CheckCircle2 size={18} strokeWidth={2.5} />
           {actionLabel}
         </motion.div>
-      </div>
+      </motion.div>
       <motion.div
         drag={confirmed ? false : "x"}
         dragDirectionLock
@@ -6146,7 +6165,13 @@ function TransactionItem({
             "w-6 h-6 flex items-center justify-center shrink-0",
             transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
           )}>
-            {transaction.type === 'income' ? <ArrowUp size={20} strokeWidth={2.5} /> : <ArrowDown size={20} strokeWidth={2.5} />}
+            {transaction.id.startsWith('bill-') ? (
+              <CreditCard size={19} strokeWidth={2.5} />
+            ) : transaction.status === 'actual' ? (
+              <Check size={20} strokeWidth={2.5} />
+            ) : (
+              <Clock size={19} strokeWidth={2.5} />
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 overflow-hidden">
