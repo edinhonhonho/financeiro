@@ -378,7 +378,6 @@ export default function App() {
   const [transactionFilter, setTransactionFilter] = useState<'pending' | 'all'>('all');
   const [movTab, setMovTab] = useState<'movimentacoes' | 'apagar' | 'areceber'>('movimentacoes');
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
-  const [manageCardId, setManageCardId] = useState<string | null>(null);
   const [showCardForm, setShowCardForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
@@ -544,6 +543,7 @@ export default function App() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
   const [personToDelete, setPersonToDelete] = useState<Person | null>(null);
+  const [cardToDelete, setCardToDelete] = useState<Card | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleteAllConfirmOpen, setIsDeleteAllConfirmOpen] = useState(false);
@@ -1021,13 +1021,16 @@ export default function App() {
       const bill = computeCardBill(activeCard, monthDate);
       return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: bill.amount };
     });
-    // Linha de tendência: regressão linear simples sobre todo o histórico,
-    // não um traçado dos valores reais — mostra a direção da projeção de gastos.
-    const n = points.length;
-    const sumX = points.reduce((acc, _, i) => acc + i, 0);
-    const sumY = points.reduce((acc, p) => acc + p.amount, 0);
-    const sumXY = points.reduce((acc, p, i) => acc + i * p.amount, 0);
-    const sumXX = points.reduce((acc, _, i) => acc + i * i, 0);
+    // Linha de tendência: regressão linear simples considerando somente os
+    // meses com valor (evita que meses zerados, sem fatura, puxem a linha
+    // para baixo) — não é um traçado dos valores reais, é uma projeção.
+    const withValue = points.map((p, i) => ({ i, amount: p.amount })).filter(p => p.amount > 0);
+    const n = withValue.length;
+    if (n < 2) return points.map(p => ({ ...p, trend: undefined }));
+    const sumX = withValue.reduce((acc, p) => acc + p.i, 0);
+    const sumY = withValue.reduce((acc, p) => acc + p.amount, 0);
+    const sumXY = withValue.reduce((acc, p) => acc + p.i * p.amount, 0);
+    const sumXX = withValue.reduce((acc, p) => acc + p.i * p.i, 0);
     const denom = n * sumXX - sumX * sumX;
     const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
     const intercept = (sumY - slope * sumX) / n;
@@ -1037,8 +1040,10 @@ export default function App() {
   const billChartScrollRef = React.useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = billChartScrollRef.current;
-    if (el) el.scrollLeft = el.scrollWidth;
-  }, [selectedCard, currentDate]);
+    if (!el) return;
+    const target = el.scrollWidth - el.clientWidth / 2 - CHART_BAR_WIDTH / 2;
+    el.scrollLeft = Math.max(0, target);
+  }, [selectedCard, currentDate, cards.length]);
 
   const cardBillItems = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
@@ -1876,7 +1881,6 @@ export default function App() {
     try {
       await api.deleteCard(id);
       await loadCards();
-      setManageCardId(prev => prev === id ? null : prev);
     } catch (err) {
       handleSupabaseError(err, OperationType.DELETE, 'cards');
       showAlert('Erro', 'Não foi possível excluir esse cartão.');
@@ -1901,11 +1905,9 @@ export default function App() {
 
       if (editingCard) {
         await api.updateCard(editingCard.id, cardData);
-        setManageCardId(editingCard.id);
         setEditingCard(null);
       } else {
         await api.createCard(user.id, cardData);
-        setManageCardId(null);
       }
       await loadCards();
       setShowCardForm(false);
@@ -1968,7 +1970,7 @@ export default function App() {
     }
   };
 
-  const handleConfirmTransaction = async (id: string, actualAmount: number, actualDate: string) => {
+  const handleConfirmTransaction = async (id: string, actualAmount: number, actualDate: string, referenceDate?: string) => {
     if (!user) return;
     try {
       if (id.startsWith('bill-')) {
@@ -1979,11 +1981,12 @@ export default function App() {
           userId: user.id,
           description: `Pagamento Fatura ${card?.name || ''}`,
           amount: actualAmount,
-          date: actualDate,
+          date: referenceDate || actualDate, // mês de referência da fatura (bate com getTransactionEffectiveMonth)
+          actualDate: actualDate, // dia em que o pagamento realmente aconteceu
           type: 'expense',
           status: 'actual',
           category: 'Fatura Cartão',
-          cardId: null, // It's paid from bank account
+          cardId: card?.id ?? null, // permite checar se a fatura do mês já foi paga
           payerPayee: 'geral',
           recurrence: 'none',
           assignments: []
@@ -2005,7 +2008,7 @@ export default function App() {
 
   /** Marca um lançamento planejado como pago/recebido com um clique, sem abrir o modal de confirmação. */
   const handleQuickConfirm = (t: Transaction) => {
-    handleConfirmTransaction(t.id, t.amount, format(new Date(), 'yyyy-MM-dd'));
+    handleConfirmTransaction(t.id, t.amount, format(new Date(), 'yyyy-MM-dd'), t.date);
   };
 
   const handleDeleteTransaction = async (id: string, deleteAllFuture = false) => {
@@ -2471,7 +2474,7 @@ export default function App() {
             <div className="pt-4 space-y-3">
               <Button className="w-full h-14 rounded-full font-medium text-lg bg-primary hover:bg-primary/90 transition-all active:scale-95" onClick={() => {
                 if (confirmingTransaction) {
-                  handleConfirmTransaction(confirmingTransaction.id, confirmAmount, confirmDate);
+                  handleConfirmTransaction(confirmingTransaction.id, confirmAmount, confirmDate, confirmingTransaction.date);
                   setConfirmingTransaction(null);
                 }
               }}>
@@ -3896,16 +3899,18 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => profileImageInputRef.current?.click()}
-                  className="relative w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-medium text-xl shrink-0 overflow-hidden"
+                  className="relative w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-medium text-xl shrink-0 overflow-visible"
                   aria-label="Alterar foto de perfil"
                 >
-                  {userProfile?.photoURL ? (
-                    <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  ) : (
-                    (userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()
-                  )}
-                  <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Camera size={16} className="text-white" />
+                  <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
+                    {userProfile?.photoURL ? (
+                      <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    ) : (
+                      (userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-secondary text-secondary-foreground border-2 border-white dark:border-[#100E3D] flex items-center justify-center shadow-sm">
+                    <Camera size={11} />
                   </div>
                 </button>
                 <input
@@ -4468,40 +4473,9 @@ export default function App() {
             >
               <div className="md:hidden space-y-5">
                 {mobileTopHeader}
-                <div className="flex items-center justify-between gap-3">
-                  <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
-                    Movimentações
-                  </h1>
-                  <div className="flex items-center gap-0.5 bg-secondary rounded-full p-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={prevMonth}
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-secondary-foreground active:scale-90 transition-transform"
-                      aria-label="Mês anterior"
-                    >
-                      <ChevronLeft size={16} strokeWidth={3} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPickerMonth(format(currentDate, 'MM'));
-                        setPickerYear(format(currentDate, 'yyyy'));
-                        setIsMonthPickerOpen(true);
-                      }}
-                      className="px-1 text-[11px] font-medium text-secondary-foreground capitalize whitespace-nowrap"
-                    >
-                      {format(currentDate, 'MMM yyyy', { locale: ptBR })}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={nextMonth}
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-secondary-foreground active:scale-90 transition-transform"
-                      aria-label="Próximo mês"
-                    >
-                      <ChevronRight size={16} strokeWidth={3} />
-                    </button>
-                  </div>
-                </div>
+                <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
+                  Movimentações
+                </h1>
                 <div className="flex items-center gap-5">
                   <button
                     onClick={() => setMovTab('movimentacoes')}
@@ -4875,6 +4849,36 @@ export default function App() {
                 </div>
               ))}
               </div>
+
+              <div className="md:hidden fixed bottom-24 right-6 z-30 flex items-center gap-0.5 bg-white dark:bg-[#100E3D] rounded-full p-1.5 shadow-bubbly">
+                <button
+                  type="button"
+                  onClick={prevMonth}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-primary active:scale-90 transition-transform"
+                  aria-label="Mês anterior"
+                >
+                  <ChevronLeft size={16} strokeWidth={3} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickerMonth(format(currentDate, 'MM'));
+                    setPickerYear(format(currentDate, 'yyyy'));
+                    setIsMonthPickerOpen(true);
+                  }}
+                  className="px-1.5 text-[11px] font-medium text-slate-700 dark:text-[#EDEAF9] capitalize whitespace-nowrap"
+                >
+                  {format(currentDate, 'MMM yyyy', { locale: ptBR })}
+                </button>
+                <button
+                  type="button"
+                  onClick={nextMonth}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-primary active:scale-90 transition-transform"
+                  aria-label="Próximo mês"
+                >
+                  <ChevronRight size={16} strokeWidth={3} />
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -4888,7 +4892,7 @@ export default function App() {
             >
               <div className="md:hidden space-y-5">
                 {mobileTopHeader}
-                {!showCardForm && !manageCardId && (
+                {!showCardForm && (
                   <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Cartões</h1>
                 )}
               </div>
@@ -4995,11 +4999,7 @@ export default function App() {
                     {editingCard && (
                       <button
                         type="button"
-                        onClick={async () => {
-                          await handleDeleteCard(editingCard.id);
-                          setShowCardForm(false);
-                          setEditingCard(null);
-                        }}
+                        onClick={() => setCardToDelete(editingCard)}
                         className="w-full h-12 rounded-full font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center justify-center gap-2 transition-colors"
                       >
                         <Trash2 size={16} strokeWidth={2.5} />
@@ -5007,86 +5007,7 @@ export default function App() {
                       </button>
                     )}
                   </div>
-                ) : manageCardId ? (() => {
-                  const card = cards.find(c => c.id === manageCardId);
-                  if (!card) return null;
-                  const bill = computeCardBill(card, currentDate);
-                  return (
-                    <div className="space-y-6">
-                      <div className="flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setManageCardId(null)}
-                          className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] shrink-0"
-                        >
-                          <ChevronLeft size={20} />
-                        </button>
-                        <h1 className="text-2xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter truncate">{card.name}</h1>
-                      </div>
-
-                      <div
-                        className="rounded-[1.75rem] h-28 shadow-sm flex items-end p-5 relative overflow-hidden"
-                        style={{ backgroundColor: card.color }}
-                      >
-                        <div className="absolute -right-8 -top-12 w-36 h-36 rounded-full border-[12px] border-white/15" />
-                        <div className="absolute -right-2 -top-6 w-20 h-20 rounded-full border-[7px] border-white/20" />
-                        <span className="text-white font-medium text-base drop-shadow-sm truncate relative z-10">{card.name}</span>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl text-center">
-                          <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider mb-1">Limite</p>
-                          <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">R$ {card.limit.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
-                        </div>
-                        <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl text-center">
-                          <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider mb-1">Fechamento</p>
-                          <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">{card.closingDay ? `Dia ${card.closingDay}` : '—'}</p>
-                        </div>
-                        <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl text-center">
-                          <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider mb-1">Vencimento</p>
-                          <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">{card.dueDay ? `Dia ${card.dueDay}` : '—'}</p>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setViewingBill(bill)}
-                        className="w-full flex items-center justify-between p-5 bg-slate-50 dark:bg-[#16133F] rounded-2xl hover:bg-slate-100 dark:hover:bg-[#1C1852] transition-colors"
-                      >
-                        <div className="text-left">
-                          <p className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider">Fatura de {format(currentDate, "MMMM", { locale: ptBR })}</p>
-                          <p className="text-lg font-heading font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">R$ {bill.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        </div>
-                        <ChevronRight size={18} className="text-slate-300 dark:text-[#6B679C]" />
-                      </button>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          className="h-12 rounded-full font-medium bg-secondary text-secondary-foreground hover:bg-secondary/70 flex items-center justify-center gap-2 transition-colors"
-                          onClick={() => {
-                            setEditingCard(card);
-                            setNewCardName(card.name);
-                            setLimitInput(maskCurrency(String(card.limit * 100)));
-                            setNewCardClosingDay(String(card.closingDay));
-                            setNewCardDueDay(String(card.dueDay));
-                            setNewCardColor(card.color);
-                            setShowCardForm(true);
-                          }}
-                        >
-                          <Settings size={16} strokeWidth={2.5} />
-                          Editar
-                        </button>
-                        <button
-                          className="h-12 rounded-full font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center justify-center gap-2 transition-colors"
-                          onClick={() => handleDeleteCard(card.id)}
-                        >
-                          <Trash2 size={16} strokeWidth={2.5} />
-                          Excluir
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })() : (
+                ) : (
                   <>
                     <div
                       ref={cardsCarouselRef}
@@ -5096,7 +5017,7 @@ export default function App() {
                       {cards.map(card => (
                         <div key={card.id} className="w-[280px] shrink-0 snap-center">
                           <div
-                            onClick={() => setManageCardId(card.id)}
+                            onClick={() => setSelectedCard(card.id)}
                             role="button"
                             tabIndex={0}
                             className="rounded-[1.75rem] h-44 p-5 relative overflow-hidden flex flex-col justify-between shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
@@ -5178,6 +5099,13 @@ export default function App() {
                       const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
                       const selectedMonthKey = format(selectedBillDate, 'yyyy-MM');
                       const billTotal = cardBillItems.reduce((acc, t) => acc + t.amount, 0);
+                      const billPaid = transactions.some(t =>
+                        t.type === 'expense' &&
+                        t.status === 'actual' &&
+                        t.cardId === activeCard.id &&
+                        (t.category === 'Fatura Cartão' || t.category === 'Fatura cartão') &&
+                        format(parseISO(t.date), 'yyyy-MM') === selectedMonthKey
+                      );
                       return (
                         <>
                           <div className="space-y-3">
@@ -5204,9 +5132,17 @@ export default function App() {
 
                           <div className="space-y-3">
                             <div className="flex items-center justify-between ml-2">
-                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest">
-                                Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest">
+                                  Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
+                                </p>
+                                <span className={cn(
+                                  "text-[10px] font-medium px-2 py-0.5 rounded-full",
+                                  billPaid ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                )}>
+                                  {billPaid ? 'Paga' : 'Em aberto'}
+                                </span>
+                              </div>
                               <p className="text-sm font-heading font-medium text-slate-800 dark:text-[#EDE9E3]">
                                 R$ {billTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </p>
@@ -5220,21 +5156,23 @@ export default function App() {
                                 <div className="space-y-2">
                                   {cardBillItems.map(t => (
                                     <div key={t.id}>
-                                      <TransactionItem transaction={t} onClick={() => handleTransactionClick(t)} />
+                                      <TransactionItem transaction={t} onClick={() => handleTransactionClick(t)} hideStatus />
                                     </div>
                                   ))}
                                 </div>
-                                <button
-                                  onClick={() => {
-                                    const bill = computeCardBill(activeCard, selectedBillDate);
-                                    setConfirmingTransaction(bill);
-                                    setConfirmAmount(billTotal);
-                                    setConfirmDate(format(new Date(), 'yyyy-MM-dd'));
-                                  }}
-                                  className="w-full h-12 rounded-full bg-primary text-white font-medium text-sm active:scale-95 transition-all"
-                                >
-                                  Pagar fatura
-                                </button>
+                                {!billPaid && (
+                                  <button
+                                    onClick={() => {
+                                      const bill = computeCardBill(activeCard, selectedBillDate);
+                                      setConfirmingTransaction(bill);
+                                      setConfirmAmount(billTotal);
+                                      setConfirmDate(format(new Date(), 'yyyy-MM-dd'));
+                                    }}
+                                    className="w-full h-12 rounded-full bg-primary text-white font-medium text-sm active:scale-95 transition-all"
+                                  >
+                                    Pagar fatura
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -5849,6 +5787,42 @@ export default function App() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={!!cardToDelete} onOpenChange={(open) => !open && setCardToDelete(null)}>
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+            <div className="p-7 space-y-6 text-center">
+              <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 rounded-full flex items-center justify-center mx-auto text-rose-400">
+                <Trash2 size={28} strokeWidth={2.5} />
+              </div>
+              <div className="space-y-1.5">
+                <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Excluir cartão</h1>
+                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+                  Tem certeza que deseja excluir {cardToDelete?.name}? As compras já lançadas nele não serão apagadas.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <button
+                  onClick={async () => {
+                    if (!cardToDelete) return;
+                    await handleDeleteCard(cardToDelete.id);
+                    setCardToDelete(null);
+                    setShowCardForm(false);
+                    setEditingCard(null);
+                  }}
+                  className="w-full h-14 rounded-full font-medium bg-rose-400 hover:bg-rose-500 text-white transition-all active:scale-95"
+                >
+                  Confirmar exclusão
+                </button>
+                <button
+                  onClick={() => setCardToDelete(null)}
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <Dialog open={isDeleteAllConfirmOpen} onOpenChange={setIsDeleteAllConfirmOpen}>
           <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
             <div className="p-7 space-y-6 text-center">
@@ -6079,16 +6053,15 @@ function SwipeToConfirm({
   children: React.ReactNode
 }) {
   const dragX = useMotionValue(0);
-  const revealOpacity = useTransform(dragX, [0, 45], [0, 1]);
   const revealScale = useTransform(dragX, [0, 45], [0.7, 1]);
   const [confirmed, setConfirmed] = useState(false);
 
   if (!enabled) return <div className="relative">{children}</div>;
 
   return (
-    <div className="relative">
-      <motion.div style={{ opacity: revealOpacity }} className={cn("absolute inset-0 rounded-full flex items-center pl-6 overflow-hidden", colorClass)}>
-        <motion.div style={{ scale: revealScale }} className="flex items-center gap-2 text-white font-medium text-sm">
+    <div className="relative rounded-full overflow-hidden">
+      <motion.div style={{ width: dragX }} className={cn("absolute inset-y-0 left-0 flex items-center pl-6 overflow-hidden", colorClass)}>
+        <motion.div style={{ scale: revealScale }} className="flex items-center gap-2 text-white font-medium text-sm whitespace-nowrap">
           <CheckCircle2 size={18} strokeWidth={2.5} />
           {actionLabel}
         </motion.div>
@@ -6106,7 +6079,7 @@ function SwipeToConfirm({
             setTimeout(() => onConfirm(), 450);
           }
         }}
-        className="relative rounded-full overflow-hidden"
+        className="relative rounded-full"
       >
         <div className={cn("transition-opacity duration-200", confirmed && "opacity-0")}>
           {children}
@@ -6137,14 +6110,16 @@ function TransactionItem({
   cardName,
   onClick,
   onQuickConfirm,
-  hideDate = false
+  hideDate = false,
+  hideStatus = false
 }: {
   transaction: Transaction,
   personName?: string,
   cardName?: string,
   onClick?: () => void,
   onQuickConfirm?: () => void,
-  hideDate?: boolean
+  hideDate?: boolean,
+  hideStatus?: boolean
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
   const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-');
@@ -6161,18 +6136,20 @@ function TransactionItem({
         className="flex items-center justify-between gap-3 border border-slate-200/70 dark:border-white/10 rounded-full pl-3 pr-4 py-3 cursor-pointer active:scale-[0.99] transition-transform"
       >
         <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
-          <div className={cn(
-            "w-6 h-6 flex items-center justify-center shrink-0",
-            transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
-          )}>
-            {transaction.id.startsWith('bill-') ? (
-              <CreditCard size={19} strokeWidth={2.5} />
-            ) : transaction.status === 'actual' ? (
-              <Check size={20} strokeWidth={2.5} />
-            ) : (
-              <Clock size={19} strokeWidth={2.5} />
-            )}
-          </div>
+          {!hideStatus && (
+            <div className={cn(
+              "w-6 h-6 flex items-center justify-center shrink-0",
+              transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
+            )}>
+              {transaction.id.startsWith('bill-') ? (
+                <CreditCard size={19} strokeWidth={2.5} />
+              ) : transaction.status === 'actual' ? (
+                <Check size={20} strokeWidth={2.5} />
+              ) : (
+                <Clock size={19} strokeWidth={2.5} />
+              )}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 overflow-hidden">
               {!hideDate && (
@@ -6199,7 +6176,7 @@ function TransactionItem({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {transaction.status === 'actual' ? (
+          {hideStatus ? null : transaction.status === 'actual' ? (
             <CheckCircle2 size={15} strokeWidth={2.5} className={transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"} />
           ) : canConfirm && (
             <button
