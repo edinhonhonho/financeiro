@@ -43,7 +43,9 @@ import {
   Sparkles,
   Home,
   User as UserIcon,
-  Bell
+  Bell,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -1989,8 +1991,8 @@ export default function App() {
 
   if (!isAuthReady) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
-        <motion.div 
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
           className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full mb-6"
@@ -2069,7 +2071,7 @@ export default function App() {
     const fieldLabel = "text-[11px] font-medium text-slate-500 dark:text-[#A8A4CC] ml-1";
 
     return (
-      <div className="min-h-screen bg-[#F6F4FD] dark:bg-[#0B0A2E] flex flex-col p-6">
+      <div className="min-h-screen flex flex-col p-6">
         <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto">
           <div className="flex items-center gap-3 mb-10">
             <div className="w-11 h-11 bg-primary rounded-2xl flex items-center justify-center text-white shadow-bubbly rotate-3 shrink-0">
@@ -2244,7 +2246,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/20 md:pl-80">
+    <div className="min-h-screen font-sans text-foreground selection:bg-primary/20 md:pl-80">
       {/* Onboarding / Nickname Modal */}
       <Dialog open={isNicknameModalOpen} onOpenChange={setIsNicknameModalOpen}>
         <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#0B0A2E] flex flex-col">
@@ -3735,7 +3737,7 @@ export default function App() {
         <MobileNavItem
           active={activeTab === 'receitas' || activeTab === 'despesas'}
           onClick={() => setActiveTab('despesas')}
-          icon={<PieChartIcon />}
+          icon={<ArrowUpDown />}
         />
         <MobileNavItem
           active={activeTab === 'cartoes'}
@@ -4357,7 +4359,7 @@ export default function App() {
             >
               <div className="md:hidden flex items-center justify-between">
                 <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
-                  {activeTab === 'receitas' ? 'Receitas' : 'Despesas'}
+                  Movimentações
                 </h1>
                 <button
                   onClick={() => handleOpenRegistrar(activeTab === 'receitas' ? 'income' : 'expense')}
@@ -4365,6 +4367,27 @@ export default function App() {
                   aria-label="Novo lançamento"
                 >
                   <Plus size={20} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              <div className="md:hidden flex items-center gap-5">
+                <button
+                  onClick={() => setActiveTab('receitas')}
+                  className={cn(
+                    "text-base transition-colors",
+                    activeTab === 'receitas' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
+                  )}
+                >
+                  Receitas
+                </button>
+                <button
+                  onClick={() => setActiveTab('despesas')}
+                  className={cn(
+                    "text-base transition-colors",
+                    activeTab === 'despesas' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
+                  )}
+                >
+                  Despesas
                 </button>
               </div>
 
@@ -5704,11 +5727,10 @@ function TransactionItem({
           "w-11 h-11 rounded-full flex items-center justify-center shrink-0",
           transaction.type === 'income' ? "bg-emerald-400 text-white" : "bg-rose-400 text-white"
         )}>
-          {transaction.type === 'income' ? <ArrowUpCircle size={20} strokeWidth={2.5} /> : <ArrowDownCircle size={20} strokeWidth={2.5} />}
+          {transaction.type === 'income' ? <ArrowUp size={20} strokeWidth={2.5} /> : <ArrowDown size={20} strokeWidth={2.5} />}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate">{transaction.description}</p>
-          <div className="flex items-center gap-1.5 mt-0.5 overflow-hidden">
+          <div className="flex items-center gap-1.5 overflow-hidden">
             {!hideDate && (
               <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight shrink-0">
                 {formattedDate}
@@ -5729,6 +5751,7 @@ function TransactionItem({
               <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 shrink-0">· vinculado</span>
             )}
           </div>
+          <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{transaction.description}</p>
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
