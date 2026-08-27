@@ -1008,7 +1008,7 @@ export default function App() {
   // Gráfico de evolução da fatura (aba Cartões, mobile) — 6 meses do cartão
   // ativo; clicar numa barra seleciona o mês e mostra os itens logo abaixo.
   const [selectedBillDate, setSelectedBillDate] = useState<Date>(currentDate);
-  useEffect(() => { setSelectedBillDate(currentDate); }, [currentDate, selectedCard]);
+  useEffect(() => { setSelectedBillDate(currentDate); }, [currentDate, selectedCard, activeTab]);
 
   const CHART_MONTHS_HISTORY = 24;
   const CHART_BAR_WIDTH = 48;
@@ -1043,7 +1043,7 @@ export default function App() {
     if (!el) return;
     const target = el.scrollWidth - el.clientWidth / 2 - CHART_BAR_WIDTH / 2;
     el.scrollLeft = Math.max(0, target);
-  }, [selectedCard, currentDate, cards.length]);
+  }, [selectedCard, currentDate, cards.length, activeTab]);
 
   const cardBillItems = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
@@ -5112,7 +5112,7 @@ export default function App() {
                             <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Evolução da fatura</p>
                             <div className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2 overflow-hidden">
                               <div ref={billChartScrollRef} className="overflow-x-auto scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
-                                <ComposedChart width={cardBillHistory.length * CHART_BAR_WIDTH} height={130} data={cardBillHistory}>
+                                <ComposedChart key={`${activeCard.id}-${cardBillHistory.length}`} width={cardBillHistory.length * CHART_BAR_WIDTH} height={130} data={cardBillHistory}>
                                   <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: '#9C93BE' }} />
                                   <Bar
                                     dataKey="amount"
@@ -5121,32 +5121,43 @@ export default function App() {
                                     onClick={(data: any) => setSelectedBillDate(parseISO(`${data.monthKey}-01`))}
                                   >
                                     {cardBillHistory.map(entry => (
-                                      <Cell key={entry.monthKey} fill={entry.monthKey === selectedMonthKey ? activeCard.color : '#E9E6F8'} />
+                                      <Cell key={entry.monthKey} fill={activeCard.color} fillOpacity={entry.monthKey === selectedMonthKey ? 1 : 0.25} />
                                     ))}
                                   </Bar>
-                                  <Line type="monotone" dataKey="trend" stroke="#B9B2EA" strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive={false} />
+                                  <Line type="monotone" dataKey="trend" stroke={activeCard.color} strokeOpacity={0.5} strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive={false} />
                                 </ComposedChart>
                               </div>
                             </div>
                           </div>
 
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between ml-2">
-                              <div className="flex items-center gap-2">
-                                <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest">
-                                  Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
-                                </p>
-                                <span className={cn(
-                                  "text-[10px] font-medium px-2 py-0.5 rounded-full",
-                                  billPaid ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                                )}>
-                                  {billPaid ? 'Paga' : 'Em aberto'}
-                                </span>
-                              </div>
-                              <p className="text-sm font-heading font-medium text-slate-800 dark:text-[#EDE9E3]">
-                                R$ {billTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            <div className="flex items-center justify-between ml-2 gap-3">
+                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest shrink-0">
+                                Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
                               </p>
+                              <button
+                                type="button"
+                                disabled={billPaid || cardBillItems.length === 0}
+                                onClick={() => {
+                                  const bill = computeCardBill(activeCard, selectedBillDate);
+                                  setConfirmingTransaction(bill);
+                                  setConfirmAmount(billTotal);
+                                  setConfirmDate(format(new Date(), 'yyyy-MM-dd'));
+                                }}
+                                className={cn(
+                                  "flex items-center gap-1.5 text-[11px] font-medium pl-2.5 pr-3 py-1.5 rounded-full shrink-0 transition-all",
+                                  billPaid
+                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 active:scale-95"
+                                )}
+                              >
+                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", billPaid ? "bg-emerald-500" : "bg-amber-500")} />
+                                {billPaid ? 'Paga' : 'Em aberto'}
+                              </button>
                             </div>
+                            <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] ml-2">
+                              R$ {billTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
                             {cardBillItems.length === 0 ? (
                               <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
                                 <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nenhuma compra nesta fatura.</p>
@@ -5156,7 +5167,12 @@ export default function App() {
                                 <div className="space-y-2">
                                   {cardBillItems.map(t => (
                                     <div key={t.id}>
-                                      <TransactionItem transaction={t} onClick={() => handleTransactionClick(t)} hideStatus />
+                                      <TransactionItem
+                                        transaction={t}
+                                        onClick={() => handleTransactionClick(t)}
+                                        hideStatus
+                                        categoryIcon={categories.find(c => c.name === t.category)?.icon}
+                                      />
                                     </div>
                                   ))}
                                 </div>
@@ -6060,7 +6076,7 @@ function SwipeToConfirm({
 
   return (
     <div className="relative rounded-full overflow-hidden">
-      <motion.div style={{ width: dragX }} className={cn("absolute inset-y-0 left-0 flex items-center pl-6 overflow-hidden", colorClass)}>
+      <motion.div style={{ width: dragX }} className={cn("absolute inset-y-0 left-0 flex items-center pl-6 rounded-full overflow-hidden", colorClass)}>
         <motion.div style={{ scale: revealScale }} className="flex items-center gap-2 text-white font-medium text-sm whitespace-nowrap">
           <CheckCircle2 size={18} strokeWidth={2.5} />
           {actionLabel}
@@ -6090,7 +6106,7 @@ function SwipeToConfirm({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className={cn("absolute inset-0 flex items-center justify-center gap-2 text-white font-medium text-sm", colorClass)}
+              className={cn("absolute inset-0 flex items-center justify-center gap-2 text-white font-medium text-sm rounded-full", colorClass)}
             >
               <motion.div initial={{ scale: 0.4 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 15 }}>
                 <CheckCircle2 size={22} strokeWidth={2.5} />
@@ -6111,7 +6127,8 @@ function TransactionItem({
   onClick,
   onQuickConfirm,
   hideDate = false,
-  hideStatus = false
+  hideStatus = false,
+  categoryIcon
 }: {
   transaction: Transaction,
   personName?: string,
@@ -6119,7 +6136,8 @@ function TransactionItem({
   onClick?: () => void,
   onQuickConfirm?: () => void,
   hideDate?: boolean,
-  hideStatus?: boolean
+  hideStatus?: boolean,
+  categoryIcon?: string
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
   const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-');
@@ -6136,7 +6154,11 @@ function TransactionItem({
         className="flex items-center justify-between gap-3 border border-slate-200/70 dark:border-white/10 rounded-full pl-3 pr-4 py-3 cursor-pointer active:scale-[0.99] transition-transform"
       >
         <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
-          {!hideStatus && (
+          {categoryIcon ? (
+            <div className="w-6 h-6 flex items-center justify-center shrink-0 text-base">
+              {categoryIcon}
+            </div>
+          ) : !hideStatus && (
             <div className={cn(
               "w-6 h-6 flex items-center justify-center shrink-0",
               transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
