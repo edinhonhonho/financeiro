@@ -44,9 +44,10 @@ import {
   Home,
   Bell,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Camera
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
 import {
   Card as ShadcnCard,
   CardContent
@@ -89,6 +90,8 @@ import {
   Area,
   BarChart,
   Bar,
+  ComposedChart,
+  Line,
   XAxis,
   YAxis
 } from 'recharts';
@@ -300,7 +303,7 @@ function AccountRow({
 function AccountSection({ label, children }: { label?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      {label && <p className="text-[10px] font-medium uppercase tracking-widest text-slate-400 dark:text-[#8D89AC] ml-1">{label}</p>}
+      {label && <p className="text-[10px] font-medium tracking-widest text-slate-400 dark:text-[#8D89AC] ml-1">{label}</p>}
       <div className="bg-white dark:bg-[#100E3D] rounded-[2rem] shadow-soft divide-y divide-slate-100 dark:divide-[#201C56] overflow-hidden">
         {children}
       </div>
@@ -382,7 +385,6 @@ export default function App() {
   const [isRegistrarOpen, setIsRegistrarOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isPessoasOpen, setIsPessoasOpen] = useState(false);
-  const [isCartoesOpen, setIsCartoesOpen] = useState(false);
   const [isCategoriasOpen, setIsCategoriasOpen] = useState(false);
   const [isNicknameModalOpen, setIsNicknameModalOpen] = useState(false);
   const [isAccountEditOpen, setIsAccountEditOpen] = useState(false);
@@ -403,6 +405,7 @@ export default function App() {
   const [tempNickname, setTempNickname] = useState('');
   const [createLinkedIncome, setCreateLinkedIncome] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmittingCard, setIsSubmittingCard] = useState(false);
   const [deleteLinked, setDeleteLinked] = useState(false);
   const [linkedIncomeDate, setLinkedIncomeDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -1005,15 +1008,28 @@ export default function App() {
   const [selectedBillDate, setSelectedBillDate] = useState<Date>(currentDate);
   useEffect(() => { setSelectedBillDate(currentDate); }, [currentDate, selectedCard]);
 
+  const [billHistoryOffset, setBillHistoryOffset] = useState(0);
+  useEffect(() => { setBillHistoryOffset(0); }, [selectedCard, currentDate]);
+
   const cardBillHistory = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
     if (!activeCard) return [];
     return Array.from({ length: 6 }).map((_, i) => {
-      const monthDate = subMonths(currentDate, 5 - i);
+      const monthDate = subMonths(currentDate, 5 - i + billHistoryOffset);
       const bill = computeCardBill(activeCard, monthDate);
       return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: bill.amount };
     });
-  }, [cards, selectedCard, currentDate]);
+  }, [cards, selectedCard, currentDate, billHistoryOffset]);
+
+  const chartSwipeStartX = React.useRef<number | null>(null);
+  const handleChartSwipeStart = (x: number) => { chartSwipeStartX.current = x; };
+  const handleChartSwipeEnd = (x: number) => {
+    if (chartSwipeStartX.current === null) return;
+    const deltaX = x - chartSwipeStartX.current;
+    chartSwipeStartX.current = null;
+    if (Math.abs(deltaX) < 30) return;
+    setBillHistoryOffset(prev => Math.max(0, Math.min(30, deltaX > 0 ? prev - 1 : prev + 1)));
+  };
 
   const cardBillItems = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
@@ -1586,6 +1602,22 @@ export default function App() {
     }
   };
 
+  const profileImageInputRef = React.useRef<HTMLInputElement>(null);
+  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        await api.saveProfile(user.id, { photoURL: reader.result as string });
+        await loadProfile();
+      } catch (err) {
+        handleSupabaseError(err, OperationType.WRITE, 'profiles');
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveNickname = async () => {
     if (!tempNickname.trim() || !user) return;
     try {
@@ -1845,8 +1877,10 @@ export default function App() {
   const [limitInput, setLimitInput] = useState('0,00');
 
   const handleAddCard = async () => {
+    if (isSubmittingCard) return;
     const limitValue = parseCurrency(limitInput);
     if (!newCardName.trim() || !limitValue || !user) return;
+    setIsSubmittingCard(true);
     try {
       const cardData = {
         name: newCardName.trim(),
@@ -1874,6 +1908,8 @@ export default function App() {
       setNewCardColor('#8A7FF5');
     } catch (err) {
       handleSupabaseError(err, OperationType.WRITE, 'cards');
+    } finally {
+      setIsSubmittingCard(false);
     }
   };
 
@@ -2493,7 +2529,7 @@ export default function App() {
           </ScrollArea>
           <div className="p-6 border-t border-slate-100 dark:border-[#201C56] space-y-3 shrink-0">
             <div className="flex justify-between items-center px-1">
-              <span className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] uppercase tracking-wider">Total da fatura</span>
+              <span className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider">Total da fatura</span>
               <span className="text-xl font-heading font-bold text-slate-800 dark:text-[#EDE9E3]">R$ {(viewingBill?.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <Button
@@ -2512,38 +2548,6 @@ export default function App() {
           </div>
         </DialogContent>
       </Dialog>
-      {/* Floating Month Selector (Above Bottom Nav) */}
-      <div className="fixed bottom-24 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 z-40 md:hidden w-full max-w-[90vw] px-2">
-        <div className="flex items-center gap-1 bg-white dark:bg-[#100E3D] px-2 py-2 rounded-[2rem] border border-white dark:border-[#100E3D] shadow-bubbly pointer-events-auto">
-          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 shrink-0" onClick={prevMonth}>
-            <ChevronLeft size={20} strokeWidth={3} />
-          </Button>
-          <button
-            type="button"
-            onClick={() => {
-              setPickerMonth(format(currentDate, 'MM'));
-              setPickerYear(format(currentDate, 'yyyy'));
-              setIsMonthPickerOpen(true);
-            }}
-            className="text-xs font-normal text-center capitalize text-slate-700 dark:text-[#EDEAF9] font-heading tracking-tight px-2 hover:text-primary transition-colors whitespace-nowrap"
-          >
-            {format(currentDate, 'MMMM yyyy', { locale: ptBR })}
-          </button>
-          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95 shrink-0" onClick={nextMonth}>
-            <ChevronRight size={20} strokeWidth={3} />
-          </Button>
-        </div>
-        {!isSameMonth(currentDate, new Date()) && (
-          <button
-            type="button"
-            onClick={() => setCurrentDate(new Date())}
-            className="h-11 px-3 rounded-full bg-white dark:bg-[#100E3D] shadow-bubbly text-[10px] font-medium text-primary shrink-0 pointer-events-auto whitespace-nowrap"
-          >
-            Hoje
-          </button>
-        )}
-      </div>
-
       {/* Month/Year Picker */}
       <Dialog open={isMonthPickerOpen} onOpenChange={setIsMonthPickerOpen}>
         <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
@@ -3200,7 +3204,7 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 uppercase tracking-widest">Suas categorias ({categories.length})</p>
+                <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Suas categorias ({categories.length})</p>
                 <div className="space-y-2">
                   {categories.map(cat => (
                     <div key={cat.id} className="flex items-center gap-3 pl-3 pr-2 py-2 bg-card rounded-full shadow-soft group">
@@ -3751,7 +3755,7 @@ export default function App() {
 
                       {createLinkedIncome && (
                         <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/10 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/30 space-y-2 animate-in fade-in slide-in-from-top-2">
-                          <Label className="text-[10px] font-medium uppercase tracking-wider text-indigo-400 ml-1">
+                          <Label className="text-[10px] font-medium tracking-wider text-indigo-400 ml-1">
                             Data limite para reembolso
                           </Label>
                           <DateField
@@ -3861,9 +3865,28 @@ export default function App() {
               </DialogHeader>
               <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mb-6">Minha conta</h1>
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-medium text-xl shrink-0">
-                  {(userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => profileImageInputRef.current?.click()}
+                  className="relative w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-medium text-xl shrink-0 overflow-hidden"
+                  aria-label="Alterar foto de perfil"
+                >
+                  {userProfile?.photoURL ? (
+                    <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    (userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()
+                  )}
+                  <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Camera size={16} className="text-white" />
+                  </div>
+                </button>
+                <input
+                  type="file"
+                  ref={profileImageInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleProfileImageChange}
+                />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-slate-800 dark:text-[#EDE9E3] truncate">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
                   <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] truncate">
@@ -4020,7 +4043,7 @@ export default function App() {
             </div>
 
             <div className="pt-4 space-y-3">
-              <p className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-[#8D89AC] ml-4">Trocar senha (opcional)</p>
+              <p className="text-xs font-medium tracking-widest text-slate-400 dark:text-[#8D89AC] ml-4">Trocar senha (opcional)</p>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Nova senha</Label>
                 <div className="relative">
@@ -4112,8 +4135,12 @@ export default function App() {
 
         <div className="mt-auto pt-6 flex flex-col gap-2">
           <button className="w-full flex items-center gap-3 p-2 rounded-[1.75rem] hover:bg-slate-50 dark:hover:bg-[#16133F] transition-colors group" onClick={() => setIsProfileOpen(true)}>
-            <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg shrink-0">
-              {(userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()}
+            <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg shrink-0 overflow-hidden">
+              {userProfile?.photoURL ? (
+                <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                (userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()
+              )}
             </div>
             <div className="flex-1 overflow-hidden text-left">
               <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3] truncate tracking-tight">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
@@ -4179,7 +4206,7 @@ export default function App() {
 
                 <div>
                   <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight capitalize">{format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}</p>
-                  <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">Seu saldo</h1>
+                  <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">Balanço do mês</h1>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     {(() => {
                       const [intPart, decPart] = Math.abs(stats.balance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
@@ -4248,15 +4275,15 @@ export default function App() {
                     const [ei, ed] = stats.expensesActual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                     return (
                       <>
-                        <div className="bg-secondary shadow-soft rounded-2xl p-4">
-                          <p className="text-sm font-normal text-secondary-foreground/70 truncate">Receitas</p>
-                          <p className="text-2xl font-heading font-medium tracking-tighter text-secondary-foreground truncate mt-1">
+                        <div className="bg-emerald-50 dark:bg-emerald-500/10 shadow-soft rounded-xl p-4">
+                          <p className="text-sm font-normal text-emerald-600/70 dark:text-emerald-400/70 truncate">Receita</p>
+                          <p className="text-2xl font-heading font-medium tracking-tighter text-emerald-600 dark:text-emerald-400 truncate mt-1">
                             R$ {ii}<span className="opacity-50 font-normal">,{id}</span>
                           </p>
                         </div>
-                        <div className="bg-secondary shadow-soft rounded-2xl p-4">
-                          <p className="text-sm font-normal text-secondary-foreground/70 truncate">Despesas</p>
-                          <p className="text-2xl font-heading font-medium tracking-tighter text-secondary-foreground truncate mt-1">
+                        <div className="bg-rose-50 dark:bg-rose-500/10 shadow-soft rounded-xl p-4">
+                          <p className="text-sm font-normal text-rose-500/70 dark:text-rose-400/70 truncate">Despesa</p>
+                          <p className="text-2xl font-heading font-medium tracking-tighter text-rose-500 dark:text-rose-400 truncate mt-1">
                             R$ {ei}<span className="opacity-50 font-normal">,{ed}</span>
                           </p>
                         </div>
@@ -4566,7 +4593,7 @@ export default function App() {
                 <div className="flex-1 bg-white dark:bg-[#100E3D] px-6 py-4 rounded-[1.75rem] border border-white dark:border-[#100E3D] shadow-soft flex justify-between items-center relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary/2 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-125 duration-700"></div>
                   <div>
-                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest uppercase opacity-60">Total</p>
+                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest opacity-60">Total</p>
                     <p className={cn(
                       "text-lg font-heading font-bold tracking-tighter",
                       activeTab === 'receitas' ? "text-emerald-500" : "text-rose-400"
@@ -4576,7 +4603,7 @@ export default function App() {
                   </div>
                   <div className="w-px h-8 bg-slate-100 dark:bg-[#1C1852] mx-2" />
                   <div className="text-right">
-                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest uppercase opacity-60">Pendente</p>
+                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest opacity-60">Pendente</p>
                     <p className={cn(
                       "text-lg font-heading font-bold tracking-tighter",
                       activeTab === 'receitas' ? "text-emerald-500" : "text-rose-400"
@@ -4592,24 +4619,24 @@ export default function App() {
                 {movTab === 'movimentacoes' && (
                   <>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-secondary shadow-soft rounded-2xl p-4">
-                        <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Receitas</p>
+                      <div className="bg-emerald-50 dark:bg-emerald-500/10 shadow-soft rounded-xl p-4">
+                        <p className="text-sm font-normal text-emerald-600/70 dark:text-emerald-400/70 truncate">Receita</p>
                         {(() => {
                           const [i, d] = stats.incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                           return (
-                            <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">
-                              R$ {i}<span className="text-slate-400 dark:text-[#6B679C] font-normal">,{d}</span>
+                            <p className="text-2xl font-heading font-medium tracking-tighter text-emerald-600 dark:text-emerald-400 truncate mt-1">
+                              R$ {i}<span className="opacity-50 font-normal">,{d}</span>
                             </p>
                           );
                         })()}
                       </div>
-                      <div className="bg-secondary shadow-soft rounded-2xl p-4">
-                        <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Despesas</p>
+                      <div className="bg-rose-50 dark:bg-rose-500/10 shadow-soft rounded-xl p-4">
+                        <p className="text-sm font-normal text-rose-500/70 dark:text-rose-400/70 truncate">Despesa</p>
                         {(() => {
                           const [i, d] = stats.expenseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                           return (
-                            <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">
-                              R$ {i}<span className="text-slate-400 dark:text-[#6B679C] font-normal">,{d}</span>
+                            <p className="text-2xl font-heading font-medium tracking-tighter text-rose-500 dark:text-rose-400 truncate mt-1">
+                              R$ {i}<span className="opacity-50 font-normal">,{d}</span>
                             </p>
                           );
                         })()}
@@ -4650,33 +4677,45 @@ export default function App() {
                         </p>
                       ) : (
                         list.map(t => (
-                          <div key={t.id} className="bg-card rounded-[1.75rem] shadow-soft p-5 space-y-4">
-                            <div className="flex items-center gap-3">
+                          <SwipeToConfirm
+                            key={t.id}
+                            enabled
+                            actionLabel={movTab === 'apagar' ? 'Pago' : 'Recebido'}
+                            colorClass={movTab === 'apagar' ? 'bg-primary' : 'bg-emerald-400'}
+                            onConfirm={() => handleQuickConfirm(t)}
+                          >
+                            <div className="flex items-center gap-3 border border-slate-200/70 dark:border-white/10 rounded-full pl-3 pr-4 py-3">
                               <div
-                                className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shrink-0 font-medium text-sm shrink-0"
+                                className="w-11 h-11 rounded-full flex items-center justify-center text-white shrink-0 font-medium text-sm"
                                 style={{ backgroundColor: categories.find(c => c.name === t.category)?.color || '#9C93BE' }}
                               >
                                 {(t.category || t.description).charAt(0).toUpperCase()}
                               </div>
-                              <p className="flex-1 min-w-0 text-sm font-medium text-slate-800 dark:text-[#EDEAF9] truncate">{t.description}</p>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 overflow-hidden">
+                                  <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight shrink-0">
+                                    {format(parseISO(t.date), 'dd/MM/yyyy')}
+                                  </span>
+                                  <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {t.category}</span>
+                                </div>
+                                <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{t.description}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleQuickConfirm(t); }}
+                                title={movTab === 'apagar' ? 'Marcar como pago' : 'Marcar como recebido'}
+                                className="p-2 -m-2 rounded-full active:scale-90 transition-all group/confirm shrink-0"
+                              >
+                                <div className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#2A2566] group-hover/confirm:border-primary transition-all" />
+                              </button>
                               <p className={cn(
-                                "font-heading font-medium text-base tracking-tighter whitespace-nowrap shrink-0",
+                                "font-heading font-medium tracking-tighter whitespace-nowrap text-base shrink-0",
                                 movTab === 'apagar' ? "text-rose-400" : "text-emerald-500"
                               )}>
                                 R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </p>
                             </div>
-                            <div className="flex items-center gap-4 text-xs font-normal text-slate-400 dark:text-[#8D89AC]">
-                              <span>{format(parseISO(t.date), 'dd/MM/yyyy')}</span>
-                              <span className="truncate">{t.category}</span>
-                            </div>
-                            <button
-                              onClick={() => handleQuickConfirm(t)}
-                              className="w-full h-12 rounded-full bg-secondary text-secondary-foreground font-medium text-sm active:scale-95 transition-all"
-                            >
-                              {movTab === 'apagar' ? 'Marcar como pago' : 'Marcar como recebido'}
-                            </button>
-                          </div>
+                          </SwipeToConfirm>
                         ))
                       )}
                     </div>
@@ -4719,12 +4758,12 @@ export default function App() {
                       <TableHeader>
                         <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#201C56]">
                           <TableHead className="w-10 pl-6"></TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Data</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Descrição</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Categoria</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Pessoa</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Status</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC] text-right pr-6">Valor</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Data</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Descrição</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Categoria</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Pessoa</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Status</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] text-right pr-6">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -4765,7 +4804,7 @@ export default function App() {
                               <TableCell className="text-xs font-normal text-slate-500 dark:text-[#A8A4CC]">{person?.name || '—'}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={cn(
-                                  "rounded-md text-[9px] border-none px-2 h-5 uppercase font-medium",
+                                  "rounded-md text-[9px] border-none px-2 h-5 font-medium",
                                   t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#1C1852] text-slate-400 dark:text-[#8D89AC]"
                                 )}>
                                   {t.status === 'actual' ? 'Confirmado' : 'Planejado'}
@@ -4799,43 +4838,191 @@ export default function App() {
             >
               <div className="md:hidden space-y-5">
                 {mobileTopHeader}
-                <div className="flex items-center justify-between">
+                {!showCardForm && !manageCardId && (
                   <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Cartões</h1>
-                  {cards.length > 0 && (
-                    <button
-                      onClick={() => {
-                        const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
-                        setEditingCard(activeCard);
-                        setNewCardName(activeCard.name);
-                        setLimitInput(maskCurrency(String(activeCard.limit * 100)));
-                        setNewCardClosingDay(String(activeCard.closingDay));
-                        setNewCardDueDay(String(activeCard.dueDay));
-                        setNewCardColor(activeCard.color);
-                        setShowCardForm(true);
-                        setIsCartoesOpen(true);
-                      }}
-                      className="w-11 h-11 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
-                      aria-label="Editar cartão"
-                    >
-                      <Pencil size={16} strokeWidth={2.5} />
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
 
-              {/* Carrossel de cartões (mobile) — no estilo "Your Cards" da referência */}
               <div className="md:hidden space-y-6">
-                {cards.length === 0 ? (
-                  <div className="bg-card rounded-[1.75rem] shadow-soft p-10 text-center">
-                    <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nenhum cartão cadastrado ainda.</p>
-                    <button
-                      onClick={() => setIsCartoesOpen(true)}
-                      className="mt-4 h-11 px-6 rounded-full bg-primary text-white text-sm font-medium active:scale-95 transition-all"
-                    >
-                      Adicionar cartão
+                {showCardForm ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => { setShowCardForm(false); setEditingCard(null); }}
+                        className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] shrink-0"
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+                      <h1 className="text-2xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter truncate">
+                        {editingCard ? 'Editar cartão' : 'Novo cartão'}
+                      </h1>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome do cartão</Label>
+                        <Input
+                          placeholder="Ex: Nubank"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
+                          value={newCardName || ''}
+                          onChange={(e) => setNewCardName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Limite</Label>
+                        <Input
+                          placeholder="0,00"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm px-4 shadow-sm"
+                          value={limitInput || ''}
+                          onChange={(e) => setLimitInput(maskCurrency(e.target.value))}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Fechamento</Label>
+                        <Input
+                          type="number"
+                          placeholder="1"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
+                          value={newCardClosingDay || ''}
+                          onChange={(e) => setNewCardClosingDay(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Vencimento</Label>
+                        <Input
+                          type="number"
+                          placeholder="10"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
+                          value={newCardDueDay || ''}
+                          onChange={(e) => setNewCardDueDay(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Visual do cartão</Label>
+                      <div
+                        className="rounded-[1.75rem] h-24 shadow-sm flex items-end p-4 transition-colors duration-300 relative overflow-hidden"
+                        style={{ backgroundColor: newCardColor }}
+                      >
+                        <div className="absolute -right-6 -top-10 w-28 h-28 rounded-full border-[10px] border-white/15" />
+                        <div className="absolute -right-2 -top-4 w-16 h-16 rounded-full border-[6px] border-white/20" />
+                        <span className="text-white font-medium text-sm drop-shadow-sm truncate relative z-10">{newCardName || 'Novo cartão'}</span>
+                      </div>
+                      <div className="grid grid-cols-6 gap-2 bg-slate-50 dark:bg-[#16133F] p-3 rounded-2xl shadow-sm">
+                        {CARD_COLOR_PRESETS.map(color => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setNewCardColor(color)}
+                            className={cn(
+                              "aspect-square rounded-xl transition-all relative flex items-center justify-center",
+                              newCardColor === color ? "ring-2 ring-offset-2 ring-primary scale-105" : "hover:scale-105 opacity-80 hover:opacity-100"
+                            )}
+                            style={{ backgroundColor: color }}
+                          >
+                            {newCardColor === color && <CheckCircle2 size={14} className="text-white drop-shadow" strokeWidth={3} />}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => colorInputRef.current?.click()}
+                          className={cn(
+                            "aspect-square rounded-xl border-2 border-dashed flex items-center justify-center transition-all",
+                            !CARD_COLOR_PRESETS.includes(newCardColor) ? "border-primary text-primary ring-2 ring-offset-2 ring-primary" : "border-slate-200 dark:border-[#2A2566] text-slate-400 dark:text-[#8D89AC] hover:border-primary hover:text-primary"
+                          )}
+                          style={{ backgroundColor: !CARD_COLOR_PRESETS.includes(newCardColor) ? newCardColor : undefined }}
+                        >
+                          <Palette size={14} className={cn(!CARD_COLOR_PRESETS.includes(newCardColor) && "text-white")} />
+                        </button>
+                        <input type="color" ref={colorInputRef} className="sr-only" value={newCardColor} onChange={(e) => setNewCardColor(e.target.value)} />
+                      </div>
+                    </div>
+                    <button onClick={handleAddCard} disabled={isSubmittingCard} className="w-full h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-60">
+                      {editingCard ? 'Salvar alterações' : 'Adicionar cartão'}
                     </button>
                   </div>
-                ) : (
+                ) : manageCardId ? (() => {
+                  const card = cards.find(c => c.id === manageCardId);
+                  if (!card) return null;
+                  const bill = computeCardBill(card, currentDate);
+                  return (
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setManageCardId(null)}
+                          className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] shrink-0"
+                        >
+                          <ChevronLeft size={20} />
+                        </button>
+                        <h1 className="text-2xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter truncate">{card.name}</h1>
+                      </div>
+
+                      <div
+                        className="rounded-[1.75rem] h-28 shadow-sm flex items-end p-5 relative overflow-hidden"
+                        style={{ backgroundColor: card.color }}
+                      >
+                        <div className="absolute -right-8 -top-12 w-36 h-36 rounded-full border-[12px] border-white/15" />
+                        <div className="absolute -right-2 -top-6 w-20 h-20 rounded-full border-[7px] border-white/20" />
+                        <span className="text-white font-medium text-base drop-shadow-sm truncate relative z-10">{card.name}</span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl text-center">
+                          <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider mb-1">Limite</p>
+                          <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">R$ {card.limit.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl text-center">
+                          <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider mb-1">Fechamento</p>
+                          <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">{card.closingDay ? `Dia ${card.closingDay}` : '—'}</p>
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl text-center">
+                          <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider mb-1">Vencimento</p>
+                          <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">{card.dueDay ? `Dia ${card.dueDay}` : '—'}</p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setViewingBill(bill)}
+                        className="w-full flex items-center justify-between p-5 bg-slate-50 dark:bg-[#16133F] rounded-2xl hover:bg-slate-100 dark:hover:bg-[#1C1852] transition-colors"
+                      >
+                        <div className="text-left">
+                          <p className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider">Fatura de {format(currentDate, "MMMM", { locale: ptBR })}</p>
+                          <p className="text-lg font-heading font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">R$ {bill.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        </div>
+                        <ChevronRight size={18} className="text-slate-300 dark:text-[#6B679C]" />
+                      </button>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          className="h-12 rounded-full font-medium bg-secondary text-secondary-foreground hover:bg-secondary/70 flex items-center justify-center gap-2 transition-colors"
+                          onClick={() => {
+                            setEditingCard(card);
+                            setNewCardName(card.name);
+                            setLimitInput(maskCurrency(String(card.limit * 100)));
+                            setNewCardClosingDay(String(card.closingDay));
+                            setNewCardDueDay(String(card.dueDay));
+                            setNewCardColor(card.color);
+                            setShowCardForm(true);
+                          }}
+                        >
+                          <Settings size={16} strokeWidth={2.5} />
+                          Editar
+                        </button>
+                        <button
+                          className="h-12 rounded-full font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center justify-center gap-2 transition-colors"
+                          onClick={() => handleDeleteCard(card.id)}
+                        >
+                          <Trash2 size={16} strokeWidth={2.5} />
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })() : (
                   <>
                     <div
                       ref={cardsCarouselRef}
@@ -4845,22 +5032,68 @@ export default function App() {
                       {cards.map(card => (
                         <div key={card.id} className="w-[280px] shrink-0 snap-center">
                           <div
-                            className="rounded-[1.75rem] h-44 p-5 relative overflow-hidden flex flex-col justify-between shadow-bubbly"
+                            onClick={() => setManageCardId(card.id)}
+                            role="button"
+                            tabIndex={0}
+                            className="rounded-[1.75rem] h-44 p-5 relative overflow-hidden flex flex-col justify-between shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
                             style={{ backgroundColor: card.color }}
                           >
                             <div className="absolute -right-8 -top-10 w-32 h-32 rounded-full border-[10px] border-white/15" />
                             <div className="absolute -right-2 -top-2 w-20 h-20 rounded-full border-[7px] border-white/20" />
-                            <span className="text-white font-medium text-sm relative z-10 drop-shadow-sm">{card.name}</span>
+                            <div className="flex items-center justify-between relative z-10">
+                              <span className="text-white font-medium text-sm drop-shadow-sm">{card.name}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCard(card);
+                                  setNewCardName(card.name);
+                                  setLimitInput(maskCurrency(String(card.limit * 100)));
+                                  setNewCardClosingDay(String(card.closingDay));
+                                  setNewCardDueDay(String(card.dueDay));
+                                  setNewCardColor(card.color);
+                                  setShowCardForm(true);
+                                }}
+                                className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0"
+                                aria-label="Editar cartão"
+                              >
+                                <Pencil size={14} strokeWidth={2.5} />
+                              </button>
+                            </div>
                             <div className="relative z-10 space-y-2">
                               <p className="text-white/90 font-mono text-lg tracking-widest">•••• •••• •••• ••••</p>
                               <div className="flex items-center justify-between">
-                                <span className="text-white/70 text-[10px] uppercase tracking-wider">Limite</span>
+                                <span className="text-white/70 text-[10px] tracking-wider">Limite</span>
                                 <span className="text-white text-xs font-medium">R$ {card.limit.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-white/70 text-[10px] tracking-wider">Vencimento</span>
+                                <span className="text-white text-xs font-medium">{card.dueDay ? `Dia ${card.dueDay}` : '—'}</span>
                               </div>
                             </div>
                           </div>
                         </div>
                       ))}
+                      <div className="w-[280px] shrink-0 snap-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCard(null);
+                            setNewCardName('');
+                            setLimitInput('0,00');
+                            setNewCardClosingDay('');
+                            setNewCardDueDay('');
+                            setNewCardColor('#8A7FF5');
+                            setShowCardForm(true);
+                          }}
+                          className="w-full h-44 rounded-[1.75rem] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#8D89AC] hover:border-primary hover:text-primary transition-all"
+                        >
+                          <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#1C1852] flex items-center justify-center">
+                            <Plus size={20} strokeWidth={2.5} />
+                          </div>
+                          <span className="text-sm font-medium">Adicionar cartão</span>
+                        </button>
+                      </div>
                     </div>
 
                     {cards.length > 1 && (
@@ -4877,23 +5110,24 @@ export default function App() {
                       </div>
                     )}
 
-                    {(() => {
+                    {cards.length > 0 && (() => {
                       const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
                       const selectedMonthKey = format(selectedBillDate, 'yyyy-MM');
                       const billTotal = cardBillItems.reduce((acc, t) => acc + t.amount, 0);
                       return (
                         <>
                           <div className="space-y-3">
-                            <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 uppercase tracking-widest">Evolução da fatura</p>
-                            <div className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2">
+                            <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Evolução da fatura</p>
+                            <div
+                              className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2 touch-pan-y"
+                              onTouchStart={(e) => handleChartSwipeStart(e.touches[0].clientX)}
+                              onTouchEnd={(e) => handleChartSwipeEnd(e.changedTouches[0].clientX)}
+                              onMouseDown={(e) => handleChartSwipeStart(e.clientX)}
+                              onMouseUp={(e) => handleChartSwipeEnd(e.clientX)}
+                            >
                               <ResponsiveContainer width="100%" height={130}>
-                                <BarChart data={cardBillHistory}>
+                                <ComposedChart data={cardBillHistory}>
                                   <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: '#9C93BE' }} />
-                                  <Tooltip
-                                    cursor={{ fill: 'transparent' }}
-                                    formatter={(v: number) => [`R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Fatura']}
-                                    contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
-                                  />
                                   <Bar
                                     dataKey="amount"
                                     radius={[8, 8, 8, 8]}
@@ -4904,14 +5138,15 @@ export default function App() {
                                       <Cell key={entry.monthKey} fill={entry.monthKey === selectedMonthKey ? activeCard.color : '#E9E6F8'} />
                                     ))}
                                   </Bar>
-                                </BarChart>
+                                  <Line type="monotone" dataKey="amount" stroke="#B9B2EA" strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive={false} />
+                                </ComposedChart>
                               </ResponsiveContainer>
                             </div>
                           </div>
 
                           <div className="space-y-3">
                             <div className="flex items-center justify-between ml-2">
-                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] uppercase tracking-widest capitalize">
+                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest capitalize">
                                 Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
                               </p>
                               <p className="text-sm font-heading font-medium text-slate-800 dark:text-[#EDE9E3]">
@@ -4991,7 +5226,7 @@ export default function App() {
                     } />
                     <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#100E3D] z-50">
                       <div className="space-y-3">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1 uppercase">Ordenamento</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Ordenamento</Label>
                         <div className="flex flex-col gap-2">
                           <button 
                             onClick={() => setSortMode('date')}
@@ -5058,12 +5293,12 @@ export default function App() {
                       <TableHeader>
                         <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#201C56]">
                           <TableHead className="w-10 pl-6"></TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Data</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Descrição</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Categoria</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Cartão</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC]">Pessoa</TableHead>
-                          <TableHead className="text-[10px] font-medium uppercase tracking-wider text-slate-400 dark:text-[#8D89AC] text-right pr-6">Valor</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Data</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Descrição</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Categoria</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Cartão</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Pessoa</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] text-right pr-6">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -5289,240 +5524,6 @@ export default function App() {
         </DialogContent>
       </Dialog>
 
-      {/* Cartões Management Modal */}
-      <Dialog open={isCartoesOpen} onOpenChange={(open) => {
-        setIsCartoesOpen(open);
-        if (!open) { setManageCardId(null); setShowCardForm(false); setEditingCard(null); }
-      }}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
-          <div className="p-6 shrink-0">
-            <DialogHeader className="sr-only">
-              <DialogTitle>{showCardForm ? (editingCard ? 'Editar cartão' : 'Novo cartão') : manageCardId ? cards.find(c => c.id === manageCardId)?.name : 'Cartões'}</DialogTitle>
-              <DialogDescription>Sua carteira de cartões</DialogDescription>
-            </DialogHeader>
-            <div className="flex items-center justify-between gap-3 mb-2">
-              {(manageCardId || showCardForm) ? (
-                <button
-                  className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] shrink-0"
-                  onClick={() => {
-                    if (showCardForm) {
-                      setShowCardForm(false);
-                      setEditingCard(null);
-                    } else {
-                      setManageCardId(null);
-                    }
-                  }}
-                >
-                  <ChevronLeft size={20} />
-                </button>
-              ) : <span />}
-              {!showCardForm && !manageCardId && (
-                <button
-                  className="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0"
-                  onClick={() => {
-                    setEditingCard(null);
-                    setNewCardName('');
-                    setLimitInput('0,00');
-                    setNewCardClosingDay('');
-                    setNewCardDueDay('');
-                    setNewCardColor('#8A7FF5');
-                    setShowCardForm(true);
-                  }}
-                >
-                  <Plus size={18} strokeWidth={3} />
-                </button>
-              )}
-            </div>
-            <h1 className="text-3xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter truncate">
-              {showCardForm ? (editingCard ? 'Editar cartão' : 'Novo cartão') : manageCardId ? cards.find(c => c.id === manageCardId)?.name : 'Cartões'}
-            </h1>
-            {!showCardForm && !manageCardId && (
-              <p className="font-normal text-sm text-slate-500 dark:text-[#A8A4CC] tracking-tight mt-1">Sua carteira de cartões</p>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide pb-20">
-            {showCardForm ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome do cartão</Label>
-                    <Input
-                      placeholder="Ex: Nubank"
-                      className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
-                      value={newCardName || ''}
-                      onChange={(e) => setNewCardName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Limite</Label>
-                    <Input
-                      placeholder="0,00"
-                      className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm px-4 shadow-sm"
-                      value={limitInput || ''}
-                      onChange={(e) => setLimitInput(maskCurrency(e.target.value))}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Fechamento</Label>
-                    <Input
-                      type="number"
-                      placeholder="1"
-                      className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
-                      value={newCardClosingDay || ''}
-                      onChange={(e) => setNewCardClosingDay(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Vencimento</Label>
-                    <Input
-                      type="number"
-                      placeholder="10"
-                      className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
-                      value={newCardDueDay || ''}
-                      onChange={(e) => setNewCardDueDay(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Visual do cartão</Label>
-                  <div
-                    className="rounded-[1.75rem] h-24 shadow-sm flex items-end p-4 transition-colors duration-300 relative overflow-hidden"
-                    style={{ backgroundColor: newCardColor }}
-                  >
-                    <div className="absolute -right-6 -top-10 w-28 h-28 rounded-full border-[10px] border-white/15" />
-                    <div className="absolute -right-2 -top-4 w-16 h-16 rounded-full border-[6px] border-white/20" />
-                    <span className="text-white font-medium text-sm drop-shadow-sm truncate relative z-10">{newCardName || 'Novo cartão'}</span>
-                  </div>
-                  <div className="grid grid-cols-6 gap-2 bg-slate-50 dark:bg-[#16133F] p-3 rounded-2xl shadow-sm">
-                    {CARD_COLOR_PRESETS.map(color => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setNewCardColor(color)}
-                        className={cn(
-                          "aspect-square rounded-xl transition-all relative flex items-center justify-center",
-                          newCardColor === color ? "ring-2 ring-offset-2 ring-primary scale-105" : "hover:scale-105 opacity-80 hover:opacity-100"
-                        )}
-                        style={{ backgroundColor: color }}
-                      >
-                        {newCardColor === color && <CheckCircle2 size={14} className="text-white drop-shadow" strokeWidth={3} />}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => colorInputRef.current?.click()}
-                      className={cn(
-                        "aspect-square rounded-xl border-2 border-dashed flex items-center justify-center transition-all",
-                        !CARD_COLOR_PRESETS.includes(newCardColor) ? "border-primary text-primary ring-2 ring-offset-2 ring-primary" : "border-slate-200 dark:border-[#2A2566] text-slate-400 dark:text-[#8D89AC] hover:border-primary hover:text-primary"
-                      )}
-                      style={{ backgroundColor: !CARD_COLOR_PRESETS.includes(newCardColor) ? newCardColor : undefined }}
-                    >
-                      <Palette size={14} className={cn(!CARD_COLOR_PRESETS.includes(newCardColor) && "text-white")} />
-                    </button>
-                    <input type="color" ref={colorInputRef} className="sr-only" value={newCardColor} onChange={(e) => setNewCardColor(e.target.value)} />
-                  </div>
-                </div>
-                <button onClick={handleAddCard} className="w-full h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all">
-                  {editingCard ? 'Salvar alterações' : 'Adicionar cartão'}
-                </button>
-              </div>
-            ) : manageCardId ? (() => {
-              const card = cards.find(c => c.id === manageCardId);
-              if (!card) return null;
-              const bill = computeCardBill(card, currentDate);
-              return (
-                <div className="space-y-6">
-                  <div
-                    className="rounded-[1.75rem] h-28 shadow-sm flex items-end p-5 relative overflow-hidden"
-                    style={{ backgroundColor: card.color }}
-                  >
-                    <div className="absolute -right-8 -top-12 w-36 h-36 rounded-full border-[12px] border-white/15" />
-                    <div className="absolute -right-2 -top-6 w-20 h-20 rounded-full border-[7px] border-white/20" />
-                    <span className="text-white font-medium text-base drop-shadow-sm truncate relative z-10">{card.name}</span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl text-center">
-                      <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] uppercase tracking-wider mb-1">Limite</p>
-                      <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">R$ {card.limit.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
-                    </div>
-                    <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl text-center">
-                      <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] uppercase tracking-wider mb-1">Fechamento</p>
-                      <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">{card.closingDay ? `Dia ${card.closingDay}` : '—'}</p>
-                    </div>
-                    <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl text-center">
-                      <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] uppercase tracking-wider mb-1">Vencimento</p>
-                      <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3]">{card.dueDay ? `Dia ${card.dueDay}` : '—'}</p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => { setViewingBill(bill); setIsCartoesOpen(false); }}
-                    className="w-full flex items-center justify-between p-5 bg-slate-50 dark:bg-[#16133F] rounded-2xl hover:bg-slate-100 dark:hover:bg-[#1C1852] transition-colors"
-                  >
-                    <div className="text-left">
-                      <p className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] uppercase tracking-wider">Fatura de {format(currentDate, "MMMM", { locale: ptBR })}</p>
-                      <p className="text-lg font-heading font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">R$ {bill.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
-                    <ChevronRight size={18} className="text-slate-300 dark:text-[#6B679C]" />
-                  </button>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      className="h-12 rounded-full font-medium bg-secondary text-secondary-foreground hover:bg-secondary/70 flex items-center justify-center gap-2 transition-colors"
-                      onClick={() => {
-                        setEditingCard(card);
-                        setNewCardName(card.name);
-                        setLimitInput(maskCurrency(String(card.limit * 100)));
-                        setNewCardClosingDay(String(card.closingDay));
-                        setNewCardDueDay(String(card.dueDay));
-                        setNewCardColor(card.color);
-                        setShowCardForm(true);
-                      }}
-                    >
-                      <Settings size={16} strokeWidth={2.5} />
-                      Editar
-                    </button>
-                    <button
-                      className="h-12 rounded-full font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center justify-center gap-2 transition-colors"
-                      onClick={() => handleDeleteCard(card.id)}
-                    >
-                      <Trash2 size={16} strokeWidth={2.5} />
-                      Excluir
-                    </button>
-                  </div>
-                </div>
-              );
-            })() : (
-              <div className="space-y-3">
-                {cards.length === 0 && (
-                  <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">Nenhum cartão cadastrado ainda.</p>
-                )}
-                {cards.map(card => (
-                  <button
-                    key={card.id}
-                    type="button"
-                    onClick={() => setManageCardId(card.id)}
-                    className="w-full flex items-center gap-3 pl-3 pr-4 py-3 bg-card rounded-full shadow-soft transition-colors text-left"
-                  >
-                    <div className="w-11 h-7 rounded-lg shrink-0" style={{ backgroundColor: card.color }}></div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-800 dark:text-[#EDE9E3] text-sm truncate tracking-tight">{card.name}</p>
-                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Limite: R$ {card.limit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
-                    <ChevronRight size={16} className="text-slate-300 dark:text-[#6B679C] shrink-0" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Pessoas Modal */}
       <Dialog open={isPessoasSummaryOpen} onOpenChange={(open) => {
         setIsPessoasSummaryOpen(open);
@@ -5636,7 +5637,7 @@ export default function App() {
                   </div>
 
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] px-2 uppercase tracking-widest">Despesas do mês ({charges.items.length})</p>
+                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] px-2 tracking-widest">Despesas do mês ({charges.items.length})</p>
                     {charges.items.length > 0 ? (
                       charges.items.map(t => (
                         <div key={t.id} className="flex items-center justify-between gap-3 bg-card rounded-full pl-3 pr-4 py-3 shadow-soft">
@@ -5646,7 +5647,7 @@ export default function App() {
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <Badge variant="outline" className={cn(
-                              "rounded-md text-[8px] border-none px-2 leading-none h-4 uppercase font-medium",
+                              "rounded-md text-[8px] border-none px-2 leading-none h-4 font-medium",
                               t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#1C1852] text-slate-400 dark:text-[#8D89AC]"
                             )}>
                               {t.status === 'actual' ? 'Pago' : 'Pendente'}
@@ -5802,7 +5803,7 @@ export default function App() {
                   Tem certeza? Isso apagará TODOS os seus lançamentos para sempre.
                 </p>
                 <div className="pt-4 space-y-2 text-left">
-                  <Label className="text-xs font-medium uppercase tracking-widest text-slate-400 dark:text-[#8D89AC] ml-1">Para confirmar, digite:</Label>
+                  <Label className="text-xs font-medium tracking-widest text-slate-400 dark:text-[#8D89AC] ml-1">Para confirmar, digite:</Label>
                   <p className="text-xs font-medium text-slate-700 dark:text-[#EDE9E3] bg-card p-3 rounded-2xl shadow-soft">
                     Eu {userProfile?.nickname || 'usuário'}, sei que não é possível recuperar os dados apagados
                   </p>
@@ -6006,6 +6007,49 @@ function StatCard({ title, value, icon, trend, subValue }: { title: string, valu
   );
 }
 
+function SwipeToConfirm({
+  enabled,
+  actionLabel,
+  colorClass,
+  onConfirm,
+  children
+}: {
+  enabled: boolean,
+  actionLabel: string,
+  colorClass: string,
+  onConfirm: () => void,
+  children: React.ReactNode
+}) {
+  const dragX = useMotionValue(0);
+  const revealOpacity = useTransform(dragX, [0, 90], [0, 1]);
+  const revealScale = useTransform(dragX, [0, 90], [0.7, 1]);
+
+  if (!enabled) return <div className="relative">{children}</div>;
+
+  return (
+    <div className="relative">
+      <div className={cn("absolute inset-0 rounded-full flex items-center pl-6 overflow-hidden", colorClass)}>
+        <motion.div style={{ opacity: revealOpacity, scale: revealScale }} className="flex items-center gap-2 text-white font-medium text-sm">
+          <CheckCircle2 size={18} strokeWidth={2.5} />
+          {actionLabel}
+        </motion.div>
+      </div>
+      <motion.div
+        drag="x"
+        dragDirectionLock
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={{ left: 0, right: 0.6 }}
+        dragMomentum={false}
+        style={{ x: dragX }}
+        onDragEnd={(_, info) => { if (info.offset.x > 88) onConfirm(); }}
+        className="relative bg-background rounded-full"
+      >
+        {children}
+      </motion.div>
+    </div>
+  );
+}
+
 function TransactionItem({
   transaction,
   personName,
@@ -6025,62 +6069,69 @@ function TransactionItem({
   const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-');
 
   return (
-    <div
-      onClick={onClick}
-      className="flex items-center justify-between gap-3 border border-slate-200/70 dark:border-white/10 rounded-full pl-3 pr-4 py-3 cursor-pointer active:scale-[0.99] transition-transform"
+    <SwipeToConfirm
+      enabled={canConfirm}
+      actionLabel={transaction.type === 'income' ? 'Recebido' : 'Pago'}
+      colorClass={transaction.type === 'income' ? 'bg-emerald-400' : 'bg-primary'}
+      onConfirm={() => onQuickConfirm?.()}
     >
-      <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
-        <div className={cn(
-          "w-11 h-11 rounded-full flex items-center justify-center shrink-0",
-          transaction.type === 'income' ? "bg-emerald-400 text-white" : "bg-rose-400 text-white"
-        )}>
-          {transaction.type === 'income' ? <ArrowUp size={20} strokeWidth={2.5} /> : <ArrowDown size={20} strokeWidth={2.5} />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 overflow-hidden">
-            {!hideDate && (
-              <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight shrink-0">
-                {formattedDate}
-              </span>
-            )}
-            {transaction.installments && (
-              <span className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] shrink-0">
-                · {transaction.installments.current}/{transaction.installments.total}
-              </span>
-            )}
-            {personName && (
-              <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {personName}</span>
-            )}
-            {cardName && (
-              <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {cardName}</span>
-            )}
-            {transaction.linkedToCard && transaction.type !== 'income' && (
-              <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 shrink-0">· vinculado</span>
-            )}
+      <div
+        onClick={onClick}
+        className="flex items-center justify-between gap-3 border border-slate-200/70 dark:border-white/10 rounded-full pl-3 pr-4 py-3 cursor-pointer active:scale-[0.99] transition-transform"
+      >
+        <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
+          <div className={cn(
+            "w-6 h-6 flex items-center justify-center shrink-0",
+            transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
+          )}>
+            {transaction.type === 'income' ? <ArrowUp size={20} strokeWidth={2.5} /> : <ArrowDown size={20} strokeWidth={2.5} />}
           </div>
-          <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{transaction.description}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 overflow-hidden">
+              {!hideDate && (
+                <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight shrink-0">
+                  {formattedDate}
+                </span>
+              )}
+              {transaction.installments && (
+                <span className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] shrink-0">
+                  · {transaction.installments.current}/{transaction.installments.total}
+                </span>
+              )}
+              {personName && (
+                <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {personName}</span>
+              )}
+              {cardName && (
+                <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {cardName}</span>
+              )}
+              {transaction.linkedToCard && transaction.type !== 'income' && (
+                <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 shrink-0">· vinculado</span>
+              )}
+            </div>
+            <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{transaction.description}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {transaction.status === 'actual' ? (
+            <CheckCircle2 size={15} strokeWidth={2.5} className={transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"} />
+          ) : canConfirm && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onQuickConfirm?.(); }}
+              title={transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
+              className="p-2 -m-2 rounded-full active:scale-90 transition-all group/confirm"
+            >
+              <div className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#2A2566] group-hover/confirm:border-primary transition-all" />
+            </button>
+          )}
+          <p className={cn(
+            "font-heading font-medium tracking-tighter whitespace-nowrap text-base",
+            transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
+          )}>
+            R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        {transaction.status === 'actual' ? (
-          <CheckCircle2 size={15} strokeWidth={2.5} className={transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"} />
-        ) : canConfirm && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onQuickConfirm?.(); }}
-            title={transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
-            className="p-2 -m-2 rounded-full active:scale-90 transition-all group/confirm"
-          >
-            <div className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#2A2566] group-hover/confirm:border-primary transition-all" />
-          </button>
-        )}
-        <p className={cn(
-          "font-heading font-medium tracking-tighter whitespace-nowrap text-base",
-          transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
-        )}>
-          R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </p>
-      </div>
-    </div>
+    </SwipeToConfirm>
   );
 }
