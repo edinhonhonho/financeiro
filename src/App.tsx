@@ -42,7 +42,6 @@ import {
   Pencil,
   Sparkles,
   Home,
-  User as UserIcon,
   Bell,
   ArrowUp,
   ArrowDown
@@ -88,6 +87,8 @@ import {
   Legend,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis
 } from 'recharts';
@@ -370,6 +371,7 @@ export default function App() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [activeTab, setActiveTab] = useState('visao-geral');
   const [transactionFilter, setTransactionFilter] = useState<'pending' | 'all'>('all');
+  const [movTab, setMovTab] = useState<'movimentacoes' | 'apagar' | 'areceber'>('movimentacoes');
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [manageCardId, setManageCardId] = useState<string | null>(null);
   const [showCardForm, setShowCardForm] = useState(false);
@@ -930,6 +932,28 @@ export default function App() {
     return {};
   }, [transactions, activeTab, selectedCard, transactionFilter, currentDate, cards, groupMode, sortMode]);
 
+  // Listas da tela "Movimentações" (nav unificada de receitas + despesas, com
+  // sub-abas "Movimentações" / "A pagar" / "A receber" no estilo da referência).
+  const movimentacoesLists: { all: Transaction[]; aPagar: Transaction[]; aReceber: Transaction[] } = useMemo(() => {
+    const cardBills: Transaction[] = cards
+      .map(card => computeCardBill(card, currentDate))
+      .filter(bill => bill.amount > 0);
+
+    const monthTransactions: Transaction[] = [...transactions, ...cardBills].filter(t =>
+      format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM')
+    );
+
+    const all: Transaction[] = [...monthTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const aPagar: Transaction[] = monthTransactions
+      .filter(t => t.type !== 'income' && t.status === 'planned')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const aReceber: Transaction[] = monthTransactions
+      .filter(t => t.type === 'income' && t.status === 'planned')
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return { all, aPagar, aReceber };
+  }, [transactions, cards, currentDate]);
+
   // Form State
   const [newTransaction, setNewTransaction] = useState<Partial<Transaction>>({
     type: 'expense',
@@ -964,6 +988,41 @@ export default function App() {
   const [personSplits, setPersonSplits] = useState<{ personId: string; type: 'value' | 'parts' | 'percentage'; value: string }[]>([]);
 
   const colorInputRef = React.useRef<HTMLInputElement>(null);
+  const cardsCarouselRef = React.useRef<HTMLDivElement>(null);
+  const CARD_CAROUSEL_ITEM_WIDTH = 296; // 280px card + 16px gap
+
+  const handleCardsCarouselScroll = () => {
+    const el = cardsCarouselRef.current;
+    if (!el || cards.length === 0) return;
+    const index = Math.round(el.scrollLeft / CARD_CAROUSEL_ITEM_WIDTH);
+    const clamped = Math.max(0, Math.min(cards.length - 1, index));
+    const card = cards[clamped];
+    if (card && card.id !== selectedCard) setSelectedCard(card.id);
+  };
+
+  // Gráfico de evolução da fatura (aba Cartões, mobile) — 6 meses do cartão
+  // ativo; clicar numa barra seleciona o mês e mostra os itens logo abaixo.
+  const [selectedBillDate, setSelectedBillDate] = useState<Date>(currentDate);
+  useEffect(() => { setSelectedBillDate(currentDate); }, [currentDate, selectedCard]);
+
+  const cardBillHistory = useMemo(() => {
+    const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
+    if (!activeCard) return [];
+    return Array.from({ length: 6 }).map((_, i) => {
+      const monthDate = subMonths(currentDate, 5 - i);
+      const bill = computeCardBill(activeCard, monthDate);
+      return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: bill.amount };
+    });
+  }, [cards, selectedCard, currentDate]);
+
+  const cardBillItems = useMemo(() => {
+    const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
+    if (!activeCard) return [];
+    return transactions
+      .filter(t => t.type === 'card_purchase' && t.cardId === activeCard.id && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(selectedBillDate, 'yyyy-MM'))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [cards, selectedCard, transactions, selectedBillDate]);
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [showSeriesEditDialog, setShowSeriesEditDialog] = useState(false);
@@ -2244,6 +2303,47 @@ export default function App() {
       </div>
     );
   }
+
+  // Cabeçalho mobile compartilhado (foto + "Oi, Nome!" + calendário + notificações),
+  // igual em toda página — dispensa qualquer controle de mês flutuante à parte.
+  const mobileTopHeader = (
+    <div className="md:hidden flex items-center justify-between">
+      <button onClick={() => setIsProfileOpen(true)} className="flex items-center gap-3 min-w-0">
+        <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium shrink-0 overflow-hidden">
+          {userProfile?.photoURL ? (
+            <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          ) : (
+            userProfile?.nickname ? userProfile.nickname.charAt(0).toUpperCase() : (user?.email || 'U').charAt(0).toUpperCase()
+          )}
+        </div>
+        <p className="text-lg text-slate-500 dark:text-[#A8A4CC] font-normal truncate">
+          Oi, <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{userProfile?.nickname || 'de novo'}</span>!
+        </p>
+      </button>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={() => {
+            setPickerMonth(format(currentDate, 'MM'));
+            setPickerYear(format(currentDate, 'yyyy'));
+            setIsMonthPickerOpen(true);
+          }}
+          className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
+          aria-label="Selecionar mês"
+        >
+          <CalendarIcon size={18} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setAlertConfig({ open: true, title: 'Notificações', message: 'Você não tem notificações novas.' })}
+          className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
+          aria-label="Notificações"
+        >
+          <Bell size={18} />
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen font-sans text-foreground selection:bg-primary/20 md:pl-80">
@@ -3728,7 +3828,7 @@ export default function App() {
       </div>
 
       {/* Bottom Navigation - Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-[#F6F4FD] dark:bg-[#0B0A2E] flex items-center justify-around px-4 pt-3 z-40 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-[#F6F4FD] dark:bg-[#0B0A2E] border-t border-slate-200/70 dark:border-white/10 flex items-center justify-around px-4 pt-3 z-40 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <MobileNavItem
           active={activeTab === 'visao-geral'}
           onClick={() => setActiveTab('visao-geral')}
@@ -3744,18 +3844,15 @@ export default function App() {
           onClick={() => setActiveTab('cartoes')}
           icon={<CreditCard />}
         />
+        <button
+          onClick={() => handleOpenRegistrar()}
+          className="flex items-center justify-center h-12 w-12 rounded-full bg-primary text-white shadow-bubbly shrink-0 active:scale-90 transition-transform"
+          aria-label="Nova movimentação"
+        >
+          <Plus size={24} strokeWidth={2.5} />
+        </button>
+
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-          <DialogTrigger
-            render={
-              <button className="flex items-center justify-center h-11 w-11 shrink-0 active:scale-90 transition-transform">
-                <UserIcon
-                  size={26}
-                  strokeWidth={isProfileOpen ? 2.25 : 1.75}
-                  className={isProfileOpen ? "text-slate-800 dark:text-white" : "text-slate-400 dark:text-[#6B679C]"}
-                />
-              </button>
-            }
-          />
           <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:w-screen sm:max-w-none sm:translate-x-0 sm:rounded-none">
             <div className="px-6 pt-6 pb-2 shrink-0">
               <DialogHeader className="sr-only">
@@ -3787,12 +3884,6 @@ export default function App() {
               <div className="max-w-2xl mx-auto w-full space-y-8">
 
                 <AccountSection label="Gerenciamento">
-                  <AccountRow
-                    icon={<CreditCard size={18} />}
-                    title="Cartões"
-                    description="Cadastre e organize os cartões usados nos lançamentos"
-                    onClick={() => { setIsProfileOpen(false); setIsCartoesOpen(true); }}
-                  />
                   <AccountRow
                     icon={<Settings size={18} />}
                     title="Categorias"
@@ -4084,38 +4175,7 @@ export default function App() {
 
               {/* Hero de saldo (mobile) — no estilo "Your Balance" da referência */}
               <div className="md:hidden space-y-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium shrink-0 overflow-hidden">
-                      {userProfile?.nickname ? userProfile.nickname.charAt(0).toUpperCase() : (user?.email || 'U').charAt(0).toUpperCase()}
-                    </div>
-                    <p className="text-lg text-slate-500 dark:text-[#A8A4CC] font-normal truncate">
-                      Oi, <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{userProfile?.nickname || 'de novo'}</span>!
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPickerMonth(format(currentDate, 'MM'));
-                        setPickerYear(format(currentDate, 'yyyy'));
-                        setIsMonthPickerOpen(true);
-                      }}
-                      className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
-                      aria-label="Selecionar mês"
-                    >
-                      <CalendarIcon size={18} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsProfileOpen(true)}
-                      className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
-                      aria-label="Minha conta"
-                    >
-                      <Bell size={18} />
-                    </button>
-                  </div>
-                </div>
+                {mobileTopHeader}
 
                 <div>
                   <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight capitalize">{format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}</p>
@@ -4188,16 +4248,16 @@ export default function App() {
                     const [ei, ed] = stats.expensesActual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                     return (
                       <>
-                        <div className="bg-secondary rounded-2xl p-4">
-                          <p className="text-[10px] font-medium text-secondary-foreground/70 tracking-tight truncate">Receitas confirmadas</p>
-                          <p className="text-lg font-heading font-normal tracking-tighter text-secondary-foreground truncate mt-0.5">
-                            R$ {ii}<span className="opacity-50">,{id}</span>
+                        <div className="bg-secondary shadow-soft rounded-2xl p-4">
+                          <p className="text-sm font-normal text-secondary-foreground/70 truncate">Receitas</p>
+                          <p className="text-2xl font-heading font-medium tracking-tighter text-secondary-foreground truncate mt-1">
+                            R$ {ii}<span className="opacity-50 font-normal">,{id}</span>
                           </p>
                         </div>
-                        <div className="bg-secondary rounded-2xl p-4">
-                          <p className="text-[10px] font-medium text-secondary-foreground/70 tracking-tight truncate">Despesas confirmadas</p>
-                          <p className="text-lg font-heading font-normal tracking-tighter text-secondary-foreground truncate mt-0.5">
-                            R$ {ei}<span className="opacity-50">,{ed}</span>
+                        <div className="bg-secondary shadow-soft rounded-2xl p-4">
+                          <p className="text-sm font-normal text-secondary-foreground/70 truncate">Despesas</p>
+                          <p className="text-2xl font-heading font-medium tracking-tighter text-secondary-foreground truncate mt-1">
+                            R$ {ei}<span className="opacity-50 font-normal">,{ed}</span>
                           </p>
                         </div>
                       </>
@@ -4357,41 +4417,43 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32"
             >
-              <div className="md:hidden flex items-center justify-between">
+              <div className="md:hidden space-y-5">
+                {mobileTopHeader}
                 <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
                   Movimentações
                 </h1>
-                <button
-                  onClick={() => handleOpenRegistrar(activeTab === 'receitas' ? 'income' : 'expense')}
-                  className="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0"
-                  aria-label="Novo lançamento"
-                >
-                  <Plus size={20} strokeWidth={2.5} />
-                </button>
+                <div className="flex items-center gap-5">
+                  <button
+                    onClick={() => setMovTab('movimentacoes')}
+                    className={cn(
+                      "text-base transition-colors",
+                      movTab === 'movimentacoes' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
+                    )}
+                  >
+                    Movimentações
+                  </button>
+                  <button
+                    onClick={() => setMovTab('apagar')}
+                    className={cn(
+                      "text-base transition-colors",
+                      movTab === 'apagar' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
+                    )}
+                  >
+                    A pagar
+                  </button>
+                  <button
+                    onClick={() => setMovTab('areceber')}
+                    className={cn(
+                      "text-base transition-colors",
+                      movTab === 'areceber' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
+                    )}
+                  >
+                    A receber
+                  </button>
+                </div>
               </div>
 
-              <div className="md:hidden flex items-center gap-5">
-                <button
-                  onClick={() => setActiveTab('receitas')}
-                  className={cn(
-                    "text-base transition-colors",
-                    activeTab === 'receitas' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
-                  )}
-                >
-                  Receitas
-                </button>
-                <button
-                  onClick={() => setActiveTab('despesas')}
-                  className={cn(
-                    "text-base transition-colors",
-                    activeTab === 'despesas' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
-                  )}
-                >
-                  Despesas
-                </button>
-              </div>
-
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="hidden md:flex md:items-center justify-between gap-6">
                 <div className="flex items-center gap-2 flex-1 relative">
                   <div className="flex bg-slate-100 dark:bg-[#1C1852] p-1 rounded-full shadow-inner">
                     <button 
@@ -4525,6 +4587,104 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Movimentações (mobile) — cards no estilo Transactions.png / Upcoming Bills.png */}
+              <div className="md:hidden space-y-6">
+                {movTab === 'movimentacoes' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-secondary shadow-soft rounded-2xl p-4">
+                        <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Receitas</p>
+                        {(() => {
+                          const [i, d] = stats.incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                          return (
+                            <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">
+                              R$ {i}<span className="text-slate-400 dark:text-[#6B679C] font-normal">,{d}</span>
+                            </p>
+                          );
+                        })()}
+                      </div>
+                      <div className="bg-secondary shadow-soft rounded-2xl p-4">
+                        <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Despesas</p>
+                        {(() => {
+                          const [i, d] = stats.expenseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                          return (
+                            <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">
+                              R$ {i}<span className="text-slate-400 dark:text-[#6B679C] font-normal">,{d}</span>
+                            </p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      {movimentacoesLists.all.length === 0 ? (
+                        <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">Nenhuma movimentação neste mês.</p>
+                      ) : (
+                        movimentacoesLists.all.map(t => {
+                          const person = people.find(p => p.id === t.payerPayee);
+                          const card = cards.find(c => c.id === t.cardId);
+                          return (
+                            <div key={t.id}>
+                              <TransactionItem
+                                transaction={t}
+                                personName={person?.name}
+                                cardName={card?.name}
+                                onClick={() => handleTransactionClick(t)}
+                                onQuickConfirm={() => handleQuickConfirm(t)}
+                              />
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {(movTab === 'apagar' || movTab === 'areceber') && (() => {
+                  const list = movTab === 'apagar' ? movimentacoesLists.aPagar : movimentacoesLists.aReceber;
+                  return (
+                    <div className="space-y-3">
+                      {list.length === 0 ? (
+                        <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">
+                          {movTab === 'apagar' ? 'Nada pendente para pagar neste mês.' : 'Nada pendente para receber neste mês.'}
+                        </p>
+                      ) : (
+                        list.map(t => (
+                          <div key={t.id} className="bg-card rounded-[1.75rem] shadow-soft p-5 space-y-4">
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shrink-0 font-medium text-sm shrink-0"
+                                style={{ backgroundColor: categories.find(c => c.name === t.category)?.color || '#9C93BE' }}
+                              >
+                                {(t.category || t.description).charAt(0).toUpperCase()}
+                              </div>
+                              <p className="flex-1 min-w-0 text-sm font-medium text-slate-800 dark:text-[#EDEAF9] truncate">{t.description}</p>
+                              <p className={cn(
+                                "font-heading font-medium text-base tracking-tighter whitespace-nowrap shrink-0",
+                                movTab === 'apagar' ? "text-rose-400" : "text-emerald-500"
+                              )}>
+                                R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs font-normal text-slate-400 dark:text-[#8D89AC]">
+                              <span>{format(parseISO(t.date), 'dd/MM/yyyy')}</span>
+                              <span className="truncate">{t.category}</span>
+                            </div>
+                            <button
+                              onClick={() => handleQuickConfirm(t)}
+                              className="w-full h-12 rounded-full bg-secondary text-secondary-foreground font-medium text-sm active:scale-95 transition-all"
+                            >
+                              {movTab === 'apagar' ? 'Marcar como pago' : 'Marcar como recebido'}
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="hidden md:block space-y-6">
               {Object.entries(groupedTransactions as Record<string, Transaction[]>).map(([date, items], groupIndex) => (
                 <div key={date} className="space-y-4">
                   <div className={cn("flex items-center gap-3 ml-2 group", groupIndex > 0 && "md:hidden")}>
@@ -4625,6 +4785,7 @@ export default function App() {
                   </ShadcnCard>
                 </div>
               ))}
+              </div>
             </motion.div>
           )}
 
@@ -4636,17 +4797,162 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32"
             >
-              <div className="md:hidden flex items-center justify-between">
-                <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Cartões</h1>
-                <button
-                  onClick={() => handleOpenRegistrar('card_purchase')}
-                  className="w-11 h-11 rounded-full bg-primary text-white flex items-center justify-center shrink-0"
-                  aria-label="Novo lançamento"
-                >
-                  <Plus size={20} strokeWidth={2.5} />
-                </button>
+              <div className="md:hidden space-y-5">
+                {mobileTopHeader}
+                <div className="flex items-center justify-between">
+                  <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Cartões</h1>
+                  {cards.length > 0 && (
+                    <button
+                      onClick={() => {
+                        const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
+                        setEditingCard(activeCard);
+                        setNewCardName(activeCard.name);
+                        setLimitInput(maskCurrency(String(activeCard.limit * 100)));
+                        setNewCardClosingDay(String(activeCard.closingDay));
+                        setNewCardDueDay(String(activeCard.dueDay));
+                        setNewCardColor(activeCard.color);
+                        setShowCardForm(true);
+                        setIsCartoesOpen(true);
+                      }}
+                      className="w-11 h-11 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
+                      aria-label="Editar cartão"
+                    >
+                      <Pencil size={16} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
               </div>
 
+              {/* Carrossel de cartões (mobile) — no estilo "Your Cards" da referência */}
+              <div className="md:hidden space-y-6">
+                {cards.length === 0 ? (
+                  <div className="bg-card rounded-[1.75rem] shadow-soft p-10 text-center">
+                    <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nenhum cartão cadastrado ainda.</p>
+                    <button
+                      onClick={() => setIsCartoesOpen(true)}
+                      className="mt-4 h-11 px-6 rounded-full bg-primary text-white text-sm font-medium active:scale-95 transition-all"
+                    >
+                      Adicionar cartão
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      ref={cardsCarouselRef}
+                      onScroll={handleCardsCarouselScroll}
+                      className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pb-1"
+                    >
+                      {cards.map(card => (
+                        <div key={card.id} className="w-[280px] shrink-0 snap-center">
+                          <div
+                            className="rounded-[1.75rem] h-44 p-5 relative overflow-hidden flex flex-col justify-between shadow-bubbly"
+                            style={{ backgroundColor: card.color }}
+                          >
+                            <div className="absolute -right-8 -top-10 w-32 h-32 rounded-full border-[10px] border-white/15" />
+                            <div className="absolute -right-2 -top-2 w-20 h-20 rounded-full border-[7px] border-white/20" />
+                            <span className="text-white font-medium text-sm relative z-10 drop-shadow-sm">{card.name}</span>
+                            <div className="relative z-10 space-y-2">
+                              <p className="text-white/90 font-mono text-lg tracking-widest">•••• •••• •••• ••••</p>
+                              <div className="flex items-center justify-between">
+                                <span className="text-white/70 text-[10px] uppercase tracking-wider">Limite</span>
+                                <span className="text-white text-xs font-medium">R$ {card.limit.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {cards.length > 1 && (
+                      <div className="flex items-center justify-center gap-1.5 -mt-3">
+                        {cards.map(card => (
+                          <div
+                            key={card.id}
+                            className={cn(
+                              "h-1.5 rounded-full transition-all",
+                              (selectedCard || cards[0].id) === card.id ? "w-5 bg-primary" : "w-1.5 bg-slate-200 dark:bg-[#2A2566]"
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {(() => {
+                      const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
+                      const selectedMonthKey = format(selectedBillDate, 'yyyy-MM');
+                      const billTotal = cardBillItems.reduce((acc, t) => acc + t.amount, 0);
+                      return (
+                        <>
+                          <div className="space-y-3">
+                            <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 uppercase tracking-widest">Evolução da fatura</p>
+                            <div className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2">
+                              <ResponsiveContainer width="100%" height={130}>
+                                <BarChart data={cardBillHistory}>
+                                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: '#9C93BE' }} />
+                                  <Tooltip
+                                    cursor={{ fill: 'transparent' }}
+                                    formatter={(v: number) => [`R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Fatura']}
+                                    contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
+                                  />
+                                  <Bar
+                                    dataKey="amount"
+                                    radius={[8, 8, 8, 8]}
+                                    cursor="pointer"
+                                    onClick={(data: any) => setSelectedBillDate(parseISO(`${data.monthKey}-01`))}
+                                  >
+                                    {cardBillHistory.map(entry => (
+                                      <Cell key={entry.monthKey} fill={entry.monthKey === selectedMonthKey ? activeCard.color : '#E9E6F8'} />
+                                    ))}
+                                  </Bar>
+                                </BarChart>
+                              </ResponsiveContainer>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between ml-2">
+                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] uppercase tracking-widest capitalize">
+                                Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
+                              </p>
+                              <p className="text-sm font-heading font-medium text-slate-800 dark:text-[#EDE9E3]">
+                                R$ {billTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                            {cardBillItems.length === 0 ? (
+                              <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
+                                <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nenhuma compra nesta fatura.</p>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="space-y-2">
+                                  {cardBillItems.map(t => (
+                                    <div key={t.id}>
+                                      <TransactionItem transaction={t} onClick={() => handleTransactionClick(t)} />
+                                    </div>
+                                  ))}
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    const bill = computeCardBill(activeCard, selectedBillDate);
+                                    setConfirmingTransaction(bill);
+                                    setConfirmAmount(billTotal);
+                                    setConfirmDate(format(new Date(), 'yyyy-MM-dd'));
+                                  }}
+                                  className="w-full h-12 rounded-full bg-primary text-white font-medium text-sm active:scale-95 transition-all"
+                                >
+                                  Pagar fatura
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
+
+              <div className="hidden md:block space-y-6">
               <div className="flex items-center gap-2 w-full overflow-hidden px-1">
                 <div className="flex gap-2.5 items-center overflow-x-auto pb-2 pt-1 scrollbar-hide flex-1 relative fade-edge-x px-4 -mx-4">
                   <button
@@ -4809,6 +5115,7 @@ export default function App() {
                   </ShadcnCard>
                 </div>
               ))}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -5720,7 +6027,7 @@ function TransactionItem({
   return (
     <div
       onClick={onClick}
-      className="flex items-center justify-between gap-3 bg-card rounded-full pl-3 pr-4 py-3 shadow-soft cursor-pointer active:scale-[0.99] transition-transform"
+      className="flex items-center justify-between gap-3 border border-slate-200/70 dark:border-white/10 rounded-full pl-3 pr-4 py-3 cursor-pointer active:scale-[0.99] transition-transform"
     >
       <div className="flex items-center gap-3 overflow-hidden flex-1 min-w-0">
         <div className={cn(
