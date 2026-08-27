@@ -942,7 +942,7 @@ export default function App() {
       .map(card => computeCardBill(card, currentDate))
       .filter(bill => bill.amount > 0);
 
-    const monthTransactions: Transaction[] = [...transactions, ...cardBills].filter(t =>
+    const monthTransactions: Transaction[] = [...transactions.filter(t => t.type !== 'card_purchase'), ...cardBills].filter(t =>
       format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM')
     );
 
@@ -1014,21 +1014,28 @@ export default function App() {
   const cardBillHistory = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
     if (!activeCard) return [];
-    return Array.from({ length: 6 }).map((_, i) => {
+    const points = Array.from({ length: 6 }).map((_, i) => {
       const monthDate = subMonths(currentDate, 5 - i + billHistoryOffset);
       const bill = computeCardBill(activeCard, monthDate);
       return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: bill.amount };
     });
+    // Linha de tendência: regressão linear simples sobre os pontos visíveis,
+    // não um traçado dos valores reais — mostra a direção da projeção de gastos.
+    const n = points.length;
+    const sumX = points.reduce((acc, _, i) => acc + i, 0);
+    const sumY = points.reduce((acc, p) => acc + p.amount, 0);
+    const sumXY = points.reduce((acc, p, i) => acc + i * p.amount, 0);
+    const sumXX = points.reduce((acc, _, i) => acc + i * i, 0);
+    const denom = n * sumXX - sumX * sumX;
+    const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+    const intercept = (sumY - slope * sumX) / n;
+    return points.map((p, i) => ({ ...p, trend: Math.max(0, intercept + slope * i) }));
   }, [cards, selectedCard, currentDate, billHistoryOffset]);
 
-  const chartSwipeStartX = React.useRef<number | null>(null);
-  const handleChartSwipeStart = (x: number) => { chartSwipeStartX.current = x; };
-  const handleChartSwipeEnd = (x: number) => {
-    if (chartSwipeStartX.current === null) return;
-    const deltaX = x - chartSwipeStartX.current;
-    chartSwipeStartX.current = null;
-    if (Math.abs(deltaX) < 30) return;
-    setBillHistoryOffset(prev => Math.max(0, Math.min(30, deltaX > 0 ? prev - 1 : prev + 1)));
+  const chartDragX = useMotionValue(0);
+  const handleChartDragEnd = (_: unknown, info: { offset: { x: number } }) => {
+    if (info.offset.x < -40) setBillHistoryOffset(prev => Math.min(30, prev + 1));
+    else if (info.offset.x > 40) setBillHistoryOffset(prev => Math.max(0, prev - 1));
   };
 
   const cardBillItems = useMemo(() => {
@@ -1915,10 +1922,15 @@ export default function App() {
 
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState('#8A7FF5');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('');
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
       showAlert("Nome necessário", "Por favor, informe o nome da categoria.");
+      return;
+    }
+    if (!newCategoryIcon.trim()) {
+      showAlert("Emoji necessário", "Por favor, escolha um emoji para a categoria.");
       return;
     }
     if (!user) return;
@@ -1926,7 +1938,7 @@ export default function App() {
       const catData = {
         name: newCategoryName.trim(),
         color: newCategoryColor,
-        icon: 'Tag'
+        icon: newCategoryIcon.trim()
       };
 
       if (editingCategory) {
@@ -1938,6 +1950,7 @@ export default function App() {
       await loadCategories();
       setNewCategoryName('');
       setNewCategoryColor('#8A7FF5');
+      setNewCategoryIcon('');
     } catch (err) {
       handleSupabaseError(err, editingCategory ? OperationType.UPDATE : OperationType.CREATE, 'categories');
     }
@@ -3153,19 +3166,31 @@ export default function App() {
                 {editingCategory && (
                   <div className="flex items-center justify-between bg-primary/10 text-primary text-xs font-medium rounded-xl px-4 py-2.5">
                     <span>Editando "{editingCategory.name}"</span>
-                    <button type="button" onClick={() => { setEditingCategory(null); setNewCategoryName(''); setNewCategoryColor('#8A7FF5'); }} className="hover:text-primary/70">
+                    <button type="button" onClick={() => { setEditingCategory(null); setNewCategoryName(''); setNewCategoryColor('#8A7FF5'); setNewCategoryIcon(''); }} className="hover:text-primary/70">
                       Cancelar
                     </button>
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome da categoria</Label>
-                  <Input 
-                    placeholder="Ex: Assinaturas" 
-                    className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5 shadow-sm"
-                    value={newCategoryName || ''}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                  />
+                <div className="flex gap-3">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Emoji</Label>
+                    <Input
+                      placeholder="🏷️"
+                      className="h-12 w-16 rounded-2xl border-none bg-white dark:bg-[#100E3D] text-center text-xl px-0 shadow-sm"
+                      maxLength={4}
+                      value={newCategoryIcon}
+                      onChange={(e) => setNewCategoryIcon(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome da categoria</Label>
+                    <Input
+                      placeholder="Ex: Assinaturas"
+                      className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5 shadow-sm"
+                      value={newCategoryName || ''}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Cor</Label>
@@ -3208,8 +3233,8 @@ export default function App() {
                 <div className="space-y-2">
                   {categories.map(cat => (
                     <div key={cat.id} className="flex items-center gap-3 pl-3 pr-2 py-2 bg-card rounded-full shadow-soft group">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white shrink-0" style={{ backgroundColor: cat.color }}>
-                        <PieChartIcon size={16} />
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-base shrink-0" style={{ backgroundColor: cat.color }}>
+                        {cat.icon}
                       </div>
                       <span className="flex-1 font-medium text-slate-700 dark:text-[#EDEAF9] text-sm truncate tracking-tight">{cat.name}</span>
                       <div className="flex items-center gap-1 shrink-0">
@@ -3219,6 +3244,7 @@ export default function App() {
                             setEditingCategory(cat);
                             setNewCategoryName(cat.name);
                             setNewCategoryColor(cat.color);
+                            setNewCategoryIcon(cat.icon);
                           }}
                         >
                           <Settings size={14} strokeWidth={2.5} />
@@ -4275,13 +4301,13 @@ export default function App() {
                     const [ei, ed] = stats.expensesActual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                     return (
                       <>
-                        <div className="bg-emerald-50 dark:bg-emerald-500/10 shadow-soft rounded-xl p-4">
+                        <div className="bg-secondary shadow-soft rounded-xl p-4">
                           <p className="text-sm font-normal text-emerald-600/70 dark:text-emerald-400/70 truncate">Receita</p>
                           <p className="text-2xl font-heading font-medium tracking-tighter text-emerald-600 dark:text-emerald-400 truncate mt-1">
                             R$ {ii}<span className="opacity-50 font-normal">,{id}</span>
                           </p>
                         </div>
-                        <div className="bg-rose-50 dark:bg-rose-500/10 shadow-soft rounded-xl p-4">
+                        <div className="bg-secondary shadow-soft rounded-xl p-4">
                           <p className="text-sm font-normal text-rose-500/70 dark:text-rose-400/70 truncate">Despesa</p>
                           <p className="text-2xl font-heading font-medium tracking-tighter text-rose-500 dark:text-rose-400 truncate mt-1">
                             R$ {ei}<span className="opacity-50 font-normal">,{ed}</span>
@@ -4619,7 +4645,7 @@ export default function App() {
                 {movTab === 'movimentacoes' && (
                   <>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-emerald-50 dark:bg-emerald-500/10 shadow-soft rounded-xl p-4">
+                      <div className="bg-secondary shadow-soft rounded-xl p-4">
                         <p className="text-sm font-normal text-emerald-600/70 dark:text-emerald-400/70 truncate">Receita</p>
                         {(() => {
                           const [i, d] = stats.incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
@@ -4630,7 +4656,7 @@ export default function App() {
                           );
                         })()}
                       </div>
-                      <div className="bg-rose-50 dark:bg-rose-500/10 shadow-soft rounded-xl p-4">
+                      <div className="bg-secondary shadow-soft rounded-xl p-4">
                         <p className="text-sm font-normal text-rose-500/70 dark:text-rose-400/70 truncate">Despesa</p>
                         {(() => {
                           const [i, d] = stats.expenseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
@@ -4686,18 +4712,15 @@ export default function App() {
                           >
                             <div className="flex items-center gap-3 border border-slate-200/70 dark:border-white/10 rounded-full pl-3 pr-4 py-3">
                               <div
-                                className="w-11 h-11 rounded-full flex items-center justify-center text-white shrink-0 font-medium text-sm"
+                                className="w-11 h-11 rounded-full flex items-center justify-center text-base shrink-0"
                                 style={{ backgroundColor: categories.find(c => c.name === t.category)?.color || '#9C93BE' }}
                               >
-                                {(t.category || t.description).charAt(0).toUpperCase()}
+                                {categories.find(c => c.name === t.category)?.icon || '🏷️'}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 overflow-hidden">
-                                  <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight shrink-0">
-                                    {format(parseISO(t.date), 'dd/MM/yyyy')}
-                                  </span>
-                                  <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {t.category}</span>
-                                </div>
+                                <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight">
+                                  {format(parseISO(t.date), 'dd/MM/yyyy')}
+                                </span>
                                 <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{t.description}</p>
                               </div>
                               <button
@@ -4942,6 +4965,20 @@ export default function App() {
                     <button onClick={handleAddCard} disabled={isSubmittingCard} className="w-full h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-60">
                       {editingCard ? 'Salvar alterações' : 'Adicionar cartão'}
                     </button>
+                    {editingCard && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleDeleteCard(editingCard.id);
+                          setShowCardForm(false);
+                          setEditingCard(null);
+                        }}
+                        className="w-full h-12 rounded-full font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Trash2 size={16} strokeWidth={2.5} />
+                        Excluir cartão
+                      </button>
+                    )}
                   </div>
                 ) : manageCardId ? (() => {
                   const card = cards.find(c => c.id === manageCardId);
@@ -5118,12 +5155,14 @@ export default function App() {
                         <>
                           <div className="space-y-3">
                             <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Evolução da fatura</p>
-                            <div
-                              className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2 touch-pan-y"
-                              onTouchStart={(e) => handleChartSwipeStart(e.touches[0].clientX)}
-                              onTouchEnd={(e) => handleChartSwipeEnd(e.changedTouches[0].clientX)}
-                              onMouseDown={(e) => handleChartSwipeStart(e.clientX)}
-                              onMouseUp={(e) => handleChartSwipeEnd(e.clientX)}
+                            <motion.div
+                              className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2"
+                              drag="x"
+                              dragConstraints={{ left: 0, right: 0 }}
+                              dragElastic={0.6}
+                              dragMomentum={false}
+                              style={{ x: chartDragX }}
+                              onDragEnd={handleChartDragEnd}
                             >
                               <ResponsiveContainer width="100%" height={130}>
                                 <ComposedChart data={cardBillHistory}>
@@ -5138,15 +5177,15 @@ export default function App() {
                                       <Cell key={entry.monthKey} fill={entry.monthKey === selectedMonthKey ? activeCard.color : '#E9E6F8'} />
                                     ))}
                                   </Bar>
-                                  <Line type="monotone" dataKey="amount" stroke="#B9B2EA" strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive={false} />
+                                  <Line type="monotone" dataKey="trend" stroke="#B9B2EA" strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive={false} />
                                 </ComposedChart>
                               </ResponsiveContainer>
-                            </div>
+                            </motion.div>
                           </div>
 
                           <div className="space-y-3">
                             <div className="flex items-center justify-between ml-2">
-                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest capitalize">
+                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest">
                                 Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
                               </p>
                               <p className="text-sm font-heading font-medium text-slate-800 dark:text-[#EDE9E3]">
@@ -6021,8 +6060,9 @@ function SwipeToConfirm({
   children: React.ReactNode
 }) {
   const dragX = useMotionValue(0);
-  const revealOpacity = useTransform(dragX, [0, 90], [0, 1]);
-  const revealScale = useTransform(dragX, [0, 90], [0.7, 1]);
+  const revealOpacity = useTransform(dragX, [0, 45], [0, 1]);
+  const revealScale = useTransform(dragX, [0, 45], [0.7, 1]);
+  const [confirmed, setConfirmed] = useState(false);
 
   if (!enabled) return <div className="relative">{children}</div>;
 
@@ -6035,16 +6075,38 @@ function SwipeToConfirm({
         </motion.div>
       </div>
       <motion.div
-        drag="x"
+        drag={confirmed ? false : "x"}
         dragDirectionLock
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={{ left: 0, right: 0.6 }}
         dragMomentum={false}
         style={{ x: dragX }}
-        onDragEnd={(_, info) => { if (info.offset.x > 88) onConfirm(); }}
-        className="relative bg-background rounded-full"
+        onDragEnd={(_, info) => {
+          if (info.offset.x > 56) {
+            setConfirmed(true);
+            setTimeout(() => onConfirm(), 450);
+          }
+        }}
+        className="relative rounded-full overflow-hidden"
       >
-        {children}
+        <div className={cn("transition-opacity duration-200", confirmed && "opacity-0")}>
+          {children}
+        </div>
+        <AnimatePresence>
+          {confirmed && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className={cn("absolute inset-0 flex items-center justify-center gap-2 text-white font-medium text-sm", colorClass)}
+            >
+              <motion.div initial={{ scale: 0.4 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 15 }}>
+                <CheckCircle2 size={22} strokeWidth={2.5} />
+              </motion.div>
+              {actionLabel}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

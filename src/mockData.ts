@@ -11,12 +11,12 @@ export const mockCards: Card[] = [
 ];
 
 export const mockCategories: Category[] = [
-  { id: 'cat1', name: 'Alimentação', icon: 'Utensils', color: '#ef4444' },
-  { id: 'cat2', name: 'Moradia', icon: 'Home', color: '#3b82f6' },
-  { id: 'cat3', name: 'Transporte', icon: 'Car', color: '#10b981' },
-  { id: 'cat4', name: 'Lazer', icon: 'Gamepad', color: '#f59e0b' },
-  { id: 'cat5', name: 'Saúde', icon: 'HeartPulse', color: '#ec4899' },
-  { id: 'cat6', name: 'Salário', icon: 'Wallet', color: '#8b5cf6' },
+  { id: 'cat1', name: 'Alimentação', icon: '🍽️', color: '#ef4444' },
+  { id: 'cat2', name: 'Moradia', icon: '🏠', color: '#3b82f6' },
+  { id: 'cat3', name: 'Transporte', icon: '🚗', color: '#10b981' },
+  { id: 'cat4', name: 'Lazer', icon: '🎮', color: '#f59e0b' },
+  { id: 'cat5', name: 'Saúde', icon: '🏥', color: '#ec4899' },
+  { id: 'cat6', name: 'Salário', icon: '💰', color: '#8b5cf6' },
 ];
 
 export const mockTransactions: Transaction[] = [
