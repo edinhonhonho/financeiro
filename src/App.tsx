@@ -779,12 +779,20 @@ export default function App() {
         const tDay = tDate.getDate();
         // Sem fechamento cadastrado, não há corte: a compra fica no próprio mês.
         const closingDay = card.closingDay ? Number(card.closingDay) : 31;
+        const dueDay = card.dueDay ? Number(card.dueDay) : closingDay;
 
-        if (tDay > closingDay) {
-          return addMonths(startOfMonth(tDate), 1);
-        } else {
-          return startOfMonth(tDate);
+        // Mês do ciclo de fechamento em que a compra cai.
+        let effectiveMonth = tDay > closingDay ? addMonths(startOfMonth(tDate), 1) : startOfMonth(tDate);
+
+        // Quando o vencimento cai no mês seguinte ao fechamento (ex: fecha
+        // dia 31, vence dia 7), a fatura é conhecida pelo mês em que é PAGA,
+        // não pelo mês em que fechou — uma compra de abril nesse cartão é
+        // "a fatura de maio", não "a fatura de abril".
+        if (dueDay <= closingDay) {
+          effectiveMonth = addMonths(effectiveMonth, 1);
         }
+
+        return effectiveMonth;
       }
     }
     return startOfMonth(parseISO(t.date));
@@ -1140,7 +1148,20 @@ export default function App() {
   const cardBillHistory = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
     if (!activeCard) return [];
-    const points = Array.from({ length: CHART_MONTHS_HISTORY }).map((_, i) => {
+
+    // A janela padrão vai só até o mês atual, mas parcelamentos longos criam
+    // faturas em meses futuros — estende a janela até a última fatura real
+    // desse cartão (parcelas futuras), pra não escondê-las do gráfico.
+    const cardPurchaseMonths = transactions
+      .filter(t => t.type === 'card_purchase' && t.cardId === activeCard.id)
+      .map(t => getTransactionEffectiveMonth(t));
+    const latestPurchaseMonth = cardPurchaseMonths.length > 0
+      ? cardPurchaseMonths.reduce((a, b) => (a > b ? a : b))
+      : currentDate;
+    const monthsAhead = Math.max(0, differenceInMonths(startOfMonth(latestPurchaseMonth), startOfMonth(currentDate)));
+    const totalMonths = CHART_MONTHS_HISTORY + monthsAhead;
+
+    const points = Array.from({ length: totalMonths }).map((_, i) => {
       const monthDate = subMonths(currentDate, CHART_MONTHS_HISTORY - 1 - i);
       const bill = computeCardBill(activeCard, monthDate);
       return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: bill.amount };
