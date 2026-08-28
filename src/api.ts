@@ -177,12 +177,6 @@ export async function insertTransactions(rows: Array<Transaction & { userId: str
   if (error) handleSupabaseError(error, OperationType.CREATE, 'transactions');
 }
 
-/** Cria/atualiza várias transações de uma vez (série recorrente, parcelas, sincronização de vinculados). */
-export async function upsertTransactions(rows: Partial<Transaction>[]) {
-  const { error } = await supabase.rpc('upsert_transactions', { payload: rows });
-  if (error) handleSupabaseError(error, OperationType.WRITE, 'transactions');
-}
-
 export async function updateTransaction(id: string, data: Partial<Transaction>) {
   const { error } = await supabase.from('transactions').update(data).eq('id', id);
   if (error) handleSupabaseError(error, OperationType.UPDATE, 'transactions');

@@ -1500,7 +1500,14 @@ export default function App() {
               }
             });
 
-            await api.upsertTransactions(rowsToUpsert);
+            // Atualiza cada linha individualmente (update, não upsert): a RPC
+            // upsert_transactions exige todas as colunas NOT NULL mesmo em
+            // linhas já existentes, o que quebra as sincronizações parciais
+            // (ex: renda vinculada, que só manda amount/description/date).
+            await Promise.all(rowsToUpsert.map(row => {
+              const { id, ...data } = row;
+              return api.updateTransaction(id as string, data);
+            }));
             showAlert('Sucesso', 'Sequência atualizada com sucesso.');
           } catch (err) {
             handleSupabaseError(err, OperationType.WRITE, 'transactions-series');
@@ -1517,7 +1524,9 @@ export default function App() {
                 return match ? { id: l.id, amount: match.amount, description: finalBaseData.description, date: finalBaseData.date } : null;
               })
               .filter((r): r is { id: string; amount: number; description: string; date: string } => r !== null);
-            if (rows.length > 0) await api.upsertTransactions(rows);
+            if (rows.length > 0) {
+              await Promise.all(rows.map(row => api.updateTransaction(row.id, { amount: row.amount, description: row.description, date: row.date })));
+            }
           }
         }
         setEditingTransaction(null);
