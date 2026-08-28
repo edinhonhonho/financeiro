@@ -434,6 +434,7 @@ export default function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingCard, setIsSubmittingCard] = useState(false);
   const [deleteLinked, setDeleteLinked] = useState(false);
+  const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
   const [linkedIncomeDate, setLinkedIncomeDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [authEmail, setAuthEmail] = useState('');
@@ -2111,7 +2112,8 @@ export default function App() {
   };
 
   const handleDeleteTransaction = async (id: string, deleteAllFuture = false) => {
-    if (!user) return;
+    if (!user || isDeletingTransaction) return;
+    setIsDeletingTransaction(true);
     try {
       // Find the transaction to see if it has linked entries
       const t = transactions.find(tx => tx.id === id);
@@ -2140,11 +2142,10 @@ export default function App() {
         const idsToDelete = txsToDelete.map(tx => tx.id);
 
         // Also handle linked transactions for EACH item in the series if requested
+        // (paralelo — buscar um por um aqui era muito lento numa série longa)
         if (deleteLinked) {
-          for (const tx of txsToDelete) {
-            const linked = await api.fetchLinkedTransactions(user.id, tx.id);
-            idsToDelete.push(...linked.map(l => l.id));
-          }
+          const linkedLists = await Promise.all(txsToDelete.map(tx => api.fetchLinkedTransactions(user.id, tx.id)));
+          linkedLists.forEach(linked => idsToDelete.push(...linked.map(l => l.id)));
         }
 
         await api.deleteTransactions(idsToDelete);
@@ -2170,7 +2171,10 @@ export default function App() {
       setIsRegistrarOpen(false);
       setDeleteLinked(false);
     } catch (err) {
-      handleSupabaseError(err, OperationType.DELETE, 'transactions');
+      console.error('Erro ao apagar lançamento:', err);
+      showAlert('Não foi possível apagar', extractErrorMessage(err));
+    } finally {
+      setIsDeletingTransaction(false);
     }
   };
 
@@ -6172,28 +6176,32 @@ export default function App() {
                   <>
                     <button
                       onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, false)}
-                      className="w-full h-14 rounded-full font-medium bg-secondary text-secondary-foreground hover:bg-secondary/70 transition-all active:scale-95"
+                      disabled={isDeletingTransaction}
+                      className="w-full h-14 rounded-full font-medium bg-secondary text-secondary-foreground hover:bg-secondary/70 transition-all active:scale-95 disabled:opacity-50"
                     >
                       Excluir somente este
                     </button>
                     <button
                       onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, true)}
-                      className="w-full h-14 rounded-full font-medium bg-rose-400 hover:bg-rose-500 text-white transition-all active:scale-95"
+                      disabled={isDeletingTransaction}
+                      className="w-full h-14 rounded-full font-medium bg-rose-400 hover:bg-rose-500 text-white transition-all active:scale-95 disabled:opacity-50"
                     >
-                      Excluir todos os seguintes
+                      {isDeletingTransaction ? 'Excluindo...' : 'Excluir todos os seguintes'}
                     </button>
                   </>
                 ) : (
                   <button
                     onClick={() => transactionToDelete && handleDeleteTransaction(transactionToDelete.id, false)}
-                    className="w-full h-14 rounded-full font-medium bg-rose-400 hover:bg-rose-500 text-white transition-all active:scale-95"
+                    disabled={isDeletingTransaction}
+                    className="w-full h-14 rounded-full font-medium bg-rose-400 hover:bg-rose-500 text-white transition-all active:scale-95 disabled:opacity-50"
                   >
-                    Confirmar exclusão
+                    {isDeletingTransaction ? 'Excluindo...' : 'Confirmar exclusão'}
                   </button>
                 )}
                 <button
                   onClick={() => setIsDeleteDialogOpen(false)}
-                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  disabled={isDeletingTransaction}
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
