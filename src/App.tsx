@@ -1142,6 +1142,9 @@ export default function App() {
   const [newCardColor, setNewCardColor] = useState('#8A7FF5');
   const [assignmentMode, setAssignmentMode] = useState<'single' | 'split'>('single');
   const [personSplits, setPersonSplits] = useState<{ personId: string; type: 'value' | 'parts' | 'percentage'; value: string }[]>([]);
+  // Com 2+ pessoas, o padrão é dividir igualmente sem mostrar nenhum controle;
+  // isso só destrava o editor de Partes/%/R$ quando a pessoa pede explicitamente.
+  const [showSplitEditor, setShowSplitEditor] = useState(false);
 
   const colorInputRef = React.useRef<HTMLInputElement>(null);
   const cardsCarouselRef = React.useRef<HTMLDivElement>(null);
@@ -1318,6 +1321,13 @@ export default function App() {
       ? { ...s, type: 'value' as const, value: amountInput }
       : { ...s, type: 'parts' as const, value: '1' }
     ));
+  };
+
+  /** Fecha o editor manual de divisão (2+ pessoas) e volta pro padrão: valor dividido igualmente entre todo mundo. */
+  const resetToEqualSplit = () => {
+    setGlobalSplitType('parts');
+    setPersonSplits(prev => prev.map(s => ({ ...s, type: 'parts' as const, value: '1' })));
+    setShowSplitEditor(false);
   };
 
   /** Atribui alguém a um lançamento buscando por @usuário; se a pessoa ainda não existir, cadastra na hora. */
@@ -2044,6 +2054,11 @@ export default function App() {
     if (t.assignments && t.assignments.length > 0) {
       setAssignmentMode('split');
       setShowPersonSelector(true);
+      setGlobalSplitType('percentage');
+      // Já vem com o editor aberto: os valores reais de uma divisão existente
+      // raramente são iguais, então esconder isso atrás do link "dividir de
+      // outro jeito" só atrapalharia quem está revendo/editando.
+      setShowSplitEditor(true);
       // Repopula como percentual do valor original (não valor fixo): assim,
       // se o valor total for editado, a parte da pessoa reescala junto em
       // vez de ficar travada no valor antigo.
@@ -2055,6 +2070,8 @@ export default function App() {
     } else {
       setAssignmentMode('single');
       setPersonSplits([]);
+      setShowSplitEditor(false);
+      setGlobalSplitType('parts');
       setShowPersonSelector(t.payerPayee !== 'geral');
     }
 
@@ -2089,6 +2106,8 @@ export default function App() {
     setAssignmentMode('single');
     setPersonSplits([]);
     setShowPersonSelector(false);
+    setShowSplitEditor(false);
+    setGlobalSplitType('parts');
     setForcedSeriesMode(null);
     setLinkedIncomeDate(format(new Date(), 'yyyy-MM-dd'));
     setRecurrenceDateMode('fixed');
@@ -3228,78 +3247,112 @@ export default function App() {
 
                     {personSplits.length > 1 && (
                       <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Como dividir</Label>
-                          <div className="flex bg-slate-50 dark:bg-[#16133F] p-0.5 rounded-lg overflow-hidden min-w-[120px]">
-                            {(['parts', 'percentage', 'value'] as const).map(type => (
-                              <button
-                                key={type}
-                                type="button"
-                                onClick={() => {
-                                  setGlobalSplitType(type);
-                                  let newSplits = personSplits.map(s => ({
-                                    ...s,
-                                    type: type,
-                                    value: type === 'parts' ? '1' : '0,00'
-                                  }));
-
-                                  if (type === 'percentage' && newSplits.length > 0) {
-                                    const perPerson = Math.floor(100 / newSplits.length);
-                                    const remainder = 100 % newSplits.length;
-                                    newSplits = newSplits.map((s, idx) => ({
-                                      ...s,
-                                      value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                    }));
-                                  }
-                                  setPersonSplits(newSplits);
-                                }}
-                                className={cn(
-                                  "flex-1 py-1 rounded-md text-[8px] font-medium transition-all",
-                                  globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
-                                )}
-                              >
-                                {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
+                        {!showSplitEditor ? (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">Dividido igualmente entre {personSplits.length} pessoas</p>
+                              <button type="button" onClick={() => setShowSplitEditor(true)} className="text-[10px] font-medium text-primary shrink-0">
+                                Dividir de outro jeito
                               </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
-                          {personSplits.map((split, index) => {
-                            const person = people.find(p => p.id === split.personId);
-                            return (
-                              <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
-                                <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                  <p className="text-[9px] font-normal text-primary">
-                                    {(() => {
-                                      const amount = parseCurrency(amountInput);
-                                      const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                      return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                    })()}
-                                  </p>
-                                </div>
-                                <div className="relative w-20 shrink-0">
-                                  <input
-                                    className="w-full h-8 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
-                                    inputMode="decimal"
-                                    value={split.value}
-                                    onChange={(e) => {
-                                      setPersonSplits(prev => prev.map((s, i) => {
-                                        if (i !== index) return s;
-                                        if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                        if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                        return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
+                            </div>
+                            <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
+                              {personSplits.map((split, index) => {
+                                const person = people.find(p => p.id === split.personId);
+                                return (
+                                  <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                                    <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                    <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
+                                    <p className="text-[10px] font-medium text-primary shrink-0">
+                                      {(() => {
+                                        const amount = parseCurrency(amountInput);
+                                        const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                                        return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                      })()}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Como dividir</Label>
+                              <div className="flex bg-slate-50 dark:bg-[#16133F] p-0.5 rounded-lg overflow-hidden min-w-[120px]">
+                                {(['parts', 'percentage', 'value'] as const).map(type => (
+                                  <button
+                                    key={type}
+                                    type="button"
+                                    onClick={() => {
+                                      setGlobalSplitType(type);
+                                      let newSplits = personSplits.map(s => ({
+                                        ...s,
+                                        type: type,
+                                        value: type === 'parts' ? '1' : '0,00'
                                       }));
+
+                                      if (type === 'percentage' && newSplits.length > 0) {
+                                        const perPerson = Math.floor(100 / newSplits.length);
+                                        const remainder = 100 % newSplits.length;
+                                        newSplits = newSplits.map((s, idx) => ({
+                                          ...s,
+                                          value: (idx === 0 ? perPerson + remainder : perPerson).toString()
+                                        }));
+                                      }
+                                      setPersonSplits(newSplits);
                                     }}
-                                  />
-                                  {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                </div>
+                                    className={cn(
+                                      "flex-1 py-1 rounded-md text-[8px] font-medium transition-all",
+                                      globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+                                    )}
+                                  >
+                                    {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
+                                  </button>
+                                ))}
                               </div>
-                            );
-                          })}
-                        </div>
+                            </div>
+
+                            <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
+                              {personSplits.map((split, index) => {
+                                const person = people.find(p => p.id === split.personId);
+                                return (
+                                  <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                                    <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                      <p className="text-[9px] font-normal text-primary">
+                                        {(() => {
+                                          const amount = parseCurrency(amountInput);
+                                          const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                                          return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                        })()}
+                                      </p>
+                                    </div>
+                                    <div className="relative w-20 shrink-0">
+                                      <input
+                                        className="w-full h-8 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
+                                        inputMode="decimal"
+                                        value={split.value}
+                                        onChange={(e) => {
+                                          setPersonSplits(prev => prev.map((s, i) => {
+                                            if (i !== index) return s;
+                                            if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
+                                            if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
+                                            return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
+                                          }));
+                                        }}
+                                      />
+                                      {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <button type="button" onClick={resetToEqualSplit} className="text-[10px] font-medium text-primary">
+                              Voltar a dividir igualmente
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -3374,30 +3427,35 @@ export default function App() {
                       </Select>
                     </div>
 
-                    <div className="space-y-2 pt-1">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Quando lançar todo mês</Label>
-                      <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-xl p-1">
-                        <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
-                          Dia fixo
-                        </button>
-                        <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
-                          Dia útil
-                        </button>
-                      </div>
-                      {recurrenceDateMode === 'businessDay' && (
-                        <div className="flex items-center gap-2 pt-1">
+                    {recurrenceDateMode === 'fixed' ? (
+                      <button
+                        type="button"
+                        onClick={() => setRecurrenceDateMode('businessDay')}
+                        className="text-[10px] font-medium text-primary ml-1"
+                      >
+                        Lançar sempre num dia útil, em vez do mesmo dia do mês
+                      </button>
+                    ) : (
+                      <div className="space-y-2 pt-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Dia útil do mês</Label>
+                          <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className="text-[10px] font-medium text-primary">
+                            Usar o mesmo dia do mês
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
                           <Input
                             type="number"
                             min="1"
                             max="23"
-                            className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2"
+                            className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
                             value={recurrenceBusinessDay}
                             onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
                           />
                           <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3900,78 +3958,112 @@ export default function App() {
 
                       {personSplits.length > 1 && (
                         <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Como dividir</Label>
-                            <div className="flex bg-slate-50 dark:bg-[#16133F] p-1 rounded-xl overflow-hidden min-w-[180px]">
-                              {(['parts', 'percentage', 'value'] as const).map(type => (
-                                <button
-                                  key={type}
-                                  type="button"
-                                  onClick={() => {
-                                    setGlobalSplitType(type);
-                                    let newSplits = personSplits.map(s => ({
-                                      ...s,
-                                      type: type,
-                                      value: type === 'parts' ? '1' : '0,00'
-                                    }));
-
-                                    if (type === 'percentage' && newSplits.length > 0) {
-                                      const perPerson = Math.floor(100 / newSplits.length);
-                                      const remainder = 100 % newSplits.length;
-                                      newSplits = newSplits.map((s, idx) => ({
-                                        ...s,
-                                        value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                      }));
-                                    }
-                                    setPersonSplits(newSplits);
-                                  }}
-                                  className={cn(
-                                    "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
-                                    globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
-                                  )}
-                                >
-                                  {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
+                          {!showSplitEditor ? (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Dividido igualmente entre {personSplits.length} pessoas</p>
+                                <button type="button" onClick={() => setShowSplitEditor(true)} className="text-xs font-medium text-primary shrink-0">
+                                  Dividir de outro jeito
                                 </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
-                            {personSplits.map((split, index) => {
-                              const person = people.find(p => p.id === split.personId);
-                              return (
-                                <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
-                                  <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                    <p className="text-[10px] font-normal text-primary">
-                                      {(() => {
-                                        const amount = parseCurrency(amountInput);
-                                        const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                        return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                      })()}
-                                    </p>
-                                  </div>
-                                  <div className="relative w-28 shrink-0">
-                                    <input
-                                      className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
-                                      inputMode="decimal"
-                                      value={split.value}
-                                      onChange={(e) => {
-                                        setPersonSplits(prev => prev.map((s, i) => {
-                                          if (i !== index) return s;
-                                          if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                          if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                          return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
+                              </div>
+                              <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
+                                {personSplits.map((split, index) => {
+                                  const person = people.find(p => p.id === split.personId);
+                                  return (
+                                    <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                                      <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                                      <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
+                                      <p className="text-xs font-medium text-primary shrink-0">
+                                        {(() => {
+                                          const amount = parseCurrency(amountInput);
+                                          const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                                          return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                        })()}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Como dividir</Label>
+                                <div className="flex bg-slate-50 dark:bg-[#16133F] p-1 rounded-xl overflow-hidden min-w-[180px]">
+                                  {(['parts', 'percentage', 'value'] as const).map(type => (
+                                    <button
+                                      key={type}
+                                      type="button"
+                                      onClick={() => {
+                                        setGlobalSplitType(type);
+                                        let newSplits = personSplits.map(s => ({
+                                          ...s,
+                                          type: type,
+                                          value: type === 'parts' ? '1' : '0,00'
                                         }));
+
+                                        if (type === 'percentage' && newSplits.length > 0) {
+                                          const perPerson = Math.floor(100 / newSplits.length);
+                                          const remainder = 100 % newSplits.length;
+                                          newSplits = newSplits.map((s, idx) => ({
+                                            ...s,
+                                            value: (idx === 0 ? perPerson + remainder : perPerson).toString()
+                                          }));
+                                        }
+                                        setPersonSplits(newSplits);
                                       }}
-                                    />
-                                    {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                  </div>
+                                      className={cn(
+                                        "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
+                                        globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+                                      )}
+                                    >
+                                      {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
+                                    </button>
+                                  ))}
                                 </div>
-                              );
-                            })}
-                          </div>
+                              </div>
+
+                              <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
+                                {personSplits.map((split, index) => {
+                                  const person = people.find(p => p.id === split.personId);
+                                  return (
+                                    <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                                      <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                        <p className="text-[10px] font-normal text-primary">
+                                          {(() => {
+                                            const amount = parseCurrency(amountInput);
+                                            const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                                            return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                          })()}
+                                        </p>
+                                      </div>
+                                      <div className="relative w-28 shrink-0">
+                                        <input
+                                          className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
+                                          inputMode="decimal"
+                                          value={split.value}
+                                          onChange={(e) => {
+                                            setPersonSplits(prev => prev.map((s, i) => {
+                                              if (i !== index) return s;
+                                              if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
+                                              if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
+                                              return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
+                                            }));
+                                          }}
+                                        />
+                                        {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <button type="button" onClick={resetToEqualSplit} className="text-xs font-medium text-primary">
+                                Voltar a dividir igualmente
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -4052,30 +4144,35 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="space-y-2 pt-1">
-                        <Label className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">Quando lançar todo mês</Label>
-                        <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-2xl p-1">
-                          <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
-                            Dia fixo
-                          </button>
-                          <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
-                            Dia útil
-                          </button>
-                        </div>
-                        {recurrenceDateMode === 'businessDay' && (
-                          <div className="flex items-center gap-3 pt-1">
+                      {recurrenceDateMode === 'fixed' ? (
+                        <button
+                          type="button"
+                          onClick={() => setRecurrenceDateMode('businessDay')}
+                          className="text-xs font-medium text-primary ml-1"
+                        >
+                          Lançar sempre num dia útil, em vez do mesmo dia do mês
+                        </button>
+                      ) : (
+                        <div className="space-y-2 pt-1">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">Dia útil do mês</Label>
+                            <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className="text-xs font-medium text-primary">
+                              Usar o mesmo dia do mês
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-3">
                             <Input
                               type="number"
                               min="1"
                               max="23"
-                              className="h-11 w-20 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2"
+                              className="h-11 w-20 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
                               value={recurrenceBusinessDay}
                               onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
                             />
                             <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
