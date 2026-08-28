@@ -1466,9 +1466,15 @@ export default function App() {
 
         const mode = overrideUpdateMode || forcedSeriesMode || 'single';
 
+        // Um lançamento avulso virando recorrente/parcelado agora (não era
+        // série antes) — precisa gerar as ocorrências futuras, não só marcar
+        // este como recorrente.
+        const becomingSeries = !isActuallySeries &&
+          ((isRecurrent && !!newTransaction.recurrenceEndDate) || (isInstallment && installmentCount > 1));
+
         // Handle series ID for legacy transactions being upgraded to series
         let seriesIdToUse = editingTransaction.seriesId || null;
-        if (!seriesIdToUse && isActuallySeries && mode === 'future') {
+        if (!seriesIdToUse && ((isActuallySeries && mode === 'future') || becomingSeries)) {
           seriesIdToUse = api.newTransactionId();
         }
 
@@ -1477,7 +1483,108 @@ export default function App() {
           seriesId: seriesIdToUse
         };
 
-        if (mode === 'future' && isActuallySeries) {
+        if (becomingSeries) {
+          await api.updateTransaction(editingTransaction.id, finalBaseData);
+
+          const newRows: Array<Transaction & { userId: string }> = [];
+          let startingLinkedRunner = parseISO(linkedIncomeDate);
+          const shouldLinkIncome = (baseData.type === 'card_purchase' || baseData.type === 'expense') &&
+            baseData.payerPayee && baseData.payerPayee !== 'geral' && createLinkedIncome && baseData.owedByPerson !== false;
+          const incomeAssignments = assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }];
+
+          if (isRecurrent && newTransaction.recurrenceEndDate) {
+            let runner = addMonths(parseISO(newTransaction.date as string), 1);
+            let linkedRunner = addMonths(startingLinkedRunner, 1);
+            while (format(runner, 'yyyy-MM') <= newTransaction.recurrenceEndDate) {
+              const mainId = api.newTransactionId();
+              const effectiveDate = recurrenceDateMode === 'businessDay'
+                ? getNthBusinessDay(runner.getFullYear(), runner.getMonth(), recurrenceBusinessDay)
+                : runner;
+              newRows.push({
+                ...baseData,
+                id: mainId,
+                userId,
+                date: format(effectiveDate, 'yyyy-MM-dd'),
+                recurrence: 'monthly',
+                recurrenceEndDate: newTransaction.recurrenceEndDate,
+                installments: null,
+                seriesId: seriesIdToUse
+              } as Transaction & { userId: string });
+
+              if (shouldLinkIncome) {
+                for (const incomeAssignment of incomeAssignments) {
+                  newRows.push({
+                    id: api.newTransactionId(),
+                    userId,
+                    type: 'income',
+                    description: baseData.description,
+                    amount: incomeAssignment.amount,
+                    date: format(linkedRunner, 'yyyy-MM-dd'),
+                    category: 'Associado',
+                    status: 'planned',
+                    payerPayee: incomeAssignment.personId,
+                    recurrence: 'monthly',
+                    recurrenceEndDate: format(addMonths(linkedRunner, differenceInMonths(parseISO(newTransaction.recurrenceEndDate + "-01"), parseISO(format(startingLinkedRunner, 'yyyy-MM') + "-01"))), 'yyyy-MM'),
+                    installments: null,
+                    seriesId: seriesIdToUse,
+                    cardId: baseData.cardId,
+                    linkedToCard: true,
+                    linkedTransactionId: mainId,
+                    assignments: []
+                  } as Transaction & { userId: string });
+                }
+              }
+
+              runner = addMonths(runner, 1);
+              linkedRunner = addMonths(linkedRunner, 1);
+              if (isAfter(runner, addMonths(parseISO(newTransaction.recurrenceEndDate + "-28"), 12))) break;
+            }
+          } else if (isInstallment && installmentCount > 1) {
+            let runner = addMonths(parseISO(newTransaction.date as string), 1);
+            let linkedRunner = addMonths(startingLinkedRunner, 1);
+            for (let i = 2; i <= installmentCount; i++) {
+              const mainId = api.newTransactionId();
+              newRows.push({
+                ...baseData,
+                id: mainId,
+                userId,
+                date: format(runner, 'yyyy-MM-dd'),
+                recurrence: 'none',
+                installments: { total: installmentCount, current: i },
+                seriesId: seriesIdToUse
+              } as Transaction & { userId: string });
+
+              if (shouldLinkIncome) {
+                for (const incomeAssignment of incomeAssignments) {
+                  newRows.push({
+                    id: api.newTransactionId(),
+                    userId,
+                    type: 'income',
+                    description: baseData.description,
+                    amount: incomeAssignment.amount,
+                    date: format(linkedRunner, 'yyyy-MM-dd'),
+                    category: 'Associado',
+                    status: 'planned',
+                    payerPayee: incomeAssignment.personId,
+                    recurrence: 'none',
+                    installments: { total: installmentCount, current: i },
+                    seriesId: seriesIdToUse,
+                    cardId: baseData.cardId,
+                    linkedToCard: true,
+                    linkedTransactionId: mainId,
+                    assignments: []
+                  } as Transaction & { userId: string });
+                }
+              }
+
+              runner = addMonths(runner, 1);
+              linkedRunner = addMonths(linkedRunner, 1);
+            }
+          }
+
+          if (newRows.length > 0) await api.insertTransactions(newRows);
+          showAlert('Sucesso', 'Lançamento atualizado e recorrência criada.');
+        } else if (mode === 'future' && isActuallySeries) {
           try {
             // Find siblings (same series, or legacy fallback by description+amount)
             const siblings = editingTransaction.seriesId
