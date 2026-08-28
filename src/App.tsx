@@ -3299,7 +3299,7 @@ export default function App() {
                 )}
               </div>
 
-                {newTransaction.type === 'card_purchase' && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && (
+                {newTransaction.type === 'card_purchase' && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
                   <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-4 h-12 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 relative">
                     <Label htmlFor="linked-income-m" className="text-[10px] font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
                       Associar receita
@@ -3979,7 +3979,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && (
+                  {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
                     <div className="space-y-3 flex-1">
                       <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-5 h-16 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm">
                         <Label htmlFor="linked-income-d" className="text-xs font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
