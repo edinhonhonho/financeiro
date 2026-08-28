@@ -826,6 +826,79 @@ export default function App() {
     format(parseISO(t.date), 'yyyy-MM') === format(month, 'yyyy-MM')
   );
 
+  /** Despesas atribuídas a uma pessoa (via payerPayee ou split) num mês específico — usado para cobrança. */
+  const getPersonMonthlyCharges = (personId: string, month: Date) => {
+    const monthStr = format(month, 'yyyy-MM');
+
+    const relevant = transactions.filter(t => {
+      if (t.type !== 'expense' && t.type !== 'card_purchase') return false;
+      const isForPerson = t.payerPayee === personId || (t.assignments && t.assignments.some(a => a.personId === personId));
+      if (!isForPerson) return false;
+      return format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr;
+    });
+
+    const withAmount = relevant
+      .map(t => {
+        let amount = t.amount;
+        if (t.assignments && t.assignments.length > 0) {
+          const assignment = t.assignments.find(a => a.personId === personId);
+          if (assignment) amount = assignment.amount;
+        }
+        return { ...t, amount };
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Dois sentidos: "ela me deve" (padrão, receivable) e "eu pago pra ela"
+    // (owedByPerson === false, payable — associação sem divisão, ex: mesada).
+    const items = withAmount.filter(t => t.owedByPerson !== false);
+    const payableItems = withAmount.filter(t => t.owedByPerson === false);
+
+    const pending = items.filter(t => t.status === 'planned');
+    const paid = items.filter(t => t.status === 'actual');
+    const pendingTotal = pending.reduce((acc, t) => acc + t.amount, 0);
+    const paidTotal = paid.reduce((acc, t) => acc + t.amount, 0);
+
+    const payablePending = payableItems.filter(t => t.status === 'planned');
+    const payablePaid = payableItems.filter(t => t.status === 'actual');
+    const payablePendingTotal = payablePending.reduce((acc, t) => acc + t.amount, 0);
+    const payablePaidTotal = payablePaid.reduce((acc, t) => acc + t.amount, 0);
+
+    return {
+      items, pending, paid, pendingTotal, paidTotal, total: pendingTotal + paidTotal,
+      payableItems, payablePending, payablePaid, payablePendingTotal, payablePaidTotal, payableTotal: payablePendingTotal + payablePaidTotal
+    };
+  };
+
+  /**
+   * Fatura sintética das pendências de uma pessoa num mês — mesmo padrão de
+   * computeCardBill: agrupa os lançamentos "ela me deve" (planned) numa única
+   * entrada, análoga à "Fatura {Cartão}" nas Movimentações.
+   */
+  const computePersonBill = (person: Person, month: Date): Transaction => {
+    const amount = getPersonMonthlyCharges(person.id, month).pendingTotal;
+    return {
+      id: `person-bill-${person.id}`,
+      type: 'expense',
+      description: `Pendências ${person.name}`,
+      amount,
+      date: format(endOfMonth(month), 'yyyy-MM-dd'),
+      category: 'Pendência pessoa',
+      status: 'planned',
+      payerPayee: person.id,
+      recurrence: 'none',
+      assignments: []
+    };
+  };
+
+  /** Um lançamento conta pra "Pendências {pessoa}" quando é 100% atribuído a
+   *  ela sozinha (não split parcial nem multi-pessoa) e ainda não foi pago. */
+  const isBundledIntoPersonBill = (t: Transaction) => {
+    if (t.type !== 'expense' || t.status !== 'planned' || t.owedByPerson === false) return false;
+    if (!t.payerPayee || t.payerPayee === 'geral' || t.payerPayee === 'multi') return false;
+    if (!t.assignments || t.assignments.length !== 1) return false;
+    return t.assignments[0].personId === t.payerPayee && Math.abs(t.assignments[0].amount - t.amount) < 0.005;
+  };
+
   // Grouping logic
   const groupedTransactions = useMemo(() => {
     let list = [...transactions];
@@ -984,7 +1057,18 @@ export default function App() {
       .map(card => computeCardBill(card, currentDate))
       .filter(bill => bill.amount > 0 && !isCardBillPaid(bill.cardId as string, currentDate));
 
-    const monthTransactions: Transaction[] = [...transactions.filter(t => t.type !== 'card_purchase'), ...cardBills].filter(t =>
+    // Igual à fatura do cartão: agrupa as pendências de cada pessoa (100%
+    // atribuídas a ela, não pagas) numa única entrada "Pendências {pessoa}"
+    // em vez de listar cada lançamento avulso.
+    const personBills: Transaction[] = people
+      .map(person => computePersonBill(person, currentDate))
+      .filter(bill => bill.amount > 0);
+
+    const monthTransactions: Transaction[] = [
+      ...transactions.filter(t => t.type !== 'card_purchase' && !isBundledIntoPersonBill(t)),
+      ...cardBills,
+      ...personBills
+    ].filter(t =>
       format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM')
     );
 
@@ -997,7 +1081,7 @@ export default function App() {
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return { all, aPagar, aReceber };
-  }, [transactions, cards, currentDate]);
+  }, [transactions, cards, people, currentDate]);
 
   // Form State
   const [newTransaction, setNewTransaction] = useState<Partial<Transaction>>({
@@ -1117,49 +1201,6 @@ export default function App() {
       }
     }
   }, [amountInput, personSplits.length, globalSplitType]);
-
-  /** Despesas atribuídas a uma pessoa (via payerPayee ou split) num mês específico — usado para cobrança. */
-  const getPersonMonthlyCharges = (personId: string, month: Date) => {
-    const monthStr = format(month, 'yyyy-MM');
-
-    const relevant = transactions.filter(t => {
-      if (t.type !== 'expense' && t.type !== 'card_purchase') return false;
-      const isForPerson = t.payerPayee === personId || (t.assignments && t.assignments.some(a => a.personId === personId));
-      if (!isForPerson) return false;
-      return format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr;
-    });
-
-    const withAmount = relevant
-      .map(t => {
-        let amount = t.amount;
-        if (t.assignments && t.assignments.length > 0) {
-          const assignment = t.assignments.find(a => a.personId === personId);
-          if (assignment) amount = assignment.amount;
-        }
-        return { ...t, amount };
-      })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    // Dois sentidos: "ela me deve" (padrão, receivable) e "eu pago pra ela"
-    // (owedByPerson === false, payable — associação sem divisão, ex: mesada).
-    const items = withAmount.filter(t => t.owedByPerson !== false);
-    const payableItems = withAmount.filter(t => t.owedByPerson === false);
-
-    const pending = items.filter(t => t.status === 'planned');
-    const paid = items.filter(t => t.status === 'actual');
-    const pendingTotal = pending.reduce((acc, t) => acc + t.amount, 0);
-    const paidTotal = paid.reduce((acc, t) => acc + t.amount, 0);
-
-    const payablePending = payableItems.filter(t => t.status === 'planned');
-    const payablePaid = payableItems.filter(t => t.status === 'actual');
-    const payablePendingTotal = payablePending.reduce((acc, t) => acc + t.amount, 0);
-    const payablePaidTotal = payablePaid.reduce((acc, t) => acc + t.amount, 0);
-
-    return {
-      items, pending, paid, pendingTotal, paidTotal, total: pendingTotal + paidTotal,
-      payableItems, payablePending, payablePaid, payablePendingTotal, payablePaidTotal, payableTotal: payablePendingTotal + payablePaidTotal
-    };
-  };
 
   // Aba Pessoas (mobile) — mesmo padrão da aba Cartões: carrossel + gráfico
   // de evolução mensal + lista do mês selecionado.
@@ -1966,6 +2007,11 @@ export default function App() {
       setActiveTab('cartoes');
       return;
     }
+    if (t.id.startsWith('person-bill-')) {
+      setSelectedPersonId(t.id.replace('person-bill-', ''));
+      setActiveTab('pessoas');
+      return;
+    }
     if (t.status === 'planned') {
       setConfirmingTransaction(t);
       setConfirmAmount(t.amount);
@@ -2218,6 +2264,17 @@ export default function App() {
           assignments: [],
           linkedToCard: false
         } as Transaction & { userId: string }]);
+      } else if (id.startsWith('person-bill-')) {
+        // Bundle sintético (soma de vários lançamentos reais) — confirmar
+        // marca cada lançamento individual como pago, sem sobrescrever o
+        // valor de cada um com o total agregado.
+        const personId = id.replace('person-bill-', '');
+        const month = referenceDate ? parseISO(referenceDate) : currentDate;
+        const monthStr = format(month, 'yyyy-MM');
+        const idsToConfirm = transactions
+          .filter(t => isBundledIntoPersonBill(t) && t.payerPayee === personId && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr)
+          .map(t => t.id);
+        await Promise.all(idsToConfirm.map(txId => api.updateTransaction(txId, { status: 'actual', actualDate })));
       } else {
         await api.updateTransaction(id, {
           status: 'actual',
@@ -2673,8 +2730,9 @@ export default function App() {
                 </Label>
                 <div className="relative group">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-slate-300 dark:text-[#6B679C] group-focus-within:text-primary transition-colors">R$</span>
-                  <Input 
-                    className="rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] h-12 pl-12 text-lg font-medium focus:bg-white dark:focus:bg-[#100E3D] focus:ring-2 focus:ring-primary/20 transition-all" 
+                  <Input
+                    className="rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] h-12 pl-12 text-lg font-medium focus:bg-white dark:focus:bg-[#100E3D] focus:ring-2 focus:ring-primary/20 transition-all"
+                    inputMode="decimal"
                     value={confirmAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     onChange={(e) => setConfirmAmount(parseCurrency(maskCurrency(e.target.value)))}
                   />
@@ -2784,37 +2842,51 @@ export default function App() {
                 <DialogTitle className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
               </DialogHeader>
             </div>
-          <div className="flex-1 overflow-y-auto p-5 pb-10 space-y-6 scrollbar-hide">
-            <div className="flex justify-center gap-2">
-                <button 
+          <div className="flex-1 overflow-y-auto p-5 pb-10 space-y-5 scrollbar-hide">
+            <div className="flex gap-3">
+                <button
                   onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null})}
                   className={cn(
-                    "flex-1 py-2 rounded-xl font-medium transition-all flex flex-col items-center gap-1 text-[9px] capitalize tracking-wide relative overflow-hidden group",
+                    "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
                     newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
                   )}
                 >
-                  <ArrowUpCircle size={16} strokeWidth={3} />
+                  <ArrowUpCircle size={18} strokeWidth={2.5} />
                   Receita
                 </button>
-                <button 
+                <button
                   onClick={() => setNewTransaction({...newTransaction, type: 'expense'})}
                   className={cn(
-                    "flex-1 py-2 rounded-xl font-medium transition-all flex flex-col items-center gap-1 text-[9px] capitalize tracking-wide relative overflow-hidden group",
+                    "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
                     (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
                   )}
                 >
-                  <ArrowDownCircle size={16} strokeWidth={3} />
+                  <ArrowDownCircle size={18} strokeWidth={2.5} />
                   Despesa
                 </button>
               </div>
 
-              <div className="space-y-3">
+              <div className="p-5 bg-slate-50 dark:bg-[#16133F] rounded-[1.75rem] space-y-1.5 text-center">
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Valor</Label>
+                <div className="flex items-center justify-center gap-1">
+                  <span className="text-2xl font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
+                  <input
+                    inputMode="decimal"
+                    className="bg-transparent outline-none text-center font-heading font-medium text-4xl text-slate-800 dark:text-[#EDE9E3] w-auto max-w-[220px] tracking-tight"
+                    style={{ width: `${Math.max(2, amountInput.length)}ch` }}
+                    value={amountInput}
+                    onChange={(e) => setAmountInput(maskCurrency(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
                 <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl space-y-4">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Descrição</Label>
                   <Input
                     placeholder="Ex: Aluguel"
-                    className="h-11 rounded-xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-4 shadow-sm"
+                    className="h-12 rounded-xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-4 shadow-sm"
                     value={newTransaction.description || ''}
                     onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
                   />
@@ -2822,20 +2894,9 @@ export default function App() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Valor</Label>
-                    <div className="relative group">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 font-normal text-slate-300 dark:text-[#6B679C] group-focus-within:text-primary transition-colors text-xs">R$</span>
-                      <Input
-                        className="h-11 rounded-xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm pl-10 pr-4 shadow-sm"
-                        value={amountInput}
-                        onChange={(e) => setAmountInput(maskCurrency(e.target.value))}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
                     <DateField
-                      className="h-11 text-xs bg-white dark:bg-[#100E3D] shadow-sm"
+                      className="h-12 text-xs bg-white dark:bg-[#100E3D] shadow-sm"
                       value={newTransaction.date || ''}
                       onChange={(v) => {
                         setNewTransaction({...newTransaction, date: v});
@@ -2843,25 +2904,24 @@ export default function App() {
                       }}
                     />
                   </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
-                  <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
-                    <SelectTrigger className="h-11 border-none bg-white dark:bg-[#100E3D] rounded-xl font-normal text-sm px-4 shadow-sm">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-none shadow-deep p-2">
-                      {categories.filter(c => c.id !== 'all').map(cat => (
-                        <SelectItem key={cat.id} value={cat.name} className="rounded-xl font-normal p-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                            <span>{cat.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
+                    <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
+                      <SelectTrigger className="h-12 border-none bg-white dark:bg-[#100E3D] rounded-xl font-normal text-sm px-4 shadow-sm">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-none shadow-deep p-2">
+                        {categories.filter(c => c.id !== 'all').map(cat => (
+                          <SelectItem key={cat.id} value={cat.name} className="rounded-xl font-normal p-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                              <span>{cat.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
@@ -3072,6 +3132,7 @@ export default function App() {
                                 <div className="relative w-32">
                                   <Input
                                     className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#1C1852] font-medium text-xs px-4 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
+                                    inputMode="decimal"
                                     value={split.value}
                                     onChange={(e) => {
                                       setPersonSplits(prev => prev.map((s, i) => {
@@ -3136,6 +3197,7 @@ export default function App() {
                                   <div className="relative w-20">
                                     <input
                                       className="w-full h-8 bg-slate-50 dark:bg-[#1C1852] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
+                                      inputMode="decimal"
                                       value={split.value}
                                       onChange={(e) => {
                                         setPersonSplits(prev => prev.map((s, i) => {
@@ -3488,27 +3550,41 @@ export default function App() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 pb-12 space-y-8 scrollbar-hide">
-              <div className="flex justify-center gap-3">
-                <button 
+              <div className="flex gap-3">
+                <button
                   onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null})}
                   className={cn(
-                    "flex-1 py-3 rounded-2xl font-medium transition-all flex flex-col items-center gap-2 text-[10px] capitalize tracking-wide relative overflow-hidden group",
+                    "flex-1 h-14 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
                     newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
                   )}
                 >
-                  <ArrowUpCircle size={22} strokeWidth={3} />
+                  <ArrowUpCircle size={20} strokeWidth={2.5} />
                   Receita
                 </button>
-                <button 
+                <button
                   onClick={() => setNewTransaction({...newTransaction, type: 'expense'})}
                   className={cn(
-                    "flex-1 py-3 rounded-2xl font-medium transition-all flex flex-col items-center gap-2 text-[10px] capitalize tracking-wide relative overflow-hidden group",
+                    "flex-1 h-14 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
                     (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
                   )}
                 >
-                  <ArrowDownCircle size={22} strokeWidth={3} />
+                  <ArrowDownCircle size={20} strokeWidth={2.5} />
                   Despesa
                 </button>
+              </div>
+
+              <div className="p-6 bg-slate-50 dark:bg-[#16133F] rounded-[1.75rem] space-y-2 text-center">
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Valor</Label>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-3xl font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
+                  <input
+                    inputMode="decimal"
+                    className="bg-transparent outline-none text-center font-heading font-medium text-5xl text-slate-800 dark:text-[#EDE9E3] w-auto max-w-[320px] tracking-tight"
+                    style={{ width: `${Math.max(2, amountInput.length)}ch` }}
+                    value={amountInput}
+                    onChange={(e) => setAmountInput(maskCurrency(e.target.value))}
+                  />
+                </div>
               </div>
 
               <div className="space-y-6">
@@ -3524,18 +3600,7 @@ export default function App() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Valor</Label>
-                        <div className="relative group">
-                          <span className="absolute left-6 top-1/2 -translate-y-1/2 font-normal text-slate-300 dark:text-[#6B679C] group-focus-within:text-primary transition-colors text-lg">R$</span>
-                          <Input
-                            className="h-14 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-base pl-16 pr-6 shadow-sm"
-                            value={amountInput}
-                            onChange={(e) => setAmountInput(maskCurrency(e.target.value))}
-                          />
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
                         <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
@@ -3770,8 +3835,9 @@ export default function App() {
                                     {split.type === 'parts' ? 'Quantas partes desse valor?' : split.type === 'percentage' ? 'Qual percentual do total?' : 'Qual o valor exato?'}
                                   </p>
                                   <div className="relative w-40">
-                                    <Input 
+                                    <Input
                                       className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm px-6 text-right shadow-sm focus:ring-2 focus:ring-primary/10"
+                                      inputMode="decimal"
                                       value={split.value}
                                       onChange={(e) => {
                                         setPersonSplits(prev => prev.map((s, i) => {
@@ -3835,8 +3901,9 @@ export default function App() {
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <div className="relative w-28">
-                                      <input 
+                                      <input
                                         className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
+                                        inputMode="decimal"
                                         value={split.value}
                                         onChange={(e) => {
                                           setPersonSplits(prev => prev.map((s, i) => {
@@ -5207,6 +5274,7 @@ export default function App() {
                         <Input
                           placeholder="0,00"
                           className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm px-4 shadow-sm"
+                          inputMode="decimal"
                           value={limitInput || ''}
                           onChange={(e) => setLimitInput(maskCurrency(e.target.value))}
                         />
@@ -6784,7 +6852,7 @@ function TransactionItem({
   categoryIcon?: string
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
-  const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-');
+  const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-') && !transaction.id.startsWith('person-bill-');
 
   return (
     <SwipeToConfirm
