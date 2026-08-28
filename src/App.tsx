@@ -431,7 +431,6 @@ export default function App() {
   const [sortMode, setSortMode] = useState<'date' | 'min' | 'max'>('date');
   const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string }>({ open: false, title: '', message: '' });
   const [tempNickname, setTempNickname] = useState('');
-  const [createLinkedIncome, setCreateLinkedIncome] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingCard, setIsSubmittingCard] = useState(false);
   const [deleteLinked, setDeleteLinked] = useState(false);
@@ -578,9 +577,6 @@ export default function App() {
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [amountInput, setAmountInput] = useState('0,00');
-  // Revela a busca "@usuário ou nome novo" — some por padrão pra não competir
-  // com os chips de gente que a pessoa já tem cadastrada.
-  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [globalSplitType, setGlobalSplitType] = useState<'parts' | 'percentage' | 'value'>('parts');
   // Etapa do "Novo lançamento" em tela cheia (mobile): 0 Tipo+Valor, 1
   // Descrição/Data/Categoria, 2 Dividir/Repetição/Status/Salvar.
@@ -1322,6 +1318,33 @@ export default function App() {
     ));
   };
 
+  /** Pessoas ordenadas por quantas vezes já foram associadas a um lançamento — base pros chips "frequentes" do buscador de Associar a pessoas. */
+  const frequentPeople = useMemo(() => {
+    const counts = new Map<string, number>();
+    transactions.forEach(t => {
+      if (t.payerPayee && t.payerPayee !== 'geral' && t.payerPayee !== 'multi') {
+        counts.set(t.payerPayee, (counts.get(t.payerPayee) || 0) + 1);
+      }
+      t.assignments?.forEach(a => counts.set(a.personId, (counts.get(a.personId) || 0) + 1));
+    });
+    return [...people]
+      .filter(p => p.visible !== false)
+      .sort((a, b) => (counts.get(b.id) || 0) - (counts.get(a.id) || 0));
+  }, [people, transactions]);
+
+  const FREQUENT_PEOPLE_COUNT = 6;
+
+  /** Sem busca: só as pessoas mais frequentes (+ quem já está selecionado, mesmo se não for frequente). Buscando: filtra todo mundo pelo nome. */
+  const personSearchResults = useMemo(() => {
+    const query = quickAssignQuery.trim().toLowerCase();
+    if (!query) {
+      const top = frequentPeople.slice(0, FREQUENT_PEOPLE_COUNT);
+      const selectedExtra = frequentPeople.filter(p => !top.some(t => t.id === p.id) && personSplits.some(s => s.personId === p.id));
+      return [...top, ...selectedExtra];
+    }
+    return frequentPeople.filter(p => p.name.toLowerCase().includes(query));
+  }, [frequentPeople, quickAssignQuery, personSplits]);
+
   /** Atribui alguém a um lançamento buscando por @usuário; se a pessoa ainda não existir, cadastra na hora. */
   const handleQuickAssignPerson = async () => {
     const raw = quickAssignQuery.trim();
@@ -1590,7 +1613,7 @@ export default function App() {
           const newRows: Array<Transaction & { userId: string }> = [];
           let startingLinkedRunner = parseISO(linkedIncomeDate);
           const shouldLinkIncome = (baseData.type === 'card_purchase' || baseData.type === 'expense') &&
-            baseData.payerPayee && baseData.payerPayee !== 'geral' && createLinkedIncome && baseData.owedByPerson !== false;
+            baseData.payerPayee && baseData.payerPayee !== 'geral' && baseData.owedByPerson !== false;
           const incomeAssignments = assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }];
 
           if (isRecurrent && newTransaction.recurrenceEndDate) {
@@ -1775,7 +1798,7 @@ export default function App() {
         // Use the synced linkedIncomeDate which matches newTransaction.date by default
         let startingLinkedRunner = parseISO(linkedIncomeDate);
         const shouldLinkIncome = (baseData.type === 'card_purchase' || baseData.type === 'expense') &&
-          baseData.payerPayee && baseData.payerPayee !== 'geral' && createLinkedIncome && baseData.owedByPerson !== false;
+          baseData.payerPayee && baseData.payerPayee !== 'geral' && baseData.owedByPerson !== false;
         const incomeAssignments = assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }];
 
         if (isRecurrent && newTransaction.recurrenceEndDate) {
@@ -1918,7 +1941,6 @@ export default function App() {
 
       await loadTransactions();
       setIsRegistrarOpen(false);
-      setCreateLinkedIncome(true);
       setNewTransaction({
         type: 'expense',
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -2043,7 +2065,7 @@ export default function App() {
       setNewTransaction(t);
     }
     setLinkedIncomeDate(t.date || format(new Date(), 'yyyy-MM-dd'));
-    setShowQuickAdd(false);
+    setQuickAssignQuery('');
     if (t.assignments && t.assignments.length === 1) {
       // Uma pessoa só: representa como valor cheio ou parcial (não %), que é
       // como a tela de pessoa única entende o split — ela nunca usa percentual.
@@ -2107,7 +2129,7 @@ export default function App() {
     setEditingTransaction(null);
     setAssignmentMode('single');
     setPersonSplits([]);
-    setShowQuickAdd(false);
+    setQuickAssignQuery('');
     setGlobalSplitType('parts');
     setForcedSeriesMode(null);
     setLinkedIncomeDate(format(new Date(), 'yyyy-MM-dd'));
@@ -3096,9 +3118,9 @@ export default function App() {
             )}
 
             {registrarStep === 2 && (
-              <div className="space-y-8 pt-4">
+              <div className="space-y-6 pt-4">
               {/* Associar a pessoas */}
-              <div className="p-5 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-3">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <Users size={14} className="text-primary shrink-0" />
                   <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Associar a pessoas</Label>
@@ -3109,60 +3131,58 @@ export default function App() {
                     : 'Quem você marcar aqui aparece também em Pessoas — a receber ou a pagar, conforme a escolha abaixo.'}
                 </p>
 
-                <div className="flex flex-wrap gap-2">
-                  {people.filter(p => p.visible !== false).map(p => {
-                    const isSelected = personSplits.some(s => s.personId === p.id);
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => togglePersonSplit(p.id)}
-                        className={cn(
-                          "h-10 px-3 rounded-full font-normal text-xs transition-all flex items-center gap-2 border-2",
-                          isSelected
-                            ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
-                            : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:border-slate-200 dark:hover:border-[#2A2566]"
-                        )}
-                      >
-                        <img src={p.image} alt="" className="w-5 h-5 rounded-full object-cover" />
-                        {p.name}
-                      </button>
-                    );
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => setShowQuickAdd(v => !v)}
-                    className={cn(
-                      "h-10 px-3 rounded-full font-normal text-xs transition-all flex items-center gap-1.5 border-2 border-dashed",
-                      showQuickAdd ? "border-primary text-primary" : "border-slate-200 dark:border-[#2A2566] text-slate-400 dark:text-[#8D89AC]"
-                    )}
-                  >
-                    <Plus size={14} /> Nova
-                  </button>
+                <div className="relative">
+                  <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] pointer-events-none" />
+                  <Input
+                    placeholder="Buscar pessoa ou @usuário..."
+                    className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs pl-10 pr-3"
+                    value={quickAssignQuery}
+                    onChange={(e) => setQuickAssignQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && personSearchResults.length === 0 && handleQuickAssignPerson()}
+                  />
                 </div>
 
-                {showQuickAdd && (
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <AtSign size={13} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] pointer-events-none" />
-                      <Input
-                        placeholder="usuário ou nome novo"
-                        className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs pl-9 pr-3"
-                        value={quickAssignQuery}
-                        onChange={(e) => setQuickAssignQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleQuickAssignPerson()}
-                        autoFocus
-                      />
-                    </div>
+                {personSearchResults.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {personSearchResults.map(p => {
+                      const isSelected = personSplits.some(s => s.personId === p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => togglePersonSplit(p.id)}
+                          className={cn(
+                            "h-10 px-3 rounded-full font-normal text-xs transition-all flex items-center gap-2 border-2",
+                            isSelected
+                              ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
+                              : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:border-slate-200 dark:hover:border-[#2A2566]"
+                          )}
+                        >
+                          <img src={p.image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                          {p.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : quickAssignQuery.trim() ? (
+                  <div className="bg-slate-50 dark:bg-[#16133F] rounded-[1.25rem] p-3 space-y-2">
+                    <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
                     <Button
                       type="button"
                       onClick={handleQuickAssignPerson}
-                      disabled={!quickAssignQuery.trim() || quickAssignSubmitting}
-                      className="h-10 px-4 rounded-xl font-medium text-xs bg-primary text-white disabled:opacity-40 shrink-0"
+                      disabled={quickAssignSubmitting}
+                      className="w-full h-10 rounded-xl font-medium text-xs bg-primary text-white disabled:opacity-40"
                     >
-                      Adicionar
+                      {quickAssignQuery.trim().startsWith('@')
+                        ? `Buscar @${quickAssignQuery.trim().replace(/^@+/, '')} como usuário`
+                        : `Adicionar "${quickAssignQuery.trim()}" como nova pessoa`}
                     </Button>
+                    {!quickAssignQuery.trim().startsWith('@') && (
+                      <p className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC]">Ou comece com @ pra procurar alguém que já usa o app.</p>
+                    )}
                   </div>
+                ) : (
+                  <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">Nenhuma pessoa cadastrada ainda — digite um nome ou @usuário na busca acima pra adicionar.</p>
                 )}
 
                 {personSplits.length === 1 && (() => {
@@ -3254,42 +3274,40 @@ export default function App() {
 
                 {personSplits.length > 1 && (
                   <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">
-                        {globalSplitType === 'parts' ? `Igual entre ${personSplits.length} pessoas` : 'Divisão personalizada'}
-                      </p>
-                      <div className="flex bg-slate-50 dark:bg-[#16133F] p-0.5 rounded-lg overflow-hidden shrink-0 min-w-[130px]">
-                        {(['parts', 'percentage', 'value'] as const).map(type => (
-                          <button
-                            key={type}
-                            type="button"
-                            onClick={() => {
-                              setGlobalSplitType(type);
-                              let newSplits = personSplits.map(s => ({
-                                ...s,
-                                type: type,
-                                value: type === 'parts' ? '1' : '0,00'
-                              }));
+                    <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">
+                      {globalSplitType === 'parts' ? `Igual entre ${personSplits.length} pessoas` : 'Divisão personalizada'}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['parts', 'percentage', 'value'] as const).map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            setGlobalSplitType(type);
+                            let newSplits = personSplits.map(s => ({
+                              ...s,
+                              type: type,
+                              value: type === 'parts' ? '1' : '0,00'
+                            }));
 
-                              if (type === 'percentage' && newSplits.length > 0) {
-                                const perPerson = Math.floor(100 / newSplits.length);
-                                const remainder = 100 % newSplits.length;
-                                newSplits = newSplits.map((s, idx) => ({
-                                  ...s,
-                                  value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                }));
-                              }
-                              setPersonSplits(newSplits);
-                            }}
-                            className={cn(
-                              "flex-1 py-1 rounded-md text-[8px] font-medium transition-all",
-                              globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
-                            )}
-                          >
-                            {type === 'parts' ? 'Igual' : type === 'percentage' ? '%' : 'R$'}
-                          </button>
-                        ))}
-                      </div>
+                            if (type === 'percentage' && newSplits.length > 0) {
+                              const perPerson = Math.floor(100 / newSplits.length);
+                              const remainder = 100 % newSplits.length;
+                              newSplits = newSplits.map((s, idx) => ({
+                                ...s,
+                                value: (idx === 0 ? perPerson + remainder : perPerson).toString()
+                              }));
+                            }
+                            setPersonSplits(newSplits);
+                          }}
+                          className={cn(
+                            "h-11 rounded-xl text-xs font-semibold transition-all",
+                            globalSplitType === type ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]"
+                          )}
+                        >
+                          {type === 'parts' ? 'Igual' : type === 'percentage' ? '%' : 'R$'}
+                        </button>
+                      ))}
                     </div>
 
                     <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
@@ -3336,9 +3354,12 @@ export default function App() {
                 )}
               </div>
 
-              {/* Repetição — sempre visível */}
-              <div className="p-5 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
-                <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+              {/* Repetição */}
+              <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                <div className="flex items-center gap-2">
+                  <Repeat size={14} className="text-primary shrink-0" />
+                  <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+                </div>
                 <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-xl p-1">
                   <button
                     type="button"
@@ -3365,48 +3386,9 @@ export default function App() {
 
                 {isRecurrent && (
                   <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-[#201C56]">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon size={12} className="text-primary" />
-                        <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
-                      </div>
-                      <Popover>
-                        <PopoverTrigger render={
-                          <button type="button" className="h-6 w-6 flex items-center justify-center rounded-full bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] shrink-0" aria-label="Ajustar o dia da recorrência">
-                            <Settings size={12} />
-                          </button>
-                        } />
-                        <PopoverContent className="w-64 p-3 rounded-2xl bg-white dark:bg-[#100E3D] border border-slate-100 dark:border-white/10 shadow-deep z-[70] space-y-2">
-                          <p className="text-[9px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] px-1">Em que dia lançar todo mês</p>
-                          <button
-                            type="button"
-                            onClick={() => setRecurrenceDateMode('fixed')}
-                            className={cn("w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-primary/10 text-primary" : "text-slate-500 dark:text-[#C5C1E5]")}
-                          >
-                            Mesmo dia do mês{newTransaction.date ? ` (dia ${parseISO(newTransaction.date).getDate()})` : ''}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setRecurrenceDateMode('businessDay')}
-                            className={cn("w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-primary/10 text-primary" : "text-slate-500 dark:text-[#C5C1E5]")}
-                          >
-                            Nº dia útil do mês
-                          </button>
-                          {recurrenceDateMode === 'businessDay' && (
-                            <div className="flex items-center gap-2 pt-1 px-1">
-                              <Input
-                                type="number"
-                                min="1"
-                                max="23"
-                                className="h-9 w-14 rounded-lg border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
-                                value={recurrenceBusinessDay}
-                                onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
-                              />
-                              <span className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] leading-snug flex-1">º dia útil (seg-sex, varia com fins de semana)</span>
-                            </div>
-                          )}
-                        </PopoverContent>
-                      </Popover>
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon size={12} className="text-primary" />
+                      <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Select
@@ -3442,6 +3424,39 @@ export default function App() {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    <div className="space-y-2 pt-1">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Em que dia lançar todo mês</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRecurrenceDateMode('fixed')}
+                          className={cn("h-11 rounded-xl text-[10px] font-medium transition-all px-2", recurrenceDateMode === 'fixed' ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]")}
+                        >
+                          Mesmo dia{newTransaction.date ? ` (dia ${parseISO(newTransaction.date).getDate()})` : ''}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRecurrenceDateMode('businessDay')}
+                          className={cn("h-11 rounded-xl text-[10px] font-medium transition-all px-2", recurrenceDateMode === 'businessDay' ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]")}
+                        >
+                          Nº dia útil do mês
+                        </button>
+                      </div>
+                      {recurrenceDateMode === 'businessDay' && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <Input
+                            type="number"
+                            min="1"
+                            max="23"
+                            className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
+                            value={recurrenceBusinessDay}
+                            onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
+                          />
+                          <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -3462,28 +3477,24 @@ export default function App() {
               </div>
 
                 {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
-                  <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-5 h-14 rounded-2xl">
-                    <Label htmlFor="linked-income-m" className="text-sm font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
-                      Associar receita
-                      <Popover>
-                        <PopoverTrigger render={
-                          <button className="h-5 w-5 flex items-center justify-center rounded-full bg-white dark:bg-[#100E3D] shadow-sm outline-none">
-                            <Info size={12} className="text-indigo-400" />
-                          </button>
-                        } />
-                        <PopoverContent className="w-56 p-4 rounded-3xl bg-indigo-600 text-white border-none shadow-deep z-[70]">
-                          <p className="text-[10px] font-normal leading-relaxed tracking-tight">
-                            Cria uma receita automática para a pessoa selecionada. Útil para reembolsos.
-                          </p>
-                        </PopoverContent>
-                      </Popover>
-                    </Label>
-                    <ToggleSwitch checked={createLinkedIncome} onChange={setCreateLinkedIncome} />
+                  <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                    <div className="flex items-start gap-2 text-indigo-600 dark:text-indigo-300">
+                      <ArrowUpCircle size={14} className="shrink-0 mt-0.5" />
+                      <p className="text-xs font-normal leading-relaxed">Isso cria automaticamente uma receita de reembolso para {people.find(p => p.id === newTransaction.payerPayee)?.name}.</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Data limite para reembolso</Label>
+                      <DateField
+                        value={linkedIncomeDate}
+                        onChange={setLinkedIncomeDate}
+                        className="h-11 rounded-xl text-sm bg-slate-50 dark:bg-[#16133F]"
+                      />
+                    </div>
                   </div>
                 )}
 
                 {newTransaction.type !== 'card_purchase' && (
-                  <div className="flex items-center justify-between px-1 py-1">
+                  <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#201C56]">
                     <Label htmlFor="status-m" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
@@ -3498,20 +3509,22 @@ export default function App() {
                   const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
                   if (!linked) return null;
                   return (
-                    <div
-                      onClick={() => handleEditClick(linked)}
-                      className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
-                          {linked.type === 'income' ? <ArrowUpCircle size={16} strokeWidth={3} /> : <CreditCard size={16} strokeWidth={3} />}
+                    <div className="pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                      <div
+                        onClick={() => handleEditClick(linked)}
+                        className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-[1.25rem] cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
+                            {linked.type === 'income' ? <ArrowUpCircle size={16} strokeWidth={3} /> : <CreditCard size={16} strokeWidth={3} />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-normal text-slate-700 dark:text-[#EDEAF9] truncate">Vinculado a: {linked.description}</p>
+                            <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-normal text-slate-700 dark:text-[#EDEAF9] truncate">Vinculado a: {linked.description}</p>
-                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        </div>
+                        <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
                       </div>
-                      <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
                     </div>
                   );
                 })()}
@@ -3794,7 +3807,7 @@ export default function App() {
                 </div>
 
                 {/* Associar a pessoas */}
-                <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
+                <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <Users size={16} className="text-primary shrink-0" />
                     <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Associar a pessoas</Label>
@@ -3805,60 +3818,58 @@ export default function App() {
                       : 'Quem você marcar aqui aparece também em Pessoas — a receber ou a pagar, conforme a escolha abaixo.'}
                   </p>
 
-                  <div className="flex flex-wrap gap-2">
-                    {people.filter(p => p.visible !== false).map(p => {
-                      const isSelected = personSplits.some(s => s.personId === p.id);
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => togglePersonSplit(p.id)}
-                          className={cn(
-                            "h-12 px-4 rounded-2xl font-normal text-sm transition-all flex items-center gap-3 border-2 outline-none",
-                            isSelected
-                              ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
-                              : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]"
-                          )}
-                        >
-                          <img src={p.image} alt="" className="w-6 h-6 rounded-full object-cover shadow-sm" />
-                          {p.name}
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={() => setShowQuickAdd(v => !v)}
-                      className={cn(
-                        "h-12 px-4 rounded-2xl font-normal text-sm transition-all flex items-center gap-2 border-2 border-dashed outline-none",
-                        showQuickAdd ? "border-primary text-primary" : "border-slate-200 dark:border-[#2A2566] text-slate-400 dark:text-[#8D89AC]"
-                      )}
-                    >
-                      <Plus size={16} /> Nova pessoa
-                    </button>
+                  <div className="relative">
+                    <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] pointer-events-none" />
+                    <Input
+                      placeholder="Buscar pessoa ou @usuário..."
+                      className="h-12 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-11 pr-4"
+                      value={quickAssignQuery}
+                      onChange={(e) => setQuickAssignQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && personSearchResults.length === 0 && handleQuickAssignPerson()}
+                    />
                   </div>
 
-                  {showQuickAdd && (
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <AtSign size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] pointer-events-none" />
-                        <Input
-                          placeholder="usuário ou nome novo"
-                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-9 pr-4"
-                          value={quickAssignQuery}
-                          onChange={(e) => setQuickAssignQuery(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleQuickAssignPerson()}
-                          autoFocus
-                        />
-                      </div>
+                  {personSearchResults.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {personSearchResults.map(p => {
+                        const isSelected = personSplits.some(s => s.personId === p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => togglePersonSplit(p.id)}
+                            className={cn(
+                              "h-12 px-4 rounded-2xl font-normal text-sm transition-all flex items-center gap-3 border-2 outline-none",
+                              isSelected
+                                ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
+                                : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]"
+                            )}
+                          >
+                            <img src={p.image} alt="" className="w-6 h-6 rounded-full object-cover shadow-sm" />
+                            {p.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : quickAssignQuery.trim() ? (
+                    <div className="bg-slate-50 dark:bg-[#16133F] rounded-[1.5rem] p-4 space-y-3">
+                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
                       <Button
                         type="button"
                         onClick={handleQuickAssignPerson}
-                        disabled={!quickAssignQuery.trim() || quickAssignSubmitting}
-                        className="h-11 px-5 rounded-xl font-medium text-sm bg-primary text-white disabled:opacity-40 shrink-0"
+                        disabled={quickAssignSubmitting}
+                        className="h-11 px-5 rounded-xl font-medium text-sm bg-primary text-white disabled:opacity-40"
                       >
-                        Adicionar
+                        {quickAssignQuery.trim().startsWith('@')
+                          ? `Buscar @${quickAssignQuery.trim().replace(/^@+/, '')} como usuário`
+                          : `Adicionar "${quickAssignQuery.trim()}" como nova pessoa`}
                       </Button>
+                      {!quickAssignQuery.trim().startsWith('@') && (
+                        <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">Ou comece com @ pra procurar alguém que já usa o app.</p>
+                      )}
                     </div>
+                  ) : (
+                    <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Nenhuma pessoa cadastrada ainda — digite um nome ou @usuário na busca acima pra adicionar.</p>
                   )}
 
                   {personSplits.length === 1 && (() => {
@@ -3950,42 +3961,40 @@ export default function App() {
 
                   {personSplits.length > 1 && (
                     <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">
-                          {globalSplitType === 'parts' ? `Igual entre ${personSplits.length} pessoas` : 'Divisão personalizada'}
-                        </p>
-                        <div className="flex bg-slate-50 dark:bg-[#16133F] p-1 rounded-xl overflow-hidden shrink-0 min-w-[180px]">
-                          {(['parts', 'percentage', 'value'] as const).map(type => (
-                            <button
-                              key={type}
-                              type="button"
-                              onClick={() => {
-                                setGlobalSplitType(type);
-                                let newSplits = personSplits.map(s => ({
-                                  ...s,
-                                  type: type,
-                                  value: type === 'parts' ? '1' : '0,00'
-                                }));
+                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">
+                        {globalSplitType === 'parts' ? `Igual entre ${personSplits.length} pessoas` : 'Divisão personalizada'}
+                      </p>
+                      <div className="grid grid-cols-3 gap-3">
+                        {(['parts', 'percentage', 'value'] as const).map(type => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => {
+                              setGlobalSplitType(type);
+                              let newSplits = personSplits.map(s => ({
+                                ...s,
+                                type: type,
+                                value: type === 'parts' ? '1' : '0,00'
+                              }));
 
-                                if (type === 'percentage' && newSplits.length > 0) {
-                                  const perPerson = Math.floor(100 / newSplits.length);
-                                  const remainder = 100 % newSplits.length;
-                                  newSplits = newSplits.map((s, idx) => ({
-                                    ...s,
-                                    value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                  }));
-                                }
-                                setPersonSplits(newSplits);
-                              }}
-                              className={cn(
-                                "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
-                                globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
-                              )}
-                            >
-                              {type === 'parts' ? 'Igual' : type === 'percentage' ? '%' : 'R$'}
-                            </button>
-                          ))}
-                        </div>
+                              if (type === 'percentage' && newSplits.length > 0) {
+                                const perPerson = Math.floor(100 / newSplits.length);
+                                const remainder = 100 % newSplits.length;
+                                newSplits = newSplits.map((s, idx) => ({
+                                  ...s,
+                                  value: (idx === 0 ? perPerson + remainder : perPerson).toString()
+                                }));
+                              }
+                              setPersonSplits(newSplits);
+                            }}
+                            className={cn(
+                              "h-12 rounded-xl text-sm font-semibold transition-all",
+                              globalSplitType === type ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5] hover:bg-slate-100 dark:hover:bg-[#1C1852]"
+                            )}
+                          >
+                            {type === 'parts' ? 'Igual' : type === 'percentage' ? '%' : 'R$'}
+                          </button>
+                        ))}
                       </div>
 
                       <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
@@ -4032,9 +4041,12 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Repetição — sempre visível */}
-                <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
-                  <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+                {/* Repetição */}
+                <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                  <div className="flex items-center gap-2">
+                    <Repeat size={16} className="text-primary shrink-0" />
+                    <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+                  </div>
                   <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-2xl p-1">
                     <button
                       type="button"
@@ -4061,48 +4073,9 @@ export default function App() {
 
                   {isRecurrent && (
                     <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-[#201C56]">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <CalendarIcon size={14} className="text-primary" />
-                          <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
-                        </div>
-                        <Popover>
-                          <PopoverTrigger render={
-                            <button type="button" className="h-7 w-7 flex items-center justify-center rounded-full bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] shrink-0" aria-label="Ajustar o dia da recorrência">
-                              <Settings size={14} />
-                            </button>
-                          } />
-                          <PopoverContent className="w-72 p-4 rounded-2xl bg-white dark:bg-[#100E3D] border border-slate-100 dark:border-white/10 shadow-deep z-[70] space-y-2">
-                            <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] px-1">Em que dia lançar todo mês</p>
-                            <button
-                              type="button"
-                              onClick={() => setRecurrenceDateMode('fixed')}
-                              className={cn("w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-primary/10 text-primary" : "text-slate-500 dark:text-[#C5C1E5]")}
-                            >
-                              Mesmo dia do mês{newTransaction.date ? ` (dia ${parseISO(newTransaction.date).getDate()})` : ''}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRecurrenceDateMode('businessDay')}
-                              className={cn("w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-primary/10 text-primary" : "text-slate-500 dark:text-[#C5C1E5]")}
-                            >
-                              Nº dia útil do mês
-                            </button>
-                            {recurrenceDateMode === 'businessDay' && (
-                              <div className="flex items-center gap-3 pt-1 px-1">
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  max="23"
-                                  className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
-                                  value={recurrenceBusinessDay}
-                                  onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
-                                />
-                                <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] leading-snug flex-1">º dia útil (seg-sex, varia conforme os fins de semana)</span>
-                              </div>
-                            )}
-                          </PopoverContent>
-                        </Popover>
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon size={14} className="text-primary" />
+                        <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1.5">
@@ -4144,6 +4117,39 @@ export default function App() {
                           </Select>
                         </div>
                       </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">Em que dia lançar todo mês</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setRecurrenceDateMode('fixed')}
+                            className={cn("h-12 rounded-xl text-sm font-medium transition-all px-3", recurrenceDateMode === 'fixed' ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]")}
+                          >
+                            Mesmo dia{newTransaction.date ? ` (dia ${parseISO(newTransaction.date).getDate()})` : ''}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRecurrenceDateMode('businessDay')}
+                            className={cn("h-12 rounded-xl text-sm font-medium transition-all px-3", recurrenceDateMode === 'businessDay' ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]")}
+                          >
+                            Nº dia útil do mês
+                          </button>
+                        </div>
+                        {recurrenceDateMode === 'businessDay' && (
+                          <div className="flex items-center gap-3 pt-1">
+                            <Input
+                              type="number"
+                              min="1"
+                              max="23"
+                              className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
+                              value={recurrenceBusinessDay}
+                              onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
+                            />
+                            <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] leading-snug flex-1">º dia útil (seg-sex, varia conforme os fins de semana)</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -4163,46 +4169,26 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-4">
-                  {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
-                    <div className="space-y-3 flex-1">
-                      <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-5 h-16 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm">
-                        <Label htmlFor="linked-income-d" className="text-xs font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
-                          Associar receita
-                          <Popover>
-                            <PopoverTrigger render={
-                              <button className="h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-[#100E3D] shadow-sm hover:scale-110 active:scale-95 transition-all outline-none">
-                                <Info size={14} className="text-indigo-400" />
-                              </button>
-                            } />
-                            <PopoverContent className="w-64 p-4 rounded-[1.5rem] bg-indigo-600 text-white border-none shadow-deep z-[70]">
-                              <p className="text-[11px] font-normal leading-relaxed tracking-tight">
-                                Ao ativar, o sistema gerará automaticamente uma receita correspondente para a pessoa selecionada. Útil para quando você paga algo para alguém e quer controlar o reembolso.
-                              </p>
-                            </PopoverContent>
-                          </Popover>
-                        </Label>
-                        <ToggleSwitch checked={createLinkedIncome} onChange={setCreateLinkedIncome} />
-                      </div>
-
-                      {createLinkedIncome && (
-                        <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/10 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/30 space-y-2 animate-in fade-in slide-in-from-top-2">
-                          <Label className="text-[10px] font-medium tracking-wider text-indigo-400 ml-1">
-                            Data limite para reembolso
-                          </Label>
-                          <DateField
-                            value={linkedIncomeDate}
-                            onChange={setLinkedIncomeDate}
-                            className="h-12 rounded-xl text-sm text-indigo-600"
-                          />
-                        </div>
-                      )}
+                {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
+                  <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                    <div className="flex items-start gap-2 text-indigo-600 dark:text-indigo-300">
+                      <ArrowUpCircle size={16} className="shrink-0 mt-0.5" />
+                      <p className="text-sm font-normal leading-relaxed">Isso cria automaticamente uma receita de reembolso para {people.find(p => p.id === newTransaction.payerPayee)?.name}.</p>
                     </div>
-                  )}
+                    <div className="space-y-1.5 max-w-xs">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Data limite para reembolso</Label>
+                      <DateField
+                        value={linkedIncomeDate}
+                        onChange={setLinkedIncomeDate}
+                        className="h-12 rounded-xl text-sm bg-slate-50 dark:bg-[#16133F]"
+                      />
+                    </div>
+                  </div>
+                )}
 
-                  {newTransaction.type !== 'card_purchase' && (
-                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#16133F] px-5 h-16 rounded-2xl border border-slate-100 dark:border-[#201C56] shadow-sm flex-1">
-                    <Label htmlFor="status-d" className="text-sm font-medium text-slate-500 dark:text-[#A8A4CC] cursor-pointer flex-1">
+                {newTransaction.type !== 'card_purchase' && (
+                  <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                    <Label htmlFor="status-d" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
                     <ToggleSwitch
@@ -4211,10 +4197,9 @@ export default function App() {
                     />
                   </div>
                 )}
-                </div>
 
                 {editingTransaction?.linkedTransactionId && (
-                  <div>
+                  <div className="pt-6 border-t border-slate-100 dark:border-[#201C56]">
                     <p className="text-[10px] font-medium tracking-wider text-indigo-400 ml-1 mb-2">Lançamento vinculado</p>
                     {(() => {
                       const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
@@ -4222,7 +4207,7 @@ export default function App() {
                       return (
                         <div
                           onClick={() => handleEditClick(linked)}
-                          className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
+                          className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-[1.5rem] border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center text-indigo-500">
