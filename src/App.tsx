@@ -93,7 +93,6 @@ import {
   BarChart,
   Bar,
   ComposedChart,
-  Line,
   XAxis,
   YAxis
 } from 'recharts';
@@ -176,6 +175,8 @@ const monthPickerYears = Array.from({ length: 9 }, (_, i) => ({
   value: String(currentYear - 6 + i),
   label: String(currentYear - 6 + i),
 }));
+
+const DEFAULT_CATEGORY_ICON = '🏷️';
 
 const CARD_COLOR_PRESETS = [
   '#8A7FF5', '#37D6A3', '#FDB8D7', '#FF6F61',
@@ -377,6 +378,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('visao-geral');
   const [transactionFilter, setTransactionFilter] = useState<'pending' | 'all'>('all');
   const [movTab, setMovTab] = useState<'movimentacoes' | 'apagar' | 'areceber'>('movimentacoes');
+  const [movStatusFilter, setMovStatusFilter] = useState<'all' | 'planned' | 'actual'>('all');
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [showCardForm, setShowCardForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -786,6 +788,15 @@ export default function App() {
     };
   };
 
+  /** Verifica se a fatura de um cartão num mês já foi paga (existe um lançamento "Pagamento Fatura"). */
+  const isCardBillPaid = (cardId: string, month: Date) => transactions.some(t =>
+    t.type === 'expense' &&
+    t.status === 'actual' &&
+    t.cardId === cardId &&
+    (t.category === 'Fatura Cartão' || t.category === 'Fatura cartão') &&
+    format(parseISO(t.date), 'yyyy-MM') === format(month, 'yyyy-MM')
+  );
+
   // Grouping logic
   const groupedTransactions = useMemo(() => {
     let list = [...transactions];
@@ -942,7 +953,7 @@ export default function App() {
   const movimentacoesLists: { all: Transaction[]; aPagar: Transaction[]; aReceber: Transaction[] } = useMemo(() => {
     const cardBills: Transaction[] = cards
       .map(card => computeCardBill(card, currentDate))
-      .filter(bill => bill.amount > 0);
+      .filter(bill => bill.amount > 0 && !isCardBillPaid(bill.cardId as string, currentDate));
 
     const monthTransactions: Transaction[] = [...transactions.filter(t => t.type !== 'card_purchase'), ...cardBills].filter(t =>
       format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM')
@@ -1021,21 +1032,8 @@ export default function App() {
       const bill = computeCardBill(activeCard, monthDate);
       return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: bill.amount };
     });
-    // Linha de tendência: regressão linear simples considerando somente os
-    // meses com valor (evita que meses zerados, sem fatura, puxem a linha
-    // para baixo) — não é um traçado dos valores reais, é uma projeção.
-    const withValue = points.map((p, i) => ({ i, amount: p.amount })).filter(p => p.amount > 0);
-    const n = withValue.length;
-    if (n < 2) return points.map(p => ({ ...p, trend: undefined }));
-    const sumX = withValue.reduce((acc, p) => acc + p.i, 0);
-    const sumY = withValue.reduce((acc, p) => acc + p.amount, 0);
-    const sumXY = withValue.reduce((acc, p) => acc + p.i * p.amount, 0);
-    const sumXX = withValue.reduce((acc, p) => acc + p.i * p.i, 0);
-    const denom = n * sumXX - sumX * sumX;
-    const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
-    const intercept = (sumY - slope * sumX) / n;
-    return points.map((p, i) => ({ ...p, trend: Math.max(0, intercept + slope * i) }));
-  }, [cards, selectedCard, currentDate]);
+    return points;
+  }, [cards, selectedCard, currentDate, transactions]);
 
   const billChartScrollRef = React.useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -1737,7 +1735,8 @@ export default function App() {
   const handleTransactionClick = (t: Transaction) => {
     setForcedSeriesMode(null);
     if (t.id.startsWith('bill-')) {
-      setViewingBill(t);
+      setSelectedCard(t.cardId ?? null);
+      setActiveTab('cartoes');
       return;
     }
     if (t.status === 'planned') {
@@ -2091,16 +2090,6 @@ export default function App() {
   const [confirmingTransaction, setConfirmingTransaction] = useState<Transaction | null>(null);
   const [confirmAmount, setConfirmAmount] = useState<number>(0);
   const [confirmDate, setConfirmDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
-  const [viewingBill, setViewingBill] = useState<Transaction | null>(null);
-
-  const billTransactions = useMemo(() => {
-    if (!viewingBill || !viewingBill.cardId) return [];
-    const card = cards.find(c => c.id === viewingBill.cardId);
-    if (!card) return [];
-    return transactions
-      .filter(t => t.type === 'card_purchase' && t.cardId === card.id && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM'))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }, [viewingBill, cards, transactions, currentDate]);
 
   if (!isAuthReady) {
     return (
@@ -2513,59 +2502,6 @@ export default function App() {
         </DialogContent>
       </Dialog>
 
-      {/* Bill Details Modal */}
-      <Dialog open={!!viewingBill} onOpenChange={(open) => !open && setViewingBill(null)}>
-        <DialogContent className="max-w-none sm:max-w-lg max-h-[85vh] p-0 border-none shadow-deep rounded-t-[2rem] rounded-b-none md:rounded-[2rem] overflow-hidden flex flex-col bg-white dark:bg-[#100E3D]">
-          <div className="p-6 shrink-0">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">
-                Fatura {cards.find(c => c.id === viewingBill?.cardId)?.name || ''}
-              </DialogTitle>
-              <DialogDescription className="font-medium text-xs text-slate-400 dark:text-[#8D89AC]">
-                {format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })} · {billTransactions.length} lançamento(s)
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-          <ScrollArea className="flex-1 overflow-y-auto">
-            <div className="space-y-2 p-4">
-              {billTransactions.length === 0 && (
-                <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#6B679C]">Nenhum lançamento nessa fatura.</p>
-              )}
-              {billTransactions.map(t => {
-                const person = people.find(p => p.id === t.payerPayee);
-                return (
-                  <div key={t.id}>
-                    <TransactionItem
-                      transaction={t}
-                      personName={person?.name}
-                      onClick={() => { setViewingBill(null); handleEditClick(t); }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          </ScrollArea>
-          <div className="p-6 border-t border-slate-100 dark:border-[#201C56] space-y-3 shrink-0">
-            <div className="flex justify-between items-center px-1">
-              <span className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-wider">Total da fatura</span>
-              <span className="text-xl font-heading font-bold text-slate-800 dark:text-[#EDE9E3]">R$ {(viewingBill?.amount ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <Button
-              className="w-full h-14 rounded-full font-medium text-base bg-primary text-white hover:bg-primary/90 transition-all active:scale-95"
-              onClick={() => {
-                if (viewingBill) {
-                  setConfirmingTransaction(viewingBill);
-                  setConfirmAmount(viewingBill.amount);
-                  setConfirmDate(format(new Date(), 'yyyy-MM-dd'));
-                  setViewingBill(null);
-                }
-              }}
-            >
-              Pagar fatura
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
       {/* Month/Year Picker */}
       <Dialog open={isMonthPickerOpen} onOpenChange={setIsMonthPickerOpen}>
         <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
@@ -3239,7 +3175,7 @@ export default function App() {
                   {categories.map(cat => (
                     <div key={cat.id} className="flex items-center gap-3 pl-3 pr-2 py-2 bg-card rounded-full shadow-soft group">
                       <div className="w-10 h-10 rounded-full flex items-center justify-center text-base shrink-0" style={{ backgroundColor: cat.color }}>
-                        {cat.icon}
+                        {cat.icon || DEFAULT_CATEGORY_ICON}
                       </div>
                       <span className="flex-1 font-medium text-slate-700 dark:text-[#EDEAF9] text-sm truncate tracking-tight">{cat.name}</span>
                       <div className="flex items-center gap-1 shrink-0">
@@ -4484,7 +4420,7 @@ export default function App() {
                       movTab === 'movimentacoes' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
                     )}
                   >
-                    Movimentações
+                    Tudo
                   </button>
                   <button
                     onClick={() => setMovTab('apagar')}
@@ -4505,6 +4441,38 @@ export default function App() {
                     A receber
                   </button>
                 </div>
+
+                {movTab === 'movimentacoes' && (
+                  <div className="flex bg-slate-100 dark:bg-[#1C1852] p-1 rounded-full shadow-inner w-fit">
+                    <button
+                      onClick={() => setMovStatusFilter('all')}
+                      className={cn(
+                        "px-4 py-2 rounded-full text-xs font-medium transition-all",
+                        movStatusFilter === 'all' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                      )}
+                    >
+                      Tudo
+                    </button>
+                    <button
+                      onClick={() => setMovStatusFilter('planned')}
+                      className={cn(
+                        "px-4 py-2 rounded-full text-xs font-medium transition-all",
+                        movStatusFilter === 'planned' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                      )}
+                    >
+                      Previsto
+                    </button>
+                    <button
+                      onClick={() => setMovStatusFilter('actual')}
+                      className={cn(
+                        "px-4 py-2 rounded-full text-xs font-medium transition-all",
+                        movStatusFilter === 'actual' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                      )}
+                    >
+                      Pago
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="hidden md:flex md:items-center justify-between gap-6">
@@ -4671,25 +4639,28 @@ export default function App() {
                     </div>
 
                     <div className="space-y-2">
-                      {movimentacoesLists.all.length === 0 ? (
-                        <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">Nenhuma movimentação neste mês.</p>
-                      ) : (
-                        movimentacoesLists.all.map(t => {
-                          const person = people.find(p => p.id === t.payerPayee);
-                          const card = cards.find(c => c.id === t.cardId);
-                          return (
-                            <div key={t.id}>
-                              <TransactionItem
-                                transaction={t}
-                                personName={person?.name}
-                                cardName={card?.name}
-                                onClick={() => handleTransactionClick(t)}
-                                onQuickConfirm={() => handleQuickConfirm(t)}
-                              />
-                            </div>
-                          );
-                        })
-                      )}
+                      {(() => {
+                        const filtered = movimentacoesLists.all.filter(t => movStatusFilter === 'all' ? true : t.status === movStatusFilter);
+                        return filtered.length === 0 ? (
+                          <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">Nenhuma movimentação neste mês.</p>
+                        ) : (
+                          filtered.map(t => {
+                            const person = people.find(p => p.id === t.payerPayee);
+                            const card = cards.find(c => c.id === t.cardId);
+                            return (
+                              <div key={t.id}>
+                                <TransactionItem
+                                  transaction={t}
+                                  personName={person?.name}
+                                  cardName={card?.name}
+                                  onClick={() => handleTransactionClick(t)}
+                                  onQuickConfirm={() => handleQuickConfirm(t)}
+                                />
+                              </div>
+                            );
+                          })
+                        );
+                      })()}
                     </div>
                   </>
                 )}
@@ -4716,7 +4687,7 @@ export default function App() {
                                 className="w-11 h-11 rounded-full flex items-center justify-center text-base shrink-0"
                                 style={{ backgroundColor: categories.find(c => c.name === t.category)?.color || '#9C93BE' }}
                               >
-                                {categories.find(c => c.name === t.category)?.icon || '🏷️'}
+                                {categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
                               </div>
                               <div className="min-w-0 flex-1">
                                 <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight">
@@ -4724,14 +4695,6 @@ export default function App() {
                                 </span>
                                 <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{t.description}</p>
                               </div>
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleQuickConfirm(t); }}
-                                title={movTab === 'apagar' ? 'Marcar como pago' : 'Marcar como recebido'}
-                                className="p-2 -m-2 rounded-full active:scale-90 transition-all group/confirm shrink-0"
-                              >
-                                <div className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#2A2566] group-hover/confirm:border-primary transition-all" />
-                              </button>
                               <p className={cn(
                                 "font-heading font-medium tracking-tighter whitespace-nowrap text-base shrink-0",
                                 movTab === 'apagar' ? "text-rose-400" : "text-emerald-500"
@@ -4960,8 +4923,9 @@ export default function App() {
                         className="rounded-[1.75rem] h-24 shadow-sm flex items-end p-4 transition-colors duration-300 relative overflow-hidden"
                         style={{ backgroundColor: newCardColor }}
                       >
-                        <div className="absolute -right-6 -top-10 w-28 h-28 rounded-full border-[10px] border-white/15" />
-                        <div className="absolute -right-2 -top-4 w-16 h-16 rounded-full border-[6px] border-white/20" />
+                        <svg className="absolute -right-2 top-3 w-24 h-12 opacity-25" viewBox="0 0 100 50" fill="none">
+                          <path d="M0 25 Q 12.5 8 25 25 T 50 25 T 75 25 T 100 25" stroke="white" strokeWidth="5" strokeLinecap="round" />
+                        </svg>
                         <span className="text-white font-medium text-sm drop-shadow-sm truncate relative z-10">{newCardName || 'Novo cartão'}</span>
                       </div>
                       <div className="grid grid-cols-6 gap-2 bg-slate-50 dark:bg-[#16133F] p-3 rounded-2xl shadow-sm">
@@ -5023,8 +4987,9 @@ export default function App() {
                             className="rounded-[1.75rem] h-44 p-5 relative overflow-hidden flex flex-col justify-between shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
                             style={{ backgroundColor: card.color }}
                           >
-                            <div className="absolute -right-8 -top-10 w-32 h-32 rounded-full border-[10px] border-white/15" />
-                            <div className="absolute -right-2 -top-2 w-20 h-20 rounded-full border-[7px] border-white/20" />
+                            <svg className="absolute -right-3 top-10 w-40 h-16 opacity-20" viewBox="0 0 160 60" fill="none">
+                              <path d="M0 30 Q 20 10 40 30 T 80 30 T 120 30 T 160 30" stroke="white" strokeWidth="6" strokeLinecap="round" />
+                            </svg>
                             <div className="flex items-center justify-between relative z-10">
                               <span className="text-white font-medium text-sm drop-shadow-sm">{card.name}</span>
                               <button
@@ -5099,13 +5064,7 @@ export default function App() {
                       const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
                       const selectedMonthKey = format(selectedBillDate, 'yyyy-MM');
                       const billTotal = cardBillItems.reduce((acc, t) => acc + t.amount, 0);
-                      const billPaid = transactions.some(t =>
-                        t.type === 'expense' &&
-                        t.status === 'actual' &&
-                        t.cardId === activeCard.id &&
-                        (t.category === 'Fatura Cartão' || t.category === 'Fatura cartão') &&
-                        format(parseISO(t.date), 'yyyy-MM') === selectedMonthKey
-                      );
+                      const billPaid = isCardBillPaid(activeCard.id, selectedBillDate);
                       return (
                         <>
                           <div className="space-y-3">
@@ -5124,7 +5083,6 @@ export default function App() {
                                       <Cell key={entry.monthKey} fill={activeCard.color} fillOpacity={entry.monthKey === selectedMonthKey ? 1 : 0.25} />
                                     ))}
                                   </Bar>
-                                  <Line type="monotone" dataKey="trend" stroke={activeCard.color} strokeOpacity={0.5} strokeWidth={1.5} dot={false} activeDot={false} isAnimationActive={false} />
                                 </ComposedChart>
                               </div>
                             </div>
@@ -5171,7 +5129,7 @@ export default function App() {
                                         transaction={t}
                                         onClick={() => handleTransactionClick(t)}
                                         hideStatus
-                                        categoryIcon={categories.find(c => c.name === t.category)?.icon}
+                                        categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
                                       />
                                     </div>
                                   ))}
@@ -6159,18 +6117,32 @@ function TransactionItem({
               {categoryIcon}
             </div>
           ) : !hideStatus && (
-            <div className={cn(
-              "w-6 h-6 flex items-center justify-center shrink-0",
-              transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
-            )}>
-              {transaction.id.startsWith('bill-') ? (
-                <CreditCard size={19} strokeWidth={2.5} />
-              ) : transaction.status === 'actual' ? (
-                <Check size={20} strokeWidth={2.5} />
-              ) : (
+            canConfirm ? (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onQuickConfirm?.(); }}
+                title={transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
+                className={cn(
+                  "w-6 h-6 flex items-center justify-center shrink-0 rounded-full active:scale-90 transition-transform",
+                  transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
+                )}
+              >
                 <Clock size={19} strokeWidth={2.5} />
-              )}
-            </div>
+              </button>
+            ) : (
+              <div className={cn(
+                "w-6 h-6 flex items-center justify-center shrink-0",
+                transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
+              )}>
+                {transaction.id.startsWith('bill-') ? (
+                  <CreditCard size={19} strokeWidth={2.5} />
+                ) : transaction.status === 'actual' ? (
+                  <Check size={20} strokeWidth={2.5} />
+                ) : (
+                  <Clock size={19} strokeWidth={2.5} />
+                )}
+              </div>
+            )
           )}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 overflow-hidden">
@@ -6180,8 +6152,8 @@ function TransactionItem({
                 </span>
               )}
               {transaction.installments && (
-                <span className="text-[10px] font-medium text-slate-400 dark:text-[#8D89AC] shrink-0">
-                  · {transaction.installments.current}/{transaction.installments.total}
+                <span className="text-[10px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full shrink-0">
+                  {transaction.installments.current}/{transaction.installments.total}
                 </span>
               )}
               {personName && (
@@ -6190,26 +6162,14 @@ function TransactionItem({
               {cardName && (
                 <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {cardName}</span>
               )}
-              {transaction.linkedToCard && transaction.type !== 'income' && (
+              {transaction.linkedToCard && (
                 <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 shrink-0">· vinculado</span>
               )}
             </div>
-            <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{transaction.description}</p>
+            <p className="text-base font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{transaction.description}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {hideStatus ? null : transaction.status === 'actual' ? (
-            <CheckCircle2 size={15} strokeWidth={2.5} className={transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"} />
-          ) : canConfirm && (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onQuickConfirm?.(); }}
-              title={transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
-              className="p-2 -m-2 rounded-full active:scale-90 transition-all group/confirm"
-            >
-              <div className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#2A2566] group-hover/confirm:border-primary transition-all" />
-            </button>
-          )}
           <p className={cn(
             "font-heading font-medium tracking-tighter whitespace-nowrap text-base",
             transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
