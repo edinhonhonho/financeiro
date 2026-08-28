@@ -7,7 +7,6 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Plus,
   ChevronRight,
-  ChevronDown,
   ArrowUpCircle,
   ArrowDownCircle,
   Calendar as CalendarIcon,
@@ -579,7 +578,6 @@ export default function App() {
   const [amountInput, setAmountInput] = useState('0,00');
   const [showPersonSelector, setShowPersonSelector] = useState(false);
   const [globalSplitType, setGlobalSplitType] = useState<'parts' | 'percentage' | 'value'>('parts');
-  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   const handleExportGlobalCSV = () => {
     if (transactions.length === 0) {
@@ -2869,7 +2867,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="p-5 bg-slate-50 dark:bg-[#16133F] rounded-[1.75rem] space-y-1.5 text-center">
+              <div className="p-5 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-1.5 text-center">
                 <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Valor</Label>
                 <div className="flex items-center justify-center gap-1">
                   <span className="text-2xl font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
@@ -2883,13 +2881,12 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl space-y-4">
+              <div className="p-4 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Descrição</Label>
                   <Input
                     placeholder="Ex: Aluguel"
-                    className="h-12 rounded-xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-4 shadow-sm"
+                    className="h-12 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm px-4"
                     value={newTransaction.description || ''}
                     onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
                   />
@@ -2899,7 +2896,7 @@ export default function App() {
                   <div className="space-y-1">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
                     <DateField
-                      className="h-12 text-xs bg-white dark:bg-[#100E3D] shadow-sm"
+                      className="h-12 text-xs bg-slate-50 dark:bg-[#16133F]"
                       value={newTransaction.date || ''}
                       onChange={(v) => {
                         setNewTransaction({...newTransaction, date: v});
@@ -2910,7 +2907,7 @@ export default function App() {
                   <div className="space-y-1">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
                     <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
-                      <SelectTrigger className="h-12 border-none bg-white dark:bg-[#100E3D] rounded-xl font-normal text-sm px-4 shadow-sm">
+                      <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-4">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -2936,7 +2933,7 @@ export default function App() {
                         onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
                         className={cn(
                           "h-9 px-3 rounded-full text-xs font-medium border-2 transition-all",
-                          !newTransaction.cardId ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC]"
+                          !newTransaction.cardId ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
                         )}
                       >
                         Não
@@ -2948,7 +2945,7 @@ export default function App() {
                           onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
                           className={cn(
                             "h-9 px-3 rounded-full text-xs font-medium border-2 transition-all flex items-center gap-2",
-                            newTransaction.cardId === card.id ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC]"
+                            newTransaction.cardId === card.id ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
                           )}
                         >
                           <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
@@ -2958,42 +2955,27 @@ export default function App() {
                     </div>
                   </div>
                 )}
-                </div>
               </div>
 
-                <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowMoreOptions(v => !v)}
-                    className="w-full flex items-center justify-between px-1 py-1"
-                  >
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] cursor-pointer">
-                      Mais opções {(personSplits.length > 0 || isRecurrent || isInstallment) && !showMoreOptions && '(em uso)'}
-                    </Label>
-                    <ChevronDown size={14} strokeWidth={2.5} className={cn("text-slate-400 dark:text-[#8D89AC] transition-transform", (showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && "rotate-180")} />
-                  </button>
+              {/* Dividir com pessoas — sempre visível, sem toggle de "mais opções" */}
+              <div className="p-4 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="assign-someone-m" className="text-xs font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Dividir com pessoas</Label>
+                  <ToggleSwitch
+                    checked={showPersonSelector}
+                    onChange={(checked) => {
+                      setShowPersonSelector(checked);
+                      if (!checked) {
+                        setPersonSplits([]);
+                        setNewTransaction({...newTransaction, payerPayee: 'geral'});
+                      }
+                    }}
+                  />
                 </div>
 
-                {(showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && (
-                <div className="space-y-3 animate-in fade-in slide-in-from-top-1">
-                <div className="space-y-3">
-                  <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="assign-someone-m" className="text-[10px] font-medium text-slate-500 dark:text-[#A8A4CC] cursor-pointer tracking-tight">Dividir com pessoas</Label>
-                    <ToggleSwitch
-                      checked={showPersonSelector}
-                      onChange={(checked) => {
-                        setShowPersonSelector(checked);
-                        if (!checked) {
-                          setPersonSplits([]);
-                          setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                        }
-                      }}
-                    />
-                  </div>
-
-                  {showPersonSelector && (
-                    <div className="flex flex-wrap gap-2 p-1 animate-in fade-in slide-in-from-top-1">
+                {showPersonSelector && (
+                  <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
+                    <div className="flex flex-wrap gap-2">
                       {people.filter(p => p.visible !== false).map(p => {
                         const isSelected = personSplits.some(s => s.personId === p.id);
                         return (
@@ -3029,24 +3011,23 @@ export default function App() {
                             className={cn(
                               "h-10 px-3 rounded-full font-normal text-xs transition-all flex items-center gap-2 border-2",
                               isSelected
-                                ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm"
-                                : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC] hover:border-slate-200 dark:hover:border-[#2A2566]"
+                                ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
+                                : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:border-slate-200 dark:hover:border-[#2A2566]"
                             )}
                           >
-                            <img src={p.image} alt="" className="w-5 h-5 rounded-full object-cover shadow-sm" />
+                            <img src={p.image} alt="" className="w-5 h-5 rounded-full object-cover" />
                             {p.name}
                           </button>
                         );
                       })}
                     </div>
-                  )}
-                  {showPersonSelector && (
-                    <div className="flex items-center gap-2 pt-1">
+
+                    <div className="flex items-center gap-2">
                       <div className="relative flex-1">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] font-medium text-xs pointer-events-none">@</span>
                         <Input
                           placeholder="usuário ou nome novo"
-                          className="h-10 rounded-xl border-none bg-white dark:bg-[#100E3D] font-normal text-xs pl-8 pr-3 shadow-sm"
+                          className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs pl-8 pr-3"
                           value={quickAssignQuery}
                           onChange={(e) => setQuickAssignQuery(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleQuickAssignPerson()}
@@ -3061,63 +3042,118 @@ export default function App() {
                         Adicionar
                       </Button>
                     </div>
-                  )}
-                  </div>
-                </div>
 
-                {personSplits.length > 0 && (
-                  <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between px-1">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Configurar divisões</Label>
-                      <div className="flex bg-slate-100 dark:bg-[#1C1852] p-0.5 rounded-lg border border-slate-200 dark:border-[#2A2566] shadow-sm overflow-hidden min-w-[120px]">
-                        {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
-                          <button
-                            key={type}
-                            type="button"
-                            onClick={() => {
-                              setGlobalSplitType(type);
-                              let newSplits = personSplits.map(s => ({
-                                ...s,
-                                type: type,
-                                value: type === 'parts' ? '1' : '0,00'
-                              }));
+                    {personSplits.length > 0 && (
+                      <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Configurar divisões</Label>
+                          <div className="flex bg-slate-50 dark:bg-[#16133F] p-0.5 rounded-lg overflow-hidden min-w-[120px]">
+                            {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => {
+                                  setGlobalSplitType(type);
+                                  let newSplits = personSplits.map(s => ({
+                                    ...s,
+                                    type: type,
+                                    value: type === 'parts' ? '1' : '0,00'
+                                  }));
 
-                              if (type === 'percentage' && newSplits.length > 0) {
-                                const perPerson = Math.floor(100 / newSplits.length);
-                                const remainder = 100 % newSplits.length;
-                                newSplits = newSplits.map((s, idx) => ({
-                                  ...s,
-                                  value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                }));
-                              }
-                              setPersonSplits(newSplits);
-                            }}
-                            className={cn(
-                              "flex-1 py-1 rounded-md text-[8px] font-medium transition-all",
-                              globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
-                            )}
-                          >
-                            {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                                  if (type === 'percentage' && newSplits.length > 0) {
+                                    const perPerson = Math.floor(100 / newSplits.length);
+                                    const remainder = 100 % newSplits.length;
+                                    newSplits = newSplits.map((s, idx) => ({
+                                      ...s,
+                                      value: (idx === 0 ? perPerson + remainder : perPerson).toString()
+                                    }));
+                                  }
+                                  setPersonSplits(newSplits);
+                                }}
+                                className={cn(
+                                  "flex-1 py-1 rounded-md text-[8px] font-medium transition-all",
+                                  globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+                                )}
+                              >
+                                {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
 
-                    {personSplits.length === 1 ? (
-                      // Single person card (existing style but without uppercase)
-                      <div className="grid gap-3">
-                        {personSplits.map((split, index) => {
-                          const person = people.find(p => p.id === split.personId);
-                          return (
-                            <div key={index} className="bg-white dark:bg-[#100E3D] p-4 rounded-2xl shadow-sm space-y-3 group hover:ring-1 hover:ring-primary/20 transition-all">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 rounded-2xl bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center overflow-hidden border border-slate-50 dark:border-[#1C1852]">
-                                    <img src={person?.image} alt="" className="w-full h-full object-cover" />
+                        {personSplits.length === 1 ? (
+                          <div className="grid gap-3">
+                            {personSplits.map((split, index) => {
+                              const person = people.find(p => p.id === split.personId);
+                              return (
+                                <div key={index} className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
+                                  <div className="flex items-center gap-3">
+                                    <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                      <p className="text-[10px] font-normal text-primary">
+                                        {(() => {
+                                          const amount = parseCurrency(amountInput);
+                                          const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                                          return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                        })()}
+                                      </p>
+                                    </div>
+                                    <div className="relative w-28 shrink-0">
+                                      <Input
+                                        className="h-10 rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
+                                        inputMode="decimal"
+                                        value={split.value}
+                                        onChange={(e) => {
+                                          setPersonSplits(prev => prev.map((s, i) => {
+                                            if (i !== index) return s;
+                                            if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
+                                            if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
+                                            return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
+                                          }));
+                                        }}
+                                      />
+                                      {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
+                                      {split.type === 'value' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
+                                    </div>
                                   </div>
-                                  <div>
-                                    <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9]">{person?.name}</p>
-                                    <p className="text-[10px] font-normal text-primary">
+
+                                  <div className="flex bg-white dark:bg-[#100E3D] p-0.5 rounded-lg">
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                                      className={cn(
+                                        "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
+                                        newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                      )}
+                                    >
+                                      Ela me deve
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                                      className={cn(
+                                        "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
+                                        newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                      )}
+                                    >
+                                      Eu pago pra ela
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
+                            {personSplits.map((split, index) => {
+                              const person = people.find(p => p.id === split.personId);
+                              return (
+                                <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                                  <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                    <p className="text-[9px] font-normal text-primary">
                                       {(() => {
                                         const amount = parseCurrency(amountInput);
                                         const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
@@ -3125,81 +3161,9 @@ export default function App() {
                                       })()}
                                     </p>
                                   </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">
-                                  {split.type === 'parts' ? 'Quantas partes?' : split.type === 'percentage' ? 'Qual percentual?' : 'Qual valor fixo?'}
-                                </p>
-                                <div className="relative w-32">
-                                  <Input
-                                    className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#1C1852] font-medium text-xs px-4 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
-                                    inputMode="decimal"
-                                    value={split.value}
-                                    onChange={(e) => {
-                                      setPersonSplits(prev => prev.map((s, i) => {
-                                        if (i !== index) return s;
-                                        if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                        if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                        return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                      }));
-                                    }}
-                                  />
-                                  {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                  {split.type === 'value' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
-                                </div>
-                              </div>
-
-                              <div className="flex bg-slate-50 dark:bg-[#1C1852] p-0.5 rounded-xl">
-                                <button
-                                  type="button"
-                                  onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
-                                  className={cn(
-                                    "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
-                                    newTransaction.owedByPerson !== false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
-                                  )}
-                                >
-                                  Ela me deve
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
-                                  className={cn(
-                                    "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
-                                    newTransaction.owedByPerson === false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
-                                  )}
-                                >
-                                  Eu pago pra ela
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      // Unified card for multiple people
-                      <div className="bg-white dark:bg-[#100E3D] p-4 rounded-2xl shadow-sm space-y-4">
-                        <div className="space-y-3">
-                          {personSplits.map((split, index) => {
-                            const person = people.find(p => p.id === split.personId);
-                            return (
-                              <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-50 dark:border-[#201C56] last:border-0 last:pb-0">
-                                <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                  <p className="text-[9px] font-normal text-primary">
-                                    {(() => {
-                                      const amount = parseCurrency(amountInput);
-                                      const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                      return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                    })()}
-                                  </p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="relative w-20">
+                                  <div className="relative w-20 shrink-0">
                                     <input
-                                      className="w-full h-8 bg-slate-50 dark:bg-[#1C1852] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
+                                      className="w-full h-8 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
                                       inputMode="decimal"
                                       value={split.value}
                                       onChange={(e) => {
@@ -3214,127 +3178,126 @@ export default function App() {
                                     {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
                 )}
+              </div>
 
-                <div className="space-y-3">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Repetição</Label>
-                  <div className="p-4 bg-slate-50 dark:bg-[#16133F] rounded-2xl space-y-4">
-                    <div className="flex bg-white dark:bg-[#100E3D] rounded-xl p-1 shadow-sm">
-                      <button
-                        type="button"
-                        onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
-                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", !isRecurrent && !isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}
+              {/* Repetição — sempre visível */}
+              <div className="p-4 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
+                <Label className="text-xs font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+                <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-xl p-1">
+                  <button
+                    type="button"
+                    onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
+                    className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", !isRecurrent && !isInstallment ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                  >
+                    Única vez
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsRecurrent(true); setIsInstallment(false); }}
+                    className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isRecurrent ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                  >
+                    Recorrente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsInstallment(true); setIsRecurrent(false); }}
+                    className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isInstallment ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                  >
+                    Parcelado
+                  </button>
+                </div>
+
+                {isRecurrent && (
+                  <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-[#201C56]">
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon size={12} className="text-primary" />
+                      <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select
+                        value={newTransaction.recurrenceEndDate?.split('-')[1] || ''}
+                        onValueChange={(m) => {
+                          const year = newTransaction.recurrenceEndDate?.split('-')[0] || years[0].value;
+                          setNewTransaction({...newTransaction, recurrenceEndDate: `${year}-${m}`});
+                        }}
                       >
-                        Única vez
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setIsRecurrent(true); setIsInstallment(false); }}
-                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isRecurrent ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}
+                        <SelectTrigger className="h-10 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-xs px-4">
+                          <SelectValue placeholder="Mês" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-deep p-2">
+                          {months.map(m => (
+                            <SelectItem key={m.value} value={m.value} className="rounded-lg font-normal text-xs p-2">{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={newTransaction.recurrenceEndDate?.split('-')[0] || ''}
+                        onValueChange={(y) => {
+                          const month = newTransaction.recurrenceEndDate?.split('-')[1] || months[0].value;
+                          setNewTransaction({...newTransaction, recurrenceEndDate: `${y}-${month}`});
+                        }}
                       >
-                        Recorrente
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setIsInstallment(true); setIsRecurrent(false); }}
-                        className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}
-                      >
-                        Parcelado
-                      </button>
+                        <SelectTrigger className="h-10 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-xs px-4">
+                          <SelectValue placeholder="Ano" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-deep p-2">
+                          {years.map(y => (
+                            <SelectItem key={y.value} value={y.value} className="rounded-lg font-normal text-xs p-2">{y.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    {isRecurrent && (
-                      <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-[#2A2566] transition-all animate-in fade-in slide-in-from-top-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          <CalendarIcon size={12} className="text-primary" />
-                          <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <Select 
-                            value={newTransaction.recurrenceEndDate?.split('-')[1] || ''} 
-                            onValueChange={(m) => {
-                              const year = newTransaction.recurrenceEndDate?.split('-')[0] || years[0].value;
-                              setNewTransaction({...newTransaction, recurrenceEndDate: `${year}-${m}`});
-                            }}
-                          >
-                            <SelectTrigger className="h-10 border-none bg-white dark:bg-[#100E3D] rounded-xl font-normal text-xs px-4 shadow-sm focus:ring-1 focus:ring-primary/20">
-                              <SelectValue placeholder="Mês" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl border-none shadow-deep p-2">
-                              {months.map(m => (
-                                <SelectItem key={m.value} value={m.value} className="rounded-lg font-normal text-xs p-2">{m.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <Select 
-                            value={newTransaction.recurrenceEndDate?.split('-')[0] || ''} 
-                            onValueChange={(y) => {
-                              const month = newTransaction.recurrenceEndDate?.split('-')[1] || months[0].value;
-                              setNewTransaction({...newTransaction, recurrenceEndDate: `${y}-${month}`});
-                            }}
-                          >
-                            <SelectTrigger className="h-10 border-none bg-white dark:bg-[#100E3D] rounded-xl font-normal text-xs px-4 shadow-sm focus:ring-1 focus:ring-primary/20">
-                              <SelectValue placeholder="Ano" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-xl border-none shadow-deep p-2">
-                              {years.map(y => (
-                                <SelectItem key={y.value} value={y.value} className="rounded-lg font-normal text-xs p-2">{y.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2 pt-1">
-                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Quando lançar todo mês</Label>
-                          <div className="flex bg-white dark:bg-[#100E3D] rounded-xl p-1 shadow-sm">
-                            <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}>
-                              Dia fixo
-                            </button>
-                            <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}>
-                              Dia útil
-                            </button>
-                          </div>
-                          {recurrenceDateMode === 'businessDay' && (
-                            <div className="flex items-center gap-2 pt-1">
-                              <Input
-                                type="number"
-                                min="1"
-                                max="23"
-                                className="h-10 w-16 rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm text-center shadow-sm px-2"
-                                value={recurrenceBusinessDay}
-                                onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
-                              />
-                              <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
-                            </div>
-                          )}
-                        </div>
+                    <div className="space-y-2 pt-1">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Quando lançar todo mês</Label>
+                      <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-xl p-1">
+                        <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
+                          Dia fixo
+                        </button>
+                        <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
+                          Dia útil
+                        </button>
                       </div>
-                    )}
-
-                    {isInstallment && (
-                      <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-[#2A2566] transition-all animate-in fade-in slide-in-from-top-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-primary block">Quantidade de Parcelas</Label>
-                        <Input
-                          type="number" 
-                          min="2" 
-                          max="84"
-                          className="h-10 border-none bg-white dark:bg-[#100E3D] rounded-xl font-normal text-base px-4 shadow-sm"
-                          value={installmentCount ?? 2}
-                          onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value)))}
-                        />
-                      </div>
-                    )}
+                      {recurrenceDateMode === 'businessDay' && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <Input
+                            type="number"
+                            min="1"
+                            max="23"
+                            className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2"
+                            value={recurrenceBusinessDay}
+                            onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
+                          />
+                          <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-                </div>
                 )}
+
+                {isInstallment && (
+                  <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-[#201C56]">
+                    <Label className="text-[10px] font-medium tracking-wider text-primary block">Quantidade de Parcelas</Label>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      min="2"
+                      max="84"
+                      className="h-10 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-base px-4"
+                      value={installmentCount ?? 2}
+                      onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value)))}
+                    />
+                  </div>
+                )}
+              </div>
 
                 {newTransaction.type === 'card_purchase' && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && (
                   <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-4 h-12 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 relative">
@@ -3358,7 +3321,7 @@ export default function App() {
                 )}
 
                 {newTransaction.type !== 'card_purchase' && (
-                  <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#16133F] px-4 h-12 rounded-2xl border border-slate-100 dark:border-[#201C56]">
+                  <div className="flex items-center gap-3 bg-card px-4 h-12 rounded-2xl border border-slate-200/70 dark:border-white/10">
                     <Label htmlFor="status-m" className="text-xs font-medium text-slate-500 dark:text-[#A8A4CC] cursor-pointer flex-1">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
@@ -3408,7 +3371,7 @@ export default function App() {
                     Salvar lançamento
                   </Button>
                 </div>
-              </div>
+          </div>
           </DialogContent>
         </Dialog>
 
@@ -3576,7 +3539,7 @@ export default function App() {
                 </button>
               </div>
 
-              <div className="p-6 bg-slate-50 dark:bg-[#16133F] rounded-[1.75rem] space-y-2 text-center">
+              <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-2 text-center">
                 <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Valor</Label>
                 <div className="flex items-center justify-center gap-2">
                   <span className="text-3xl font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
@@ -3591,116 +3554,101 @@ export default function App() {
               </div>
 
               <div className="space-y-6">
-                <div className="space-y-3">
-                  <div className="p-6 bg-slate-50 dark:bg-[#16133F] rounded-[1.75rem] space-y-5">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Descrição</Label>
-                      <Input
-                        placeholder="Ex: Aluguel"
-                        className="h-14 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-base px-6 shadow-sm"
-                        value={newTransaction.description || ''}
-                        onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
-                        <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
-                          <SelectTrigger className="h-14 border-none bg-white dark:bg-[#100E3D] rounded-2xl font-normal text-base px-6 shadow-sm">
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-xl border-none shadow-deep p-2">
-                            {categories.filter(c => c.id !== 'all').map(cat => (
-                              <SelectItem key={cat.id} value={cat.name} className="rounded-xl font-normal p-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                                  <span>{cat.name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
-                        <DateField
-                          className="h-14 rounded-2xl bg-white dark:bg-[#100E3D] text-sm px-6 shadow-sm"
-                          value={newTransaction.date || ''}
-                          onChange={(v) => {
-                            setNewTransaction({...newTransaction, date: v});
-                            setLinkedIncomeDate(v);
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">É no cartão de crédito?</Label>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
-                            className={cn(
-                              "h-11 px-4 rounded-full text-sm font-medium border-2 transition-all",
-                              !newTransaction.cardId ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC]"
-                            )}
-                          >
-                            Não
-                          </button>
-                          {cards.map(card => (
-                            <button
-                              key={card.id}
-                              type="button"
-                              onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
-                              className={cn(
-                                "h-11 px-4 rounded-full text-sm font-medium border-2 transition-all flex items-center gap-2",
-                                newTransaction.cardId === card.id ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm" : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC]"
-                              )}
-                            >
-                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
-                              {card.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-5">
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Descrição</Label>
+                    <Input
+                      placeholder="Ex: Aluguel"
+                      className="h-14 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-base px-6"
+                      value={newTransaction.description || ''}
+                      onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
+                    />
                   </div>
-                </div>
 
-                <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowMoreOptions(v => !v)}
-                    className="w-full flex items-center justify-between px-1 py-1"
-                  >
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] cursor-pointer">
-                      Mais opções {(personSplits.length > 0 || isRecurrent || isInstallment) && !showMoreOptions && '(em uso)'}
-                    </Label>
-                    <ChevronDown size={14} strokeWidth={2.5} className={cn("text-slate-400 dark:text-[#8D89AC] transition-transform", (showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && "rotate-180")} />
-                  </button>
-                </div>
-
-                {(showMoreOptions || personSplits.length > 0 || isRecurrent || isInstallment) && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-top-1">
-                  <div className="p-6 bg-slate-50 dark:bg-[#16133F] rounded-[1.75rem] space-y-4">
-                    <div className="flex items-center justify-between px-1">
-                      <Label htmlFor="assign-someone-d" className="text-xs font-medium text-slate-500 dark:text-[#A8A4CC] cursor-pointer tracking-wide">Dividir com pessoas</Label>
-                      <ToggleSwitch
-                        checked={showPersonSelector}
-                        onChange={(checked) => {
-                          setShowPersonSelector(checked);
-                          if (!checked) {
-                            setPersonSplits([]);
-                            setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                          }
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
+                      <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
+                        <SelectTrigger className="h-14 border-none bg-slate-50 dark:bg-[#16133F] rounded-2xl font-normal text-base px-6">
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none shadow-deep p-2">
+                          {categories.filter(c => c.id !== 'all').map(cat => (
+                            <SelectItem key={cat.id} value={cat.name} className="rounded-xl font-normal p-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                                <span>{cat.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
+                      <DateField
+                        className="h-14 rounded-2xl bg-slate-50 dark:bg-[#16133F] text-sm px-6"
+                        value={newTransaction.date || ''}
+                        onChange={(v) => {
+                          setNewTransaction({...newTransaction, date: v});
+                          setLinkedIncomeDate(v);
                         }}
                       />
                     </div>
+                  </div>
 
-                    {showPersonSelector && (
-                      <div className="flex flex-wrap gap-2 p-1 animate-in fade-in slide-in-from-top-2">
+                  {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">É no cartão de crédito?</Label>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
+                          className={cn(
+                            "h-11 px-4 rounded-full text-sm font-medium border-2 transition-all",
+                            !newTransaction.cardId ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
+                          )}
+                        >
+                          Não
+                        </button>
+                        {cards.map(card => (
+                          <button
+                            key={card.id}
+                            type="button"
+                            onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
+                            className={cn(
+                              "h-11 px-4 rounded-full text-sm font-medium border-2 transition-all flex items-center gap-2",
+                              newTransaction.cardId === card.id ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
+                            )}
+                          >
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
+                            {card.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Dividir com pessoas — sempre visível */}
+                <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="assign-someone-d" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Dividir com pessoas</Label>
+                    <ToggleSwitch
+                      checked={showPersonSelector}
+                      onChange={(checked) => {
+                        setShowPersonSelector(checked);
+                        if (!checked) {
+                          setPersonSplits([]);
+                          setNewTransaction({...newTransaction, payerPayee: 'geral'});
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {showPersonSelector && (
+                    <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
+                      <div className="flex flex-wrap gap-2">
                         {people.filter(p => p.visible !== false).map(p => {
                           const isSelected = personSplits.some(s => s.personId === p.id);
                           return (
@@ -3736,8 +3684,8 @@ export default function App() {
                               className={cn(
                                 "h-12 px-4 rounded-2xl font-normal text-sm transition-all flex items-center gap-3 border-2 outline-none",
                                 isSelected
-                                  ? "bg-white dark:bg-[#100E3D] border-primary text-primary shadow-sm"
-                                  : "bg-white dark:bg-[#100E3D] border-transparent text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]"
+                                  ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
+                                  : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]"
                               )}
                             >
                               <img src={p.image} alt="" className="w-6 h-6 rounded-full object-cover shadow-sm" />
@@ -3746,14 +3694,13 @@ export default function App() {
                           );
                         })}
                       </div>
-                    )}
-                    {showPersonSelector && (
-                      <div className="flex items-center gap-2 px-1 pt-1">
+
+                      <div className="flex items-center gap-2">
                         <div className="relative flex-1">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] font-medium text-sm pointer-events-none">@</span>
                           <Input
                             placeholder="usuário ou nome novo"
-                            className="h-11 rounded-xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm pl-9 pr-4"
+                            className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-9 pr-4"
                             value={quickAssignQuery}
                             onChange={(e) => setQuickAssignQuery(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleQuickAssignPerson()}
@@ -3768,61 +3715,118 @@ export default function App() {
                           Adicionar
                         </Button>
                       </div>
-                    )}
-                  </div>
 
-                  {personSplits.length > 0 && (
-                    <div className="space-y-4 pt-2">
-                      <div className="flex items-center justify-between px-1">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Configurar divisões</Label>
-                        <div className="flex bg-slate-100 dark:bg-[#1C1852] p-1 rounded-xl border border-slate-200 dark:border-[#2A2566] shadow-sm overflow-hidden min-w-[180px]">
-                          {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
-                            <button
-                              key={type}
-                              type="button"
-                              onClick={() => {
-                                setGlobalSplitType(type);
-                                let newSplits = personSplits.map(s => ({
-                                  ...s,
-                                  type: type,
-                                  value: type === 'parts' ? '1' : '0,00'
-                                }));
+                      {personSplits.length > 0 && (
+                        <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Configurar divisões</Label>
+                            <div className="flex bg-slate-50 dark:bg-[#16133F] p-1 rounded-xl overflow-hidden min-w-[180px]">
+                              {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
+                                <button
+                                  key={type}
+                                  type="button"
+                                  onClick={() => {
+                                    setGlobalSplitType(type);
+                                    let newSplits = personSplits.map(s => ({
+                                      ...s,
+                                      type: type,
+                                      value: type === 'parts' ? '1' : '0,00'
+                                    }));
 
-                                if (type === 'percentage' && newSplits.length > 0) {
-                                  const perPerson = Math.floor(100 / newSplits.length);
-                                  const remainder = 100 % newSplits.length;
-                                  newSplits = newSplits.map((s, idx) => ({
-                                    ...s,
-                                    value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                  }));
-                                }
-                                setPersonSplits(newSplits);
-                              }}
-                              className={cn(
-                                "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
-                                globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
-                              )}
-                            >
-                              {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {personSplits.length === 1 ? (
-                        <div className="grid gap-4">
-                          {personSplits.map((split, index) => {
-                            const person = people.find(p => p.id === split.personId);
-                            return (
-                              <div key={index} className="bg-slate-50/50 dark:bg-[#16133F]/50 p-5 rounded-[2rem] border border-slate-100 dark:border-[#201C56] space-y-4 group hover:border-primary/20 transition-all">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center overflow-hidden border border-slate-50 dark:border-[#1C1852]">
-                                      <img src={person?.image} alt="" className="w-full h-full object-cover" />
+                                    if (type === 'percentage' && newSplits.length > 0) {
+                                      const perPerson = Math.floor(100 / newSplits.length);
+                                      const remainder = 100 % newSplits.length;
+                                      newSplits = newSplits.map((s, idx) => ({
+                                        ...s,
+                                        value: (idx === 0 ? perPerson + remainder : perPerson).toString()
+                                      }));
+                                    }
+                                    setPersonSplits(newSplits);
+                                  }}
+                                  className={cn(
+                                    "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
+                                    globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+                                  )}
+                                >
+                                  {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {personSplits.length === 1 ? (
+                            <div className="grid gap-4">
+                              {personSplits.map((split, index) => {
+                                const person = people.find(p => p.id === split.personId);
+                                return (
+                                  <div key={index} className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
+                                    <div className="flex items-center gap-4">
+                                      <img src={person?.image} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{person?.name}</p>
+                                        <p className="text-xs font-medium text-primary">
+                                          {(() => {
+                                            const amount = parseCurrency(amountInput);
+                                            const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                                            return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                          })()}
+                                        </p>
+                                      </div>
+                                      <div className="relative w-36 shrink-0">
+                                        <Input
+                                          className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm px-6 text-right shadow-sm focus:ring-2 focus:ring-primary/10"
+                                          inputMode="decimal"
+                                          value={split.value}
+                                          onChange={(e) => {
+                                            setPersonSplits(prev => prev.map((s, i) => {
+                                              if (i !== index) return s;
+                                              if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
+                                              if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
+                                              return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
+                                            }));
+                                          }}
+                                        />
+                                        {split.type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
+                                        {split.type === 'value' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
+                                      </div>
                                     </div>
-                                    <div>
-                                      <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{person?.name}</p>
-                                      <p className="text-xs font-medium text-primary">
+
+                                    <div className="flex bg-white dark:bg-[#100E3D] p-1 rounded-xl">
+                                      <button
+                                        type="button"
+                                        onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                                        className={cn(
+                                          "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
+                                          newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                        )}
+                                      >
+                                        Ela me deve
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                                        className={cn(
+                                          "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
+                                          newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                        )}
+                                      >
+                                        Eu pago pra ela
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
+                              {personSplits.map((split, index) => {
+                                const person = people.find(p => p.id === split.personId);
+                                return (
+                                  <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                                    <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                      <p className="text-[10px] font-normal text-primary">
                                         {(() => {
                                           const amount = parseCurrency(amountInput);
                                           const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
@@ -3830,80 +3834,7 @@ export default function App() {
                                         })()}
                                       </p>
                                     </div>
-                                  </div>
-                                </div>
-                                
-                                <div className="flex items-center justify-between gap-4">
-                                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] ml-1">
-                                    {split.type === 'parts' ? 'Quantas partes desse valor?' : split.type === 'percentage' ? 'Qual percentual do total?' : 'Qual o valor exato?'}
-                                  </p>
-                                  <div className="relative w-40">
-                                    <Input
-                                      className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm px-6 text-right shadow-sm focus:ring-2 focus:ring-primary/10"
-                                      inputMode="decimal"
-                                      value={split.value}
-                                      onChange={(e) => {
-                                        setPersonSplits(prev => prev.map((s, i) => {
-                                          if (i !== index) return s;
-                                          if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                          if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                          return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                        }));
-                                      }}
-                                    />
-                                    {split.type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                    {split.type === 'value' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
-                                  </div>
-                                </div>
-
-                                <div className="flex bg-white dark:bg-[#100E3D] p-1 rounded-2xl shadow-sm">
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
-                                    className={cn(
-                                      "flex-1 py-2.5 rounded-xl text-xs font-medium transition-all",
-                                      newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                    )}
-                                  >
-                                    Ela me deve
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
-                                    className={cn(
-                                      "flex-1 py-2.5 rounded-xl text-xs font-medium transition-all",
-                                      newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                    )}
-                                  >
-                                    Eu pago pra ela
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="bg-slate-50/50 dark:bg-[#16133F]/50 p-6 rounded-[2rem] border border-slate-100 dark:border-[#201C56] space-y-4">
-                          <div className="space-y-4">
-                            {personSplits.map((split, index) => {
-                              const person = people.find(p => p.id === split.personId);
-                              return (
-                                <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-100 dark:border-[#201C56] last:border-0 last:pb-0">
-                                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white dark:border-[#100E3D] shadow-sm shrink-0">
-                                    <img src={person?.image} alt="" className="w-full h-full object-cover" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                    <p className="text-[10px] font-normal text-primary">
-                                      {(() => {
-                                        const amount = parseCurrency(amountInput);
-                                        const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                        return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                      })()}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <div className="relative w-28">
+                                    <div className="relative w-28 shrink-0">
                                       <input
                                         className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
                                         inputMode="decimal"
@@ -3920,137 +3851,132 @@ export default function App() {
                                       {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
+                </div>
 
-                  <div className="space-y-3">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Repetição</Label>
-                  <div className="p-6 bg-slate-50 dark:bg-[#16133F] rounded-[1.5rem] space-y-4">
-                    <div className="flex bg-white dark:bg-[#100E3D] rounded-2xl p-1 shadow-sm">
-                      <button
-                        type="button"
-                        onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
-                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", !isRecurrent && !isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}
-                      >
-                        Única vez
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setIsRecurrent(true); setIsInstallment(false); }}
-                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isRecurrent ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}
-                      >
-                        Recorrente
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setIsInstallment(true); setIsRecurrent(false); }}
-                        className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isInstallment ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}
-                      >
-                        Parcelado
-                      </button>
-                    </div>
-
-                    {isRecurrent && (
-                      <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-[#2A2566] transition-all animate-in fade-in slide-in-from-top-2">
-                        <div className="flex items-center gap-3 mb-1">
-                          <div className="p-2 bg-white dark:bg-[#100E3D] rounded-xl shadow-sm">
-                            <CalendarIcon size={16} className="text-primary" />
-                          </div>
-                          <div>
-                            <Label className="text-[10px] font-medium tracking-wider text-primary block">Repetir até</Label>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1.5">
-                            <Label className="text-[9px] font-normal text-primary/40 ml-1">Mês</Label>
-                            <Select 
-                              value={newTransaction.recurrenceEndDate?.split('-')[1] || ''} 
-                              onValueChange={(m) => {
-                                const year = newTransaction.recurrenceEndDate?.split('-')[0] || years[0].value;
-                                setNewTransaction({...newTransaction, recurrenceEndDate: `${year}-${m}`});
-                              }}
-                            >
-                              <SelectTrigger className="h-12 border-none bg-white dark:bg-[#100E3D] rounded-2xl font-normal text-sm px-6 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all">
-                                <SelectValue placeholder="Mês" />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-2xl border-none shadow-deep">
-                                {months.map(m => (
-                                  <SelectItem key={m.value} value={m.value} className="rounded-xl font-normal text-sm">{m.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-[9px] font-normal text-primary/40 ml-1">Ano</Label>
-                            <Select 
-                              value={newTransaction.recurrenceEndDate?.split('-')[0] || ''} 
-                              onValueChange={(y) => {
-                                const month = newTransaction.recurrenceEndDate?.split('-')[1] || months[0].value;
-                                setNewTransaction({...newTransaction, recurrenceEndDate: `${y}-${month}`});
-                              }}
-                            >
-                              <SelectTrigger className="h-12 border-none bg-white dark:bg-[#100E3D] rounded-2xl font-normal text-sm px-6 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all">
-                                <SelectValue placeholder="Ano" />
-                              </SelectTrigger>
-                              <SelectContent className="rounded-2xl border-none shadow-deep">
-                                {years.map(y => (
-                                  <SelectItem key={y.value} value={y.value} className="rounded-xl font-normal text-sm">{y.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 pt-2">
-                          <Label className="text-[9px] font-normal text-primary/40 ml-1">Quando lançar todo mês</Label>
-                          <div className="flex bg-white dark:bg-[#100E3D] rounded-2xl p-1 shadow-sm">
-                            <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}>
-                              Dia fixo
-                            </button>
-                            <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]")}>
-                              Dia útil
-                            </button>
-                          </div>
-                          {recurrenceDateMode === 'businessDay' && (
-                            <div className="flex items-center gap-3 pt-1">
-                              <Input
-                                type="number"
-                                min="1"
-                                max="23"
-                                className="h-11 w-20 rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm text-center shadow-sm px-2"
-                                value={recurrenceBusinessDay}
-                                onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
-                              />
-                              <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {isInstallment && (
-                      <div className="space-y-2 pt-4 border-t border-slate-200 dark:border-[#2A2566] transition-all animate-in fade-in slide-in-from-top-2">
-                        <Label className="text-[10px] font-medium tracking-wider text-primary ml-1">Quantidade de Parcelas</Label>
-                        <Input
-                          type="number" 
-                          min="2" 
-                          max="84"
-                          className="h-12 border-none bg-white dark:bg-[#100E3D] rounded-xl font-normal text-base px-6 shadow-sm"
-                          value={installmentCount ?? 2}
-                          onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value)))}
-                        />
-                      </div>
-                    )}
+                {/* Repetição — sempre visível */}
+                <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
+                  <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+                  <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-2xl p-1">
+                    <button
+                      type="button"
+                      onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
+                      className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", !isRecurrent && !isInstallment ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                    >
+                      Única vez
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setIsRecurrent(true); setIsInstallment(false); }}
+                      className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isRecurrent ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                    >
+                      Recorrente
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setIsInstallment(true); setIsRecurrent(false); }}
+                      className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", isInstallment ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                    >
+                      Parcelado
+                    </button>
                   </div>
+
+                  {isRecurrent && (
+                    <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-[#201C56]">
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon size={14} className="text-primary" />
+                        <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">Mês</Label>
+                          <Select
+                            value={newTransaction.recurrenceEndDate?.split('-')[1] || ''}
+                            onValueChange={(m) => {
+                              const year = newTransaction.recurrenceEndDate?.split('-')[0] || years[0].value;
+                              setNewTransaction({...newTransaction, recurrenceEndDate: `${year}-${m}`});
+                            }}
+                          >
+                            <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-6">
+                              <SelectValue placeholder="Mês" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl border-none shadow-deep">
+                              {months.map(m => (
+                                <SelectItem key={m.value} value={m.value} className="rounded-xl font-normal text-sm">{m.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">Ano</Label>
+                          <Select
+                            value={newTransaction.recurrenceEndDate?.split('-')[0] || ''}
+                            onValueChange={(y) => {
+                              const month = newTransaction.recurrenceEndDate?.split('-')[1] || months[0].value;
+                              setNewTransaction({...newTransaction, recurrenceEndDate: `${y}-${month}`});
+                            }}
+                          >
+                            <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-6">
+                              <SelectValue placeholder="Ano" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl border-none shadow-deep">
+                              {years.map(y => (
+                                <SelectItem key={y.value} value={y.value} className="rounded-xl font-normal text-sm">{y.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pt-1">
+                        <Label className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">Quando lançar todo mês</Label>
+                        <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-2xl p-1">
+                          <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
+                            Dia fixo
+                          </button>
+                          <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
+                            Dia útil
+                          </button>
+                        </div>
+                        {recurrenceDateMode === 'businessDay' && (
+                          <div className="flex items-center gap-3 pt-1">
+                            <Input
+                              type="number"
+                              min="1"
+                              max="23"
+                              className="h-11 w-20 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2"
+                              value={recurrenceBusinessDay}
+                              onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
+                            />
+                            <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {isInstallment && (
+                    <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-[#201C56]">
+                      <Label className="text-[10px] font-medium tracking-wider text-primary ml-1">Quantidade de Parcelas</Label>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min="2"
+                        max="84"
+                        className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-base px-6"
+                        value={installmentCount ?? 2}
+                        onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value)))}
+                      />
+                    </div>
+                  )}
                 </div>
-                </div>
-                )}
 
                 <div className="flex items-center gap-4">
                   {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && (
@@ -4581,7 +4507,7 @@ export default function App() {
                       {people.filter(p => p.visible !== false).map(p => (
                         <button
                           key={p.id}
-                          onClick={() => { setIsPessoasSummaryOpen(true); setSelectedPersonId(p.id); }}
+                          onClick={() => { setSelectedPersonId(p.id); setActiveTab('pessoas'); }}
                           className="w-12 h-12 rounded-full overflow-hidden shrink-0 shadow-soft"
                         >
                           <img src={p.image || `https://picsum.photos/seed/${p.name}/100/100`} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -4714,7 +4640,7 @@ export default function App() {
                       {debtors.map(({ person, charges }) => (
                         <button
                           key={person.id}
-                          onClick={() => { setIsPessoasSummaryOpen(true); setSelectedPersonId(person.id); }}
+                          onClick={() => { setSelectedPersonId(person.id); setActiveTab('pessoas'); }}
                           className="w-full flex items-center gap-3 bg-card rounded-full pl-2 pr-4 py-2 shadow-soft transition-transform active:scale-[0.99] text-left"
                         >
                           <img src={person.image || `https://picsum.photos/seed/${person.name}/100/100`} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
