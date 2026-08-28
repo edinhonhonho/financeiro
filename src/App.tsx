@@ -1299,10 +1299,25 @@ export default function App() {
       const remainder = 100 % newSplits.length;
       newSplits = newSplits.map((s, idx) => ({ ...s, value: (idx === 0 ? perPerson + remainder : perPerson).toString() }));
     }
+    // Com exatamente uma pessoa, sempre volta pro estado "valor cheio" — sem
+    // isso, sobras de um split anterior (ex: 50% de uma divisão de 2 pessoas)
+    // ficariam presas nessa pessoa de um jeito que a UI de pessoa única não
+    // deixa claro nem editar.
+    if (newSplits.length === 1) {
+      newSplits = [{ ...newSplits[0], type: 'parts', value: '1' }];
+    }
     setPersonSplits(newSplits);
     if (newSplits.length === 0) setNewTransaction(prev => ({ ...prev, payerPayee: 'geral' }));
     else if (newSplits.length === 1) setNewTransaction(prev => ({ ...prev, payerPayee: newSplits[0].personId }));
     else setNewTransaction(prev => ({ ...prev, payerPayee: 'multi', category: 'Emprestado' }));
+  };
+
+  /** Alterna a pessoa única entre "recebe o valor cheio do lançamento" (padrão) e "recebe um valor parcial digitado". */
+  const setSinglePersonPartial = (partial: boolean) => {
+    setPersonSplits(prev => prev.map(s => partial
+      ? { ...s, type: 'value' as const, value: amountInput }
+      : { ...s, type: 'parts' as const, value: '1' }
+    ));
   };
 
   /** Atribui alguém a um lançamento buscando por @usuário; se a pessoa ainda não existir, cadastra na hora. */
@@ -2994,7 +3009,7 @@ export default function App() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
                     <DateField
@@ -3092,32 +3107,7 @@ export default function App() {
                           <button
                             key={p.id}
                             type="button"
-                            onClick={() => {
-                              let newSplits = [...personSplits];
-                              if (isSelected) {
-                                newSplits = newSplits.filter(s => s.personId !== p.id);
-                              } else {
-                                newSplits.push({ personId: p.id, type: globalSplitType, value: globalSplitType === 'parts' ? '1' : '0,00' });
-                              }
-
-                              if (globalSplitType === 'percentage' && newSplits.length > 0) {
-                                const perPerson = Math.floor(100 / newSplits.length);
-                                const remainder = 100 % newSplits.length;
-                                newSplits = newSplits.map((s, idx) => ({
-                                  ...s,
-                                  value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                }));
-                              }
-
-                              setPersonSplits(newSplits);
-                              if (newSplits.length === 0) {
-                                setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                              } else if (newSplits.length === 1) {
-                                setNewTransaction({...newTransaction, payerPayee: newSplits[0].personId});
-                              } else {
-                                setNewTransaction({...newTransaction, payerPayee: 'multi', category: 'Emprestado'});
-                              }
-                            }}
+                            onClick={() => togglePersonSplit(p.id)}
                             className={cn(
                               "h-10 px-3 rounded-full font-normal text-xs transition-all flex items-center gap-2 border-2",
                               isSelected
@@ -3153,12 +3143,95 @@ export default function App() {
                       </Button>
                     </div>
 
-                    {personSplits.length > 0 && (
+                    {personSplits.length === 1 && (() => {
+                      const split = personSplits[0];
+                      const person = people.find(p => p.id === split.personId);
+                      const isPartial = split.type === 'value';
+                      return (
+                        <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
+                          <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
+                            <div className="flex items-center gap-3">
+                              <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">{isPartial ? 'Valor parcial' : 'Valor cheio do lançamento'}</p>
+                              </div>
+                              {isPartial ? (
+                                <div className="relative w-28 shrink-0">
+                                  <Input
+                                    className="h-10 rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
+                                    inputMode="decimal"
+                                    autoFocus
+                                    value={split.value}
+                                    onChange={(e) => {
+                                      const value = maskCurrency(e.target.value);
+                                      setPersonSplits(prev => prev.map(s => ({ ...s, value })));
+                                    }}
+                                  />
+                                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-200 dark:text-[#5C5686]">R$</span>
+                                </div>
+                              ) : (
+                                <p className="text-sm font-medium text-primary shrink-0">
+                                  {parseCurrency(amountInput).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </p>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setSinglePersonPartial(!isPartial)}
+                              className="text-[10px] font-medium text-primary"
+                            >
+                              {isPartial ? 'Usar o valor cheio do lançamento' : 'Atribuir só uma parte a essa pessoa'}
+                            </button>
+
+                            {newTransaction.type === 'income' ? (
+                              <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 rounded-lg">
+                                <ArrowUpCircle size={12} className="text-emerald-500 shrink-0" />
+                                <p className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="flex bg-white dark:bg-[#100E3D] p-0.5 rounded-lg">
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                                    className={cn(
+                                      "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
+                                      newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                    )}
+                                  >
+                                    Ela me deve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                                    className={cn(
+                                      "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
+                                      newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                    )}
+                                  >
+                                    Eu pago pra ela
+                                  </button>
+                                </div>
+                                <p className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed px-1">
+                                  {newTransaction.owedByPerson === false
+                                    ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
+                                    : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
+                                </p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {personSplits.length > 1 && (
                       <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
                         <div className="flex items-center justify-between">
-                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Configurar divisões</Label>
+                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Como dividir</Label>
                           <div className="flex bg-slate-50 dark:bg-[#16133F] p-0.5 rounded-lg overflow-hidden min-w-[120px]">
-                            {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
+                            {(['parts', 'percentage', 'value'] as const).map(type => (
                               <button
                                 key={type}
                                 type="button"
@@ -3191,121 +3264,42 @@ export default function App() {
                           </div>
                         </div>
 
-                        {personSplits.length === 1 ? (
-                          <div className="grid gap-3">
-                            {personSplits.map((split, index) => {
-                              const person = people.find(p => p.id === split.personId);
-                              return (
-                                <div key={index} className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
-                                  <div className="flex items-center gap-3">
-                                    <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                      <p className="text-[10px] font-normal text-primary">
-                                        {(() => {
-                                          const amount = parseCurrency(amountInput);
-                                          const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                          return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                        })()}
-                                      </p>
-                                    </div>
-                                    <div className="relative w-28 shrink-0">
-                                      <Input
-                                        className="h-10 rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
-                                        inputMode="decimal"
-                                        value={split.value}
-                                        onChange={(e) => {
-                                          setPersonSplits(prev => prev.map((s, i) => {
-                                            if (i !== index) return s;
-                                            if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                            if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                            return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                          }));
-                                        }}
-                                      />
-                                      {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                      {split.type === 'value' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
-                                    </div>
-                                  </div>
-
-                                  {newTransaction.type === 'income' ? (
-                                    <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 rounded-lg">
-                                      <ArrowUpCircle size={12} className="text-emerald-500 shrink-0" />
-                                      <p className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex bg-white dark:bg-[#100E3D] p-0.5 rounded-lg">
-                                        <button
-                                          type="button"
-                                          onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
-                                          className={cn(
-                                            "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
-                                            newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                          )}
-                                        >
-                                          Ela me deve
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
-                                          className={cn(
-                                            "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
-                                            newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                          )}
-                                        >
-                                          Eu pago pra ela
-                                        </button>
-                                      </div>
-                                      <p className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed px-1">
-                                        {newTransaction.owedByPerson === false
-                                          ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
-                                          : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
-                                      </p>
-                                    </>
-                                  )}
+                        <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
+                          {personSplits.map((split, index) => {
+                            const person = people.find(p => p.id === split.personId);
+                            return (
+                              <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                                <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                  <p className="text-[9px] font-normal text-primary">
+                                    {(() => {
+                                      const amount = parseCurrency(amountInput);
+                                      const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                                      return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                    })()}
+                                  </p>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
-                            {personSplits.map((split, index) => {
-                              const person = people.find(p => p.id === split.personId);
-                              return (
-                                <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
-                                  <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                    <p className="text-[9px] font-normal text-primary">
-                                      {(() => {
-                                        const amount = parseCurrency(amountInput);
-                                        const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                        return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                      })()}
-                                    </p>
-                                  </div>
-                                  <div className="relative w-20 shrink-0">
-                                    <input
-                                      className="w-full h-8 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
-                                      inputMode="decimal"
-                                      value={split.value}
-                                      onChange={(e) => {
-                                        setPersonSplits(prev => prev.map((s, i) => {
-                                          if (i !== index) return s;
-                                          if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                          if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                          return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                        }));
-                                      }}
-                                    />
-                                    {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                  </div>
+                                <div className="relative w-20 shrink-0">
+                                  <input
+                                    className="w-full h-8 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
+                                    inputMode="decimal"
+                                    value={split.value}
+                                    onChange={(e) => {
+                                      setPersonSplits(prev => prev.map((s, i) => {
+                                        if (i !== index) return s;
+                                        if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
+                                        if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
+                                        return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
+                                      }));
+                                    }}
+                                  />
+                                  {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
                                 </div>
-                              );
-                            })}
-                          </div>
-                        )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -3690,7 +3684,7 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <div className="space-y-2">
                       <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
                       <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
@@ -3785,32 +3779,7 @@ export default function App() {
                             <button
                               key={p.id}
                               type="button"
-                              onClick={() => {
-                                let newSplits = [...personSplits];
-                                if (isSelected) {
-                                  newSplits = newSplits.filter(s => s.personId !== p.id);
-                                } else {
-                                  newSplits.push({ personId: p.id, type: globalSplitType, value: globalSplitType === 'parts' ? '1' : '0,00' });
-                                }
-
-                                if (globalSplitType === 'percentage' && newSplits.length > 0) {
-                                  const perPerson = Math.floor(100 / newSplits.length);
-                                  const remainder = 100 % newSplits.length;
-                                  newSplits = newSplits.map((s, idx) => ({
-                                    ...s,
-                                    value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                  }));
-                                }
-
-                                setPersonSplits(newSplits);
-                                if (newSplits.length === 0) {
-                                  setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                                } else if (newSplits.length === 1) {
-                                  setNewTransaction({...newTransaction, payerPayee: newSplits[0].personId});
-                                } else {
-                                  setNewTransaction({...newTransaction, payerPayee: 'multi', category: 'Emprestado'});
-                                }
-                              }}
+                              onClick={() => togglePersonSplit(p.id)}
                               className={cn(
                                 "h-12 px-4 rounded-2xl font-normal text-sm transition-all flex items-center gap-3 border-2 outline-none",
                                 isSelected
@@ -3846,12 +3815,95 @@ export default function App() {
                         </Button>
                       </div>
 
-                      {personSplits.length > 0 && (
+                      {personSplits.length === 1 && (() => {
+                        const split = personSplits[0];
+                        const person = people.find(p => p.id === split.personId);
+                        const isPartial = split.type === 'value';
+                        return (
+                          <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
+                            <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
+                              <div className="flex items-center gap-4">
+                                <img src={person?.image} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{person?.name}</p>
+                                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">{isPartial ? 'Valor parcial' : 'Valor cheio do lançamento'}</p>
+                                </div>
+                                {isPartial ? (
+                                  <div className="relative w-36 shrink-0">
+                                    <Input
+                                      className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm px-6 text-right shadow-sm focus:ring-2 focus:ring-primary/10"
+                                      inputMode="decimal"
+                                      autoFocus
+                                      value={split.value}
+                                      onChange={(e) => {
+                                        const value = maskCurrency(e.target.value);
+                                        setPersonSplits(prev => prev.map(s => ({ ...s, value })));
+                                      }}
+                                    />
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-200 dark:text-[#5C5686]">R$</span>
+                                  </div>
+                                ) : (
+                                  <p className="text-base font-medium text-primary shrink-0">
+                                    {parseCurrency(amountInput).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                  </p>
+                                )}
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => setSinglePersonPartial(!isPartial)}
+                                className="text-xs font-medium text-primary"
+                              >
+                                {isPartial ? 'Usar o valor cheio do lançamento' : 'Atribuir só uma parte a essa pessoa'}
+                              </button>
+
+                              {newTransaction.type === 'income' ? (
+                                <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2.5 rounded-xl">
+                                  <ArrowUpCircle size={14} className="text-emerald-500 shrink-0" />
+                                  <p className="text-xs font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex bg-white dark:bg-[#100E3D] p-1 rounded-xl">
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                                      className={cn(
+                                        "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
+                                        newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                      )}
+                                    >
+                                      Ela me deve
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                                      className={cn(
+                                        "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
+                                        newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                      )}
+                                    >
+                                      Eu pago pra ela
+                                    </button>
+                                  </div>
+                                  <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed px-1">
+                                    {newTransaction.owedByPerson === false
+                                      ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
+                                      : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {personSplits.length > 1 && (
                         <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
                           <div className="flex items-center justify-between">
-                            <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Configurar divisões</Label>
+                            <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Como dividir</Label>
                             <div className="flex bg-slate-50 dark:bg-[#16133F] p-1 rounded-xl overflow-hidden min-w-[180px]">
-                              {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
+                              {(['parts', 'percentage', 'value'] as const).map(type => (
                                 <button
                                   key={type}
                                   type="button"
@@ -3884,121 +3936,42 @@ export default function App() {
                             </div>
                           </div>
 
-                          {personSplits.length === 1 ? (
-                            <div className="grid gap-4">
-                              {personSplits.map((split, index) => {
-                                const person = people.find(p => p.id === split.personId);
-                                return (
-                                  <div key={index} className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
-                                    <div className="flex items-center gap-4">
-                                      <img src={person?.image} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{person?.name}</p>
-                                        <p className="text-xs font-medium text-primary">
-                                          {(() => {
-                                            const amount = parseCurrency(amountInput);
-                                            const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                            return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                          })()}
-                                        </p>
-                                      </div>
-                                      <div className="relative w-36 shrink-0">
-                                        <Input
-                                          className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm px-6 text-right shadow-sm focus:ring-2 focus:ring-primary/10"
-                                          inputMode="decimal"
-                                          value={split.value}
-                                          onChange={(e) => {
-                                            setPersonSplits(prev => prev.map((s, i) => {
-                                              if (i !== index) return s;
-                                              if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                              if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                              return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                            }));
-                                          }}
-                                        />
-                                        {split.type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                        {split.type === 'value' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
-                                      </div>
-                                    </div>
-
-                                    {newTransaction.type === 'income' ? (
-                                      <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2.5 rounded-xl">
-                                        <ArrowUpCircle size={14} className="text-emerald-500 shrink-0" />
-                                        <p className="text-xs font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
-                                      </div>
-                                    ) : (
-                                      <>
-                                        <div className="flex bg-white dark:bg-[#100E3D] p-1 rounded-xl">
-                                          <button
-                                            type="button"
-                                            onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
-                                            className={cn(
-                                              "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
-                                              newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                            )}
-                                          >
-                                            Ela me deve
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
-                                            className={cn(
-                                              "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
-                                              newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                            )}
-                                          >
-                                            Eu pago pra ela
-                                          </button>
-                                        </div>
-                                        <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed px-1">
-                                          {newTransaction.owedByPerson === false
-                                            ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
-                                            : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
-                                        </p>
-                                      </>
-                                    )}
+                          <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
+                            {personSplits.map((split, index) => {
+                              const person = people.find(p => p.id === split.personId);
+                              return (
+                                <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                                  <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                    <p className="text-[10px] font-normal text-primary">
+                                      {(() => {
+                                        const amount = parseCurrency(amountInput);
+                                        const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                                        return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                                      })()}
+                                    </p>
                                   </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
-                              {personSplits.map((split, index) => {
-                                const person = people.find(p => p.id === split.personId);
-                                return (
-                                  <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
-                                    <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                      <p className="text-[10px] font-normal text-primary">
-                                        {(() => {
-                                          const amount = parseCurrency(amountInput);
-                                          const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                          return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                        })()}
-                                      </p>
-                                    </div>
-                                    <div className="relative w-28 shrink-0">
-                                      <input
-                                        className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
-                                        inputMode="decimal"
-                                        value={split.value}
-                                        onChange={(e) => {
-                                          setPersonSplits(prev => prev.map((s, i) => {
-                                            if (i !== index) return s;
-                                            if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                            if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                            return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                          }));
-                                        }}
-                                      />
-                                      {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                    </div>
+                                  <div className="relative w-28 shrink-0">
+                                    <input
+                                      className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
+                                      inputMode="decimal"
+                                      value={split.value}
+                                      onChange={(e) => {
+                                        setPersonSplits(prev => prev.map((s, i) => {
+                                          if (i !== index) return s;
+                                          if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
+                                          if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
+                                          return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
+                                        }));
+                                      }}
+                                    />
+                                    {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
                                   </div>
-                                );
-                              })}
-                            </div>
-                          )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
