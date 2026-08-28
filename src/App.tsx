@@ -845,8 +845,13 @@ export default function App() {
   const getPersonMonthlyCharges = (personId: string, month: Date) => {
     const monthStr = format(month, 'yyyy-MM');
 
+    // Qualquer tipo conta (expense, card_purchase ou income direto marcado
+    // como "ela me deve") — o que importa é estar atribuído a essa pessoa;
+    // status planned/actual já mapeia certinho pra Pendente/Pago nos três casos.
+    // Exceção: o reembolso automático (linkedToCard) já é o espelho de uma
+    // despesa que também está nessa lista — contar os dois duplicaria a dívida.
     const relevant = transactions.filter(t => {
-      if (t.type !== 'expense' && t.type !== 'card_purchase') return false;
+      if (t.linkedToCard) return false;
       const isForPerson = t.payerPayee === personId || (t.assignments && t.assignments.some(a => a.personId === personId));
       if (!isForPerson) return false;
       return format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr;
@@ -3047,10 +3052,10 @@ export default function App() {
 
             {registrarStep === 2 && (
               <div className="space-y-8 pt-4">
-              {/* Dividir com pessoas — sempre visível, sem toggle de "mais opções" */}
+              {/* Associar a pessoas — sempre visível, sem toggle de "mais opções" */}
               <div className="p-5 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="assign-someone-m" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Dividir com pessoas</Label>
+                  <Label htmlFor="assign-someone-m" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Associar a pessoas</Label>
                   <ToggleSwitch
                     checked={showPersonSelector}
                     onChange={(checked) => {
@@ -3721,10 +3726,10 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Dividir com pessoas — sempre visível */}
+                {/* Associar a pessoas — sempre visível */}
                 <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="assign-someone-d" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Dividir com pessoas</Label>
+                    <Label htmlFor="assign-someone-d" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Associar a pessoas</Label>
                     <ToggleSwitch
                       checked={showPersonSelector}
                       onChange={(checked) => {
