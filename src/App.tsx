@@ -1046,10 +1046,14 @@ export default function App() {
   const billChartScrollRef = React.useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = billChartScrollRef.current;
-    if (!el) return;
-    const target = el.scrollWidth - el.clientWidth / 2 - CHART_BAR_WIDTH / 2;
+    if (!el || cardBillHistory.length === 0) return;
+    const selectedMonthKey = format(selectedBillDate, 'yyyy-MM');
+    const index = cardBillHistory.findIndex(p => p.monthKey === selectedMonthKey);
+    const targetIndex = index === -1 ? cardBillHistory.length - 1 : index;
+    const barCenter = targetIndex * CHART_BAR_WIDTH + CHART_BAR_WIDTH / 2;
+    const target = barCenter - el.clientWidth / 2;
     el.scrollLeft = Math.max(0, target);
-  }, [selectedCard, currentDate, cards.length, activeTab]);
+  }, [selectedCard, currentDate, selectedBillDate, cards.length, activeTab]);
 
   const cardBillItems = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
