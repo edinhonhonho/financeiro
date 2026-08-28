@@ -2967,24 +2967,23 @@ export default function App() {
             )}
 
             {registrarStep === 1 && (
-              <div className="space-y-4 pt-2">
-              <div className="p-4 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
-                <div className="space-y-1">
+              <div className="space-y-8 pt-4">
+                <div className="space-y-2">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Descrição</Label>
                   <Input
                     placeholder="Ex: Aluguel"
-                    className="h-12 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm px-4"
+                    className="h-14 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-base px-5"
                     value={newTransaction.description || ''}
                     onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
                     autoFocus
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
                     <DateField
-                      className="h-12 text-xs bg-slate-50 dark:bg-[#16133F]"
+                      className="h-14 rounded-2xl text-sm bg-slate-50 dark:bg-[#16133F]"
                       value={newTransaction.date || ''}
                       onChange={(v) => {
                         setNewTransaction({...newTransaction, date: v});
@@ -2992,10 +2991,10 @@ export default function App() {
                       }}
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
                     <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
-                      <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-4">
+                      <SelectTrigger className="h-14 border-none bg-slate-50 dark:bg-[#16133F] rounded-2xl font-normal text-sm px-5">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -3013,14 +3012,14 @@ export default function App() {
                 </div>
 
                 {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">É no cartão de crédito?</Label>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
                         className={cn(
-                          "h-9 px-3 rounded-full text-xs font-medium border-2 transition-all",
+                          "h-10 px-4 rounded-full text-sm font-medium border-2 transition-all",
                           !newTransaction.cardId ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
                         )}
                       >
@@ -3032,7 +3031,7 @@ export default function App() {
                           type="button"
                           onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
                           className={cn(
-                            "h-9 px-3 rounded-full text-xs font-medium border-2 transition-all flex items-center gap-2",
+                            "h-10 px-4 rounded-full text-sm font-medium border-2 transition-all flex items-center gap-2",
                             newTransaction.cardId === card.id ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
                           )}
                         >
@@ -3044,15 +3043,14 @@ export default function App() {
                   </div>
                 )}
               </div>
-              </div>
             )}
 
             {registrarStep === 2 && (
-              <div className="space-y-4 pt-2">
+              <div className="space-y-8 pt-4">
               {/* Dividir com pessoas — sempre visível, sem toggle de "mais opções" */}
-              <div className="p-4 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-3">
+              <div className="p-5 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="assign-someone-m" className="text-xs font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Dividir com pessoas</Label>
+                  <Label htmlFor="assign-someone-m" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Dividir com pessoas</Label>
                   <ToggleSwitch
                     checked={showPersonSelector}
                     onChange={(checked) => {
@@ -3281,8 +3279,8 @@ export default function App() {
               </div>
 
               {/* Repetição — sempre visível */}
-              <div className="p-4 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
-                <Label className="text-xs font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+              <div className="p-5 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
+                <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
                 <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-xl p-1">
                   <button
                     type="button"
@@ -3392,8 +3390,8 @@ export default function App() {
               </div>
 
                 {newTransaction.type === 'card_purchase' && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
-                  <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-4 h-12 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 relative">
-                    <Label htmlFor="linked-income-m" className="text-[10px] font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
+                  <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-5 h-14 rounded-2xl">
+                    <Label htmlFor="linked-income-m" className="text-sm font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
                       Associar receita
                       <Popover>
                         <PopoverTrigger render={
@@ -3413,8 +3411,8 @@ export default function App() {
                 )}
 
                 {newTransaction.type !== 'card_purchase' && (
-                  <div className="flex items-center gap-3 bg-card px-4 h-12 rounded-2xl border border-slate-200/70 dark:border-white/10">
-                    <Label htmlFor="status-m" className="text-xs font-medium text-slate-500 dark:text-[#A8A4CC] cursor-pointer flex-1">
+                  <div className="flex items-center justify-between px-1 py-1">
+                    <Label htmlFor="status-m" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
                     <ToggleSwitch
@@ -3430,7 +3428,7 @@ export default function App() {
                   return (
                     <div
                       onClick={() => handleEditClick(linked)}
-                      className="flex items-center justify-between p-3 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
+                      className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
