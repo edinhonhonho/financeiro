@@ -1623,7 +1623,9 @@ export default function App() {
       setRecurrenceBusinessDay(5);
       setPersonSplits([]);
     } catch (err) {
-      handleSupabaseError(err, OperationType.WRITE, 'transactions');
+      console.error('Erro ao salvar lançamento:', err);
+      const message = err instanceof Error ? err.message : String(err);
+      showAlert('Não foi possível salvar', message);
     } finally {
       setIsSubmitting(false);
     }
