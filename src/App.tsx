@@ -1151,7 +1151,7 @@ export default function App() {
   // de evolução mensal + lista do mês selecionado.
   const [showPersonForm, setShowPersonForm] = useState(false);
   const peopleCarouselRef = React.useRef<HTMLDivElement>(null);
-  const PEOPLE_CAROUSEL_ITEM_WIDTH = 296; // 280px card + 16px gap
+  const PEOPLE_CAROUSEL_ITEM_WIDTH = 226; // 210px card + 16px gap
 
   const handlePeopleCarouselScroll = () => {
     const el = peopleCarouselRef.current;
@@ -1282,11 +1282,17 @@ export default function App() {
       return { personId: s.personId, cents: Math.round(amount * 100) };
     });
 
-    // Adjust the last split so the sum matches the total exactly (avoids rounding drift)
-    const totalCents = Math.round(total * 100);
-    const sumCents = rounded.reduce((acc, r) => acc + r.cents, 0);
-    if (rounded.length > 0 && sumCents !== totalCents) {
-      rounded[rounded.length - 1].cents += totalCents - sumCents;
+    // Adjust the last split so the sum matches the total exactly (avoids rounding
+    // drift) — only when there's more than one split. With a single split the
+    // person may deliberately owe less than the full amount (ex: cobrar só 50%,
+    // o resto é por conta de quem lançou); forcing it up to `total` here was the
+    // bug that made a partial single-person split always charge the full value.
+    if (rounded.length > 1) {
+      const totalCents = Math.round(total * 100);
+      const sumCents = rounded.reduce((acc, r) => acc + r.cents, 0);
+      if (sumCents !== totalCents) {
+        rounded[rounded.length - 1].cents += totalCents - sumCents;
+      }
     }
 
     return rounded.map(r => ({ personId: r.personId, amount: r.cents / 100 }));
@@ -5611,28 +5617,18 @@ export default function App() {
                           ? `@${personLinkSelected.username}`
                           : person.linkedUserId ? '@vinculado' : (person.email || person.phone || '');
                         return (
-                          <div key={person.id} className="w-[280px] shrink-0 snap-center">
+                          <div key={person.id} className="w-[210px] shrink-0 snap-center">
                             <div
                               onClick={() => setSelectedPersonId(person.id)}
                               role="button"
                               tabIndex={0}
-                              className="rounded-[1.75rem] h-44 p-5 relative overflow-hidden flex flex-col justify-between shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
+                              className="rounded-[1.5rem] h-[230px] p-4 relative overflow-hidden flex flex-col shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
                               style={{ backgroundColor: getPersonColor(person.id) }}
                             >
-                              <svg className="absolute -right-3 top-10 w-40 h-16 opacity-20" viewBox="0 0 160 60" fill="none">
+                              <svg className="absolute -right-4 -bottom-6 w-32 h-16 opacity-20" viewBox="0 0 160 60" fill="none">
                                 <path d="M0 30 Q 20 10 40 30 T 80 30 T 120 30 T 160 30" stroke="white" strokeWidth="6" strokeLinecap="round" />
                               </svg>
                               <div className="flex items-center justify-between relative z-10 gap-2">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-medium text-xs shrink-0 overflow-hidden">
-                                    {person.image ? (
-                                      <img src={person.image} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                      person.name.charAt(0).toUpperCase()
-                                    )}
-                                  </div>
-                                  <span className="text-white font-medium text-sm drop-shadow-sm truncate">{person.name}</span>
-                                </div>
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); handleEditPersonClick(person); setShowPersonForm(true); }}
@@ -5641,9 +5637,29 @@ export default function App() {
                                 >
                                   <Pencil size={14} strokeWidth={2.5} />
                                 </button>
+                                {monthCharges.pendingTotal > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); shareChargeOnWhatsApp(person, monthCharges); }}
+                                    className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0"
+                                    aria-label="Enviar cobrança"
+                                  >
+                                    <MessageCircle size={14} strokeWidth={2.5} />
+                                  </button>
+                                )}
                               </div>
-                              <div className="relative z-10 space-y-2">
-                                <p className="text-white/90 text-sm truncate h-[1.75rem] flex items-center">{identityLine}</p>
+                              <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 min-h-0">
+                                <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-white font-medium text-2xl shrink-0 overflow-hidden">
+                                  {person.image ? (
+                                    <img src={person.image} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    person.name.charAt(0).toUpperCase()
+                                  )}
+                                </div>
+                                <span className="text-white font-medium text-sm drop-shadow-sm truncate max-w-full">{person.name}</span>
+                                {identityLine && <p className="text-white/80 text-[11px] truncate max-w-full">{identityLine}</p>}
+                              </div>
+                              <div className="relative z-10 space-y-1.5">
                                 <div className="flex items-center justify-between">
                                   <span className="text-white/70 text-[10px] tracking-wider">Pendente</span>
                                   <span className="text-white text-xs font-medium">R$ {monthCharges.pendingTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
@@ -5657,11 +5673,11 @@ export default function App() {
                           </div>
                         );
                       })}
-                      <div className="w-[280px] shrink-0 snap-center">
+                      <div className="w-[210px] shrink-0 snap-center">
                         <button
                           type="button"
                           onClick={() => { handleCancelEditPerson(); setShowPersonForm(true); }}
-                          className="w-full h-44 rounded-[1.75rem] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#8D89AC] hover:border-primary hover:text-primary transition-all"
+                          className="w-full h-[230px] rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#8D89AC] hover:border-primary hover:text-primary transition-all"
                         >
                           <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#1C1852] flex items-center justify-center">
                             <Plus size={20} strokeWidth={2.5} />
