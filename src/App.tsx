@@ -1040,7 +1040,10 @@ export default function App() {
       const bill = computeCardBill(activeCard, monthDate);
       return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: bill.amount };
     });
-    return points;
+    // Só mostra a partir do primeiro mês com fatura (evita meses vazios no
+    // início do intervalo); o mês atual sempre fica, mesmo com fatura zerada.
+    const firstWithBill = points.findIndex(p => p.amount > 0);
+    return firstWithBill === -1 ? points.slice(-1) : points.slice(firstWithBill);
   }, [cards, selectedCard, currentDate, transactions]);
 
   const billChartScrollRef = React.useRef<HTMLDivElement>(null);
