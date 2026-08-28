@@ -47,7 +47,9 @@ import {
   Camera,
   Clock,
   Check,
-  Search
+  Search,
+  X,
+  Delete
 } from 'lucide-react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
 import {
@@ -578,6 +580,13 @@ export default function App() {
   const [amountInput, setAmountInput] = useState('0,00');
   const [showPersonSelector, setShowPersonSelector] = useState(false);
   const [globalSplitType, setGlobalSplitType] = useState<'parts' | 'percentage' | 'value'>('parts');
+  // Etapa do "Novo lançamento" em tela cheia (mobile): 0 Tipo+Valor, 1
+  // Descrição/Data/Categoria, 2 Dividir/Repetição/Status/Salvar.
+  const [registrarStep, setRegistrarStep] = useState<0 | 1 | 2>(0);
+  // Teclado numérico próprio do valor — reaproveita o mesmo esquema de
+  // máscara em centavos do maskCurrency, sem depender do teclado do celular.
+  const pressAmountDigit = (d: string) => setAmountInput(maskCurrency(amountInput.replace(/\D/g, '') + d));
+  const backspaceAmountDigit = () => setAmountInput(maskCurrency(amountInput.replace(/\D/g, '').slice(0, -1)));
 
   const handleExportGlobalCSV = () => {
     if (transactions.length === 0) {
@@ -1984,6 +1993,7 @@ export default function App() {
   };
 
   const handleEditClick = (t: Transaction) => {
+    setRegistrarStep(0);
     setEditingTransaction(t);
     setNewTransaction(t);
     setAmountInput(t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -2044,6 +2054,7 @@ export default function App() {
   };
 
   const handleOpenRegistrar = (typeOverride?: TransactionType) => {
+    setRegistrarStep(0);
     setEditingTransaction(null);
     setAssignmentMode('single');
     setPersonSplits([]);
@@ -2855,53 +2866,108 @@ export default function App() {
         </DialogContent>
       </Dialog>
 
-      {/* Novo lançamento (mobile) — controlled dialog, triggered from the per-tab "+" buttons */}
+      {/* Novo lançamento (mobile) — tela cheia, em 3 etapas */}
       <div className="md:hidden">
-        <Dialog open={isRegistrarOpen && window.innerWidth < 768} onOpenChange={setIsRegistrarOpen}>
-          <DialogContent className="max-w-none sm:max-w-lg h-[85vh] flex flex-col p-0 border-none shadow-deep rounded-t-[2.5rem] rounded-b-none overflow-hidden bg-white dark:bg-[#100E3D]">
-            <div className="px-6 pt-6 pb-2 shrink-0">
-              <DialogHeader>
-                <DialogTitle className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
-              </DialogHeader>
-            </div>
-          <div className="flex-1 overflow-y-auto p-5 pb-10 space-y-5 scrollbar-hide">
-            <div className="flex gap-3">
-                <button
-                  onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null})}
-                  className={cn(
-                    "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
-                    newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
-                  )}
-                >
-                  <ArrowUpCircle size={18} strokeWidth={2.5} />
-                  Receita
-                </button>
-                <button
-                  onClick={() => setNewTransaction({...newTransaction, type: 'expense'})}
-                  className={cn(
-                    "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
-                    (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
-                  )}
-                >
-                  <ArrowDownCircle size={18} strokeWidth={2.5} />
-                  Despesa
-                </button>
-              </div>
+        <Dialog open={isRegistrarOpen && window.innerWidth < 768} onOpenChange={(open) => { setIsRegistrarOpen(open); if (!open) setRegistrarStep(0); }}>
+          <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none flex flex-col p-0 border-none shadow-none overflow-hidden bg-white dark:bg-[#100E3D]">
+            <DialogHeader className="sr-only">
+              <DialogTitle>{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
+              <DialogDescription>Etapa {registrarStep + 1} de 3</DialogDescription>
+            </DialogHeader>
 
-              <div className="p-5 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-1.5 text-center">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Valor</Label>
-                <div className="flex items-center justify-center gap-1">
-                  <span className="text-2xl font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
-                  <input
-                    inputMode="decimal"
-                    className="bg-transparent outline-none text-center font-heading font-medium text-4xl text-slate-800 dark:text-[#EDE9E3] w-auto max-w-[220px] tracking-tight"
-                    style={{ width: `${Math.max(2, amountInput.length)}ch` }}
-                    value={amountInput}
-                    onChange={(e) => setAmountInput(maskCurrency(e.target.value))}
+            <div className="flex items-center justify-between px-6 pt-6 pb-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => registrarStep > 0 ? setRegistrarStep(s => (s - 1) as 0 | 1 | 2) : setIsRegistrarOpen(false)}
+                className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] shrink-0"
+                aria-label={registrarStep > 0 ? 'Etapa anterior' : 'Fechar'}
+              >
+                {registrarStep > 0 ? <ChevronLeft size={20} /> : <X size={20} />}
+              </button>
+              <div className="flex items-center gap-1.5">
+                {([0, 1, 2] as const).map(s => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setRegistrarStep(s)}
+                    aria-label={`Ir para etapa ${s + 1}`}
+                    className={cn("h-1.5 rounded-full transition-all", registrarStep === s ? "w-5 bg-primary" : "w-1.5 bg-slate-200 dark:bg-[#2A2566]")}
                   />
+                ))}
+              </div>
+              {editingTransaction && !editingTransaction.id.startsWith('bill-') ? (
+                <button
+                  type="button"
+                  onClick={() => { setTransactionToDelete(editingTransaction); setIsDeleteDialogOpen(true); }}
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-rose-400 shrink-0"
+                  aria-label="Excluir lançamento"
+                >
+                  <Trash2 size={18} />
+                </button>
+              ) : <div className="w-11 h-11 shrink-0" />}
+            </div>
+
+          <div className="flex-1 overflow-y-auto px-6 pb-6 scrollbar-hide">
+            {registrarStep === 0 && (
+              <div className="h-full flex flex-col">
+                <div className="flex gap-3 mb-8">
+                  <button
+                    onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null})}
+                    className={cn(
+                      "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
+                      newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
+                    )}
+                  >
+                    <ArrowUpCircle size={18} strokeWidth={2.5} />
+                    Receita
+                  </button>
+                  <button
+                    onClick={() => setNewTransaction({...newTransaction, type: 'expense'})}
+                    className={cn(
+                      "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
+                      (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
+                    )}
+                  >
+                    <ArrowDownCircle size={18} strokeWidth={2.5} />
+                    Despesa
+                  </button>
+                </div>
+
+                <div className="flex-1 flex flex-col items-center justify-center gap-10">
+                  <div className="text-center space-y-2">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Valor</Label>
+                    <div className="flex items-center justify-center gap-1">
+                      <span className="text-3xl font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
+                      <p className="font-heading font-medium text-5xl text-slate-800 dark:text-[#EDE9E3] tracking-tight">{amountInput}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0'].map(d => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => pressAmountDigit(d)}
+                        className="h-16 rounded-2xl bg-slate-50 dark:bg-[#16133F] text-slate-700 dark:text-[#EDEAF9] text-xl font-medium active:scale-95 transition-all"
+                      >
+                        {d}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={backspaceAmountDigit}
+                      className="h-16 rounded-2xl bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] flex items-center justify-center active:scale-95 transition-all"
+                      aria-label="Apagar dígito"
+                    >
+                      <Delete size={20} />
+                    </button>
+                  </div>
                 </div>
               </div>
+            )}
 
+            {registrarStep === 1 && (
+              <div className="space-y-4 pt-2">
               <div className="p-4 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Descrição</Label>
@@ -2910,6 +2976,7 @@ export default function App() {
                     className="h-12 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm px-4"
                     value={newTransaction.description || ''}
                     onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
+                    autoFocus
                   />
                 </div>
 
@@ -2977,7 +3044,11 @@ export default function App() {
                   </div>
                 )}
               </div>
+              </div>
+            )}
 
+            {registrarStep === 2 && (
+              <div className="space-y-4 pt-2">
               {/* Dividir com pessoas — sempre visível, sem toggle de "mais opções" */}
               <div className="p-4 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
@@ -3374,24 +3445,25 @@ export default function App() {
                     </div>
                   );
                 })()}
+              </div>
+            )}
+          </div>
 
-                <div className="flex items-center gap-3 pt-2">
-                  {editingTransaction && !editingTransaction.id.startsWith('bill-') && (
-                    <Button
-                      onClick={() => {
-                        setTransactionToDelete(editingTransaction);
-                        setIsDeleteDialogOpen(true);
-                      }}
-                      variant="outline"
-                      className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-950/20 border-none text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40 transition-all flex items-center justify-center shrink-0"
-                    >
-                      <Trash2 size={18} />
-                    </Button>
-                  )}
-                  <Button onClick={() => handleAddTransaction()} className="flex-1 h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all">
-                    Salvar lançamento
-                  </Button>
-                </div>
+          <div className="p-6 pt-2 shrink-0">
+            {registrarStep < 2 ? (
+              <button
+                type="button"
+                onClick={() => setRegistrarStep(s => (s + 1) as 0 | 1 | 2)}
+                disabled={registrarStep === 0 ? parseCurrency(amountInput) === 0 : !newTransaction.description}
+                className="w-full h-14 rounded-full font-medium bg-primary text-white active:scale-95 transition-all disabled:opacity-40"
+              >
+                Próximo
+              </button>
+            ) : (
+              <Button onClick={() => handleAddTransaction()} className="w-full h-14 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all">
+                Salvar lançamento
+              </Button>
+            )}
           </div>
           </DialogContent>
         </Dialog>
