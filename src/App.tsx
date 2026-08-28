@@ -1676,13 +1676,16 @@ export default function App() {
             // upsert_transactions exige todas as colunas NOT NULL mesmo em
             // linhas já existentes, o que quebra as sincronizações parciais
             // (ex: renda vinculada, que só manda amount/description/date).
-            await Promise.all(rowsToUpsert.map(row => {
+            // Sequencial (não Promise.all) — grava uma de cada vez para não
+            // arriscar updates concorrentes na mesma série.
+            for (const row of rowsToUpsert) {
               const { id, ...data } = row;
-              return api.updateTransaction(id as string, data);
-            }));
+              await api.updateTransaction(id as string, data);
+            }
             showAlert('Sucesso', 'Sequência atualizada com sucesso.');
           } catch (err) {
-            handleSupabaseError(err, OperationType.WRITE, 'transactions-series');
+            console.error('Erro ao atualizar sequência:', err);
+            showAlert('Não foi possível atualizar a sequência', extractErrorMessage(err));
           }
         } else {
           await api.updateTransaction(editingTransaction.id, finalBaseData);
@@ -1696,8 +1699,8 @@ export default function App() {
                 return match ? { id: l.id, amount: match.amount, description: finalBaseData.description, date: finalBaseData.date } : null;
               })
               .filter((r): r is { id: string; amount: number; description: string; date: string } => r !== null);
-            if (rows.length > 0) {
-              await Promise.all(rows.map(row => api.updateTransaction(row.id, { amount: row.amount, description: row.description, date: row.date })));
+            for (const row of rows) {
+              await api.updateTransaction(row.id, { amount: row.amount, description: row.description, date: row.date });
             }
           }
         }
