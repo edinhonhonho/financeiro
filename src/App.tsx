@@ -185,6 +185,13 @@ const CARD_COLOR_PRESETS = [
   '#F797C0', '#FF9D91', '#8D89AC', '#4B4570',
 ];
 
+/** Cor determinística por pessoa (não editável — Person não tem campo `color`). */
+function getPersonColor(personId: string): string {
+  let hash = 0;
+  for (let i = 0; i < personId.length; i++) hash = (hash * 31 + personId.charCodeAt(i)) >>> 0;
+  return CARD_COLOR_PRESETS[hash % CARD_COLOR_PRESETS.length];
+}
+
 function DateField({
   value,
   onChange,
@@ -1124,6 +1131,50 @@ export default function App() {
 
     return { items, pending, paid, pendingTotal, paidTotal, total: pendingTotal + paidTotal };
   };
+
+  // Aba Pessoas (mobile) — mesmo padrão da aba Cartões: carrossel + gráfico
+  // de evolução mensal + lista do mês selecionado.
+  const [showPersonForm, setShowPersonForm] = useState(false);
+  const peopleCarouselRef = React.useRef<HTMLDivElement>(null);
+  const PEOPLE_CAROUSEL_ITEM_WIDTH = 296; // 280px card + 16px gap
+
+  const handlePeopleCarouselScroll = () => {
+    const el = peopleCarouselRef.current;
+    if (!el || people.length === 0) return;
+    const index = Math.round(el.scrollLeft / PEOPLE_CAROUSEL_ITEM_WIDTH);
+    const clamped = Math.max(0, Math.min(people.length - 1, index));
+    const person = people[clamped];
+    if (person && person.id !== selectedPersonId) setSelectedPersonId(person.id);
+  };
+
+  const [selectedChargeDate, setSelectedChargeDate] = useState<Date>(new Date());
+  useEffect(() => {
+    if (activeTab === 'pessoas') setSelectedChargeDate(new Date());
+  }, [selectedPersonId, activeTab]);
+
+  const personChargeHistory = useMemo(() => {
+    const activePerson = people.find(p => p.id === selectedPersonId) || people[0];
+    if (!activePerson) return [];
+    const points = Array.from({ length: CHART_MONTHS_HISTORY }).map((_, i) => {
+      const monthDate = subMonths(currentDate, CHART_MONTHS_HISTORY - 1 - i);
+      const charges = getPersonMonthlyCharges(activePerson.id, monthDate);
+      return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: charges.total };
+    });
+    const firstWithCharge = points.findIndex(p => p.amount > 0);
+    return firstWithCharge === -1 ? points.slice(-1) : points.slice(firstWithCharge);
+  }, [people, selectedPersonId, currentDate, transactions]);
+
+  const personChargeScrollRef = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = personChargeScrollRef.current;
+    if (!el || personChargeHistory.length === 0) return;
+    const selectedMonthKey = format(selectedChargeDate, 'yyyy-MM');
+    const index = personChargeHistory.findIndex(p => p.monthKey === selectedMonthKey);
+    const targetIndex = index === -1 ? personChargeHistory.length - 1 : index;
+    const barCenter = targetIndex * CHART_BAR_WIDTH + CHART_BAR_WIDTH / 2;
+    const target = barCenter - el.clientWidth / 2;
+    el.scrollLeft = Math.max(0, target);
+  }, [selectedPersonId, currentDate, selectedChargeDate, people.length, activeTab]);
 
   const togglePersonSplit = (personId: string) => {
     let newSplits = [...personSplits];
@@ -3834,11 +3885,6 @@ export default function App() {
           onClick={() => setActiveTab('despesas')}
           icon={<ArrowUpDown />}
         />
-        <MobileNavItem
-          active={activeTab === 'cartoes'}
-          onClick={() => setActiveTab('cartoes')}
-          icon={<CreditCard />}
-        />
         <button
           onClick={() => handleOpenRegistrar()}
           className="flex items-center justify-center h-12 w-12 rounded-full bg-primary text-white shadow-bubbly shrink-0 active:scale-90 transition-transform"
@@ -3846,6 +3892,16 @@ export default function App() {
         >
           <Plus size={24} strokeWidth={2.5} />
         </button>
+        <MobileNavItem
+          active={activeTab === 'cartoes'}
+          onClick={() => setActiveTab('cartoes')}
+          icon={<CreditCard />}
+        />
+        <MobileNavItem
+          active={activeTab === 'pessoas'}
+          onClick={() => setActiveTab('pessoas')}
+          icon={<Users />}
+        />
 
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
           <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:w-screen sm:max-w-none sm:translate-x-0 sm:rounded-none">
@@ -5372,6 +5428,327 @@ export default function App() {
                   </ShadcnCard>
                 </div>
               ))}
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'pessoas' && (
+            <motion.div
+              key="pessoas-list"
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              className="space-y-6 pb-32"
+            >
+              <div className="md:hidden space-y-5">
+                {mobileTopHeader}
+                {!showPersonForm && (
+                  <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Pessoas</h1>
+                )}
+              </div>
+
+              <div className="md:hidden space-y-6">
+                {showPersonForm ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => { setShowPersonForm(false); handleCancelEditPerson(); }}
+                        className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] shrink-0"
+                      >
+                        <ChevronLeft size={20} />
+                      </button>
+                      <h1 className="text-2xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter truncate">
+                        {editingPerson ? 'Editar pessoa' : 'Nova pessoa'}
+                      </h1>
+                    </div>
+                    <div className="flex gap-4 items-center">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-20 h-20 rounded-3xl bg-slate-50 dark:bg-[#16133F] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex items-center justify-center overflow-hidden hover:border-primary transition-all group shrink-0"
+                      >
+                        {newPersonImage ? (
+                          <img src={newPersonImage} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <Users size={28} className="text-slate-300 dark:text-[#6B679C] group-hover:text-primary" />
+                        )}
+                      </button>
+                      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome</Label>
+                        <Input
+                          placeholder="Ex: Edson"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
+                          value={newPersonName || ''}
+                          onChange={(e) => setNewPersonName(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">E-mail</Label>
+                        <Input
+                          placeholder="contato@edson.com"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs px-4 shadow-sm"
+                          value={newPersonEmail || ''}
+                          onChange={(e) => setNewPersonEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Telefone</Label>
+                        <Input
+                          placeholder="(00) 00000-0000"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs px-4 shadow-sm"
+                          value={newPersonPhone || ''}
+                          onChange={(e) => setNewPersonPhone(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2 relative">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Vincular a um usuário do app (opcional)</Label>
+                      {personLinkSelected ? (
+                        <div className="h-11 rounded-xl bg-slate-50 dark:bg-[#16133F] shadow-sm flex items-center justify-between px-4">
+                          <span className="flex items-center gap-2 font-normal text-sm text-primary">
+                            <UserCheck size={16} />
+                            @{personLinkSelected.username}
+                          </span>
+                          <button type="button" onClick={() => { setPersonLinkSelected(null); setPersonLinkQuery(''); }} className="text-slate-300 dark:text-[#6B679C] hover:text-rose-400">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] font-medium text-sm pointer-events-none">@</span>
+                          <Input
+                            placeholder="usuario"
+                            className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-8 pr-4 shadow-sm"
+                            value={personLinkQuery}
+                            onChange={(e) => setPersonLinkQuery(e.target.value.replace(/^@+/, ''))}
+                          />
+                        </div>
+                      )}
+                      {!personLinkSelected && personLinkQuery.trim() && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#100E3D] rounded-2xl shadow-deep border border-slate-50 dark:border-[#1C1852] z-20 overflow-hidden max-h-48 overflow-y-auto">
+                          {personLinkSearching && (
+                            <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Buscando...</p>
+                          )}
+                          {!personLinkSearching && personLinkResults.length === 0 && (
+                            <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Nenhum usuário encontrado.</p>
+                          )}
+                          {personLinkResults.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => { setPersonLinkSelected(p); setPersonLinkQuery(''); }}
+                              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#16133F] text-left"
+                            >
+                              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-xs shrink-0">
+                                {(p.firstName || p.username || '?').charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{[p.firstName, p.lastName].filter(Boolean).join(' ') || p.nickname}</p>
+                                <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">@{p.username}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={async () => { await handleAddPerson(); setShowPersonForm(false); }}
+                      className="w-full h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all"
+                    >
+                      {editingPerson ? 'Salvar alterações' : 'Adicionar pessoa'}
+                    </button>
+                    {editingPerson && (
+                      <button
+                        type="button"
+                        onClick={() => setPersonToDelete(editingPerson)}
+                        className="w-full h-12 rounded-full font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <Trash2 size={16} strokeWidth={2.5} />
+                        Excluir pessoa
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      ref={peopleCarouselRef}
+                      onScroll={handlePeopleCarouselScroll}
+                      className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pb-1"
+                    >
+                      {people.map(person => {
+                        const monthCharges = getPersonMonthlyCharges(person.id, currentDate);
+                        const identityLine = personLinkSelected && editingPerson?.id === person.id
+                          ? `@${personLinkSelected.username}`
+                          : person.linkedUserId ? '@vinculado' : (person.email || person.phone || '');
+                        return (
+                          <div key={person.id} className="w-[280px] shrink-0 snap-center">
+                            <div
+                              onClick={() => setSelectedPersonId(person.id)}
+                              role="button"
+                              tabIndex={0}
+                              className="rounded-[1.75rem] h-44 p-5 relative overflow-hidden flex flex-col justify-between shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
+                              style={{ backgroundColor: getPersonColor(person.id) }}
+                            >
+                              <svg className="absolute -right-3 top-10 w-40 h-16 opacity-20" viewBox="0 0 160 60" fill="none">
+                                <path d="M0 30 Q 20 10 40 30 T 80 30 T 120 30 T 160 30" stroke="white" strokeWidth="6" strokeLinecap="round" />
+                              </svg>
+                              <div className="flex items-center justify-between relative z-10 gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-medium text-xs shrink-0 overflow-hidden">
+                                    {person.image ? (
+                                      <img src={person.image} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                      person.name.charAt(0).toUpperCase()
+                                    )}
+                                  </div>
+                                  <span className="text-white font-medium text-sm drop-shadow-sm truncate">{person.name}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleEditPersonClick(person); setShowPersonForm(true); }}
+                                  className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0"
+                                  aria-label="Editar pessoa"
+                                >
+                                  <Pencil size={14} strokeWidth={2.5} />
+                                </button>
+                              </div>
+                              <div className="relative z-10 space-y-2">
+                                <p className="text-white/90 text-sm truncate h-[1.75rem] flex items-center">{identityLine}</p>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-white/70 text-[10px] tracking-wider">Pendente</span>
+                                  <span className="text-white text-xs font-medium">R$ {monthCharges.pendingTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-white/70 text-[10px] tracking-wider">Pago</span>
+                                  <span className="text-white text-xs font-medium">R$ {monthCharges.paidTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                      <div className="w-[280px] shrink-0 snap-center">
+                        <button
+                          type="button"
+                          onClick={() => { handleCancelEditPerson(); setShowPersonForm(true); }}
+                          className="w-full h-44 rounded-[1.75rem] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#8D89AC] hover:border-primary hover:text-primary transition-all"
+                        >
+                          <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#1C1852] flex items-center justify-center">
+                            <Plus size={20} strokeWidth={2.5} />
+                          </div>
+                          <span className="text-sm font-medium">Adicionar pessoa</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {people.length > 1 && (
+                      <div className="flex items-center justify-center gap-1.5 -mt-3">
+                        {people.map(person => (
+                          <div
+                            key={person.id}
+                            className={cn(
+                              "h-1.5 rounded-full transition-all",
+                              (selectedPersonId || people[0].id) === person.id ? "w-5 bg-primary" : "w-1.5 bg-slate-200 dark:bg-[#2A2566]"
+                            )}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {people.length > 0 && (() => {
+                      const activePerson = people.find(p => p.id === selectedPersonId) || people[0];
+                      const selectedMonthKey = format(selectedChargeDate, 'yyyy-MM');
+                      const charges = getPersonMonthlyCharges(activePerson.id, selectedChargeDate);
+                      const personColor = getPersonColor(activePerson.id);
+                      return (
+                        <>
+                          <div className="space-y-3">
+                            <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Evolução</p>
+                            <div className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2 overflow-hidden">
+                              <div ref={personChargeScrollRef} className="overflow-x-auto scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
+                                <ComposedChart key={`${activePerson.id}-${personChargeHistory.length}`} width={personChargeHistory.length * CHART_BAR_WIDTH} height={130} data={personChargeHistory}>
+                                  <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: '#9C93BE' }} />
+                                  <Bar
+                                    dataKey="amount"
+                                    radius={[8, 8, 8, 8]}
+                                    cursor="pointer"
+                                    onClick={(data: any) => setSelectedChargeDate(parseISO(`${data.monthKey}-01`))}
+                                  >
+                                    {personChargeHistory.map(entry => (
+                                      <Cell key={entry.monthKey} fill={personColor} fillOpacity={entry.monthKey === selectedMonthKey ? 1 : 0.25} />
+                                    ))}
+                                  </Bar>
+                                </ComposedChart>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between ml-2 gap-3">
+                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest shrink-0">
+                                Pendências de {format(selectedChargeDate, "MMMM", { locale: ptBR })}
+                              </p>
+                              <button
+                                type="button"
+                                disabled={charges.items.length === 0}
+                                onClick={() => shareChargeOnWhatsApp(activePerson, charges)}
+                                className={cn(
+                                  "flex items-center gap-1.5 text-[11px] font-medium pl-2.5 pr-3 py-1.5 rounded-full shrink-0 transition-all",
+                                  charges.pendingTotal === 0
+                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                    : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 active:scale-95"
+                                )}
+                              >
+                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", charges.pendingTotal === 0 ? "bg-emerald-500" : "bg-amber-500")} />
+                                {charges.pendingTotal === 0 ? 'Em dia' : 'Pendente'}
+                              </button>
+                            </div>
+                            <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] ml-2">
+                              R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                            {charges.items.length === 0 ? (
+                              <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
+                                <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nenhuma despesa neste mês.</p>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="space-y-2">
+                                  {charges.items.map(t => (
+                                    <div key={t.id}>
+                                      <TransactionItem
+                                        transaction={t}
+                                        onClick={() => handleTransactionClick(t)}
+                                        hideStatus
+                                        categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                                <button
+                                  onClick={() => shareChargeOnWhatsApp(activePerson, charges)}
+                                  disabled={charges.items.length === 0}
+                                  className="w-full h-12 rounded-full bg-primary text-white font-medium text-sm active:scale-95 transition-all disabled:opacity-40"
+                                >
+                                  Cobrar no WhatsApp
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
+              </div>
+
+              <div className="hidden md:block space-y-6">
+                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">
+                  Use o menu lateral "Pessoas" para gerenciar contatos no desktop.
+                </p>
               </div>
             </motion.div>
           )}
