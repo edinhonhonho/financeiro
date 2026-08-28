@@ -192,6 +192,21 @@ function getPersonColor(personId: string): string {
   return CARD_COLOR_PRESETS[hash % CARD_COLOR_PRESETS.length];
 }
 
+/**
+ * Erros do Supabase (PostgrestError) são objetos simples com `.message`, não
+ * instâncias de `Error` — `String(err)` neles vira "[object Object]". Extrai
+ * a mensagem de forma robusta para os dois casos.
+ */
+function extractErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object') {
+    const anyErr = err as Record<string, unknown>;
+    if (typeof anyErr.message === 'string' && anyErr.message) return anyErr.message;
+    try { return JSON.stringify(err); } catch { /* fall through */ }
+  }
+  return String(err);
+}
+
 function DateField({
   value,
   onChange,
@@ -1675,8 +1690,7 @@ export default function App() {
       setPersonSplits([]);
     } catch (err) {
       console.error('Erro ao salvar lançamento:', err);
-      const message = err instanceof Error ? err.message : String(err);
-      showAlert('Não foi possível salvar', message);
+      showAlert('Não foi possível salvar', extractErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

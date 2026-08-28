@@ -50,9 +50,21 @@ export enum OperationType {
   WRITE = 'write',
 }
 
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (error && typeof error === 'object') {
+    const anyError = error as Record<string, unknown>;
+    if (typeof anyError.message === 'string' && anyError.message) return anyError.message;
+    try { return JSON.stringify(error); } catch { /* fall through */ }
+  }
+  return String(error);
+}
+
 export function handleSupabaseError(error: unknown, operationType: OperationType, path: string | null) {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error('Supabase Error:', { message, operationType, path });
+  // Erros do Supabase (PostgrestError) são objetos simples com `.message`,
+  // não instâncias de `Error` — `String(error)` neles vira "[object Object]".
+  const message = extractErrorMessage(error);
+  console.error('Supabase Error:', { message, operationType, path, raw: error });
   throw new Error(message);
 }
 
