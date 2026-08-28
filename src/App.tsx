@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   Plus,
   ChevronRight,
@@ -1044,16 +1044,25 @@ export default function App() {
   }, [cards, selectedCard, currentDate, transactions]);
 
   const billChartScrollRef = React.useRef<HTMLDivElement>(null);
+  // Metade da largura visível do carrossel do gráfico, usada como respiro nas
+  // pontas — sem isso a última barra (mês atual) nunca consegue ficar
+  // centralizada: o scroll trava assim que a borda direita dela encosta na
+  // borda do card, não dá pra rolar "além" do fim do conteúdo.
+  const [chartHalfViewport, setChartHalfViewport] = useState(0);
+  useLayoutEffect(() => {
+    const el = billChartScrollRef.current;
+    if (el) setChartHalfViewport(el.clientWidth / 2);
+  }, [activeTab, selectedCard]);
   useEffect(() => {
     const el = billChartScrollRef.current;
     if (!el || cardBillHistory.length === 0) return;
     const selectedMonthKey = format(selectedBillDate, 'yyyy-MM');
     const index = cardBillHistory.findIndex(p => p.monthKey === selectedMonthKey);
     const targetIndex = index === -1 ? cardBillHistory.length - 1 : index;
-    const barCenter = targetIndex * CHART_BAR_WIDTH + CHART_BAR_WIDTH / 2;
+    const barCenter = chartHalfViewport + targetIndex * CHART_BAR_WIDTH + CHART_BAR_WIDTH / 2;
     const target = barCenter - el.clientWidth / 2;
     el.scrollLeft = Math.max(0, target);
-  }, [selectedCard, currentDate, selectedBillDate, cards.length, activeTab]);
+  }, [selectedCard, currentDate, selectedBillDate, cards.length, activeTab, chartHalfViewport]);
 
   const cardBillItems = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
@@ -5117,7 +5126,8 @@ export default function App() {
                           <div className="space-y-3">
                             <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Evolução da fatura</p>
                             <div className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2 overflow-hidden">
-                              <div ref={billChartScrollRef} className="overflow-x-auto scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
+                              <div ref={billChartScrollRef} className="overflow-x-auto scrollbar-hide flex items-center" style={{ scrollBehavior: 'smooth' }}>
+                                <div style={{ width: chartHalfViewport, flexShrink: 0 }} />
                                 <ComposedChart key={`${activeCard.id}-${cardBillHistory.length}`} width={cardBillHistory.length * CHART_BAR_WIDTH} height={130} data={cardBillHistory}>
                                   <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: '#9C93BE' }} />
                                   <Bar
@@ -5131,6 +5141,7 @@ export default function App() {
                                     ))}
                                   </Bar>
                                 </ComposedChart>
+                                <div style={{ width: chartHalfViewport, flexShrink: 0 }} />
                               </div>
                             </div>
                           </div>
