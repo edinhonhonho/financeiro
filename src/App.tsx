@@ -1129,7 +1129,7 @@ export default function App() {
       return format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr;
     });
 
-    const items = relevant
+    const withAmount = relevant
       .map(t => {
         let amount = t.amount;
         if (t.assignments && t.assignments.length > 0) {
@@ -1140,12 +1140,25 @@ export default function App() {
       })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+    // Dois sentidos: "ela me deve" (padrão, receivable) e "eu pago pra ela"
+    // (owedByPerson === false, payable — associação sem divisão, ex: mesada).
+    const items = withAmount.filter(t => t.owedByPerson !== false);
+    const payableItems = withAmount.filter(t => t.owedByPerson === false);
+
     const pending = items.filter(t => t.status === 'planned');
     const paid = items.filter(t => t.status === 'actual');
     const pendingTotal = pending.reduce((acc, t) => acc + t.amount, 0);
     const paidTotal = paid.reduce((acc, t) => acc + t.amount, 0);
 
-    return { items, pending, paid, pendingTotal, paidTotal, total: pendingTotal + paidTotal };
+    const payablePending = payableItems.filter(t => t.status === 'planned');
+    const payablePaid = payableItems.filter(t => t.status === 'actual');
+    const payablePendingTotal = payablePending.reduce((acc, t) => acc + t.amount, 0);
+    const payablePaidTotal = payablePaid.reduce((acc, t) => acc + t.amount, 0);
+
+    return {
+      items, pending, paid, pendingTotal, paidTotal, total: pendingTotal + paidTotal,
+      payableItems, payablePending, payablePaid, payablePendingTotal, payablePaidTotal, payableTotal: payablePendingTotal + payablePaidTotal
+    };
   };
 
   // Aba Pessoas (mobile) — mesmo padrão da aba Cartões: carrossel + gráfico
@@ -1432,7 +1445,11 @@ export default function App() {
           current: editingTransaction?.installments?.current || 1
         } : null,
         // Coluna NOT NULL no banco — precisa ir explícito em todo insert.
-        linkedToCard: false
+        linkedToCard: false,
+        // false = "eu pago pra essa pessoa" (não gera receita vinculada,
+        // aparece em Pessoas como algo que eu devo); só relevante quando há
+        // exatamente uma pessoa associada.
+        owedByPerson: personSplits.length === 1 ? (newTransaction.owedByPerson ?? true) : true
       };
 
       if (editingTransaction) {
@@ -1547,7 +1564,7 @@ export default function App() {
         // Use the synced linkedIncomeDate which matches newTransaction.date by default
         let startingLinkedRunner = parseISO(linkedIncomeDate);
         const shouldLinkIncome = (baseData.type === 'card_purchase' || baseData.type === 'expense') &&
-          baseData.payerPayee && baseData.payerPayee !== 'geral' && createLinkedIncome;
+          baseData.payerPayee && baseData.payerPayee !== 'geral' && createLinkedIncome && baseData.owedByPerson !== false;
         const incomeAssignments = assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }];
 
         if (isRecurrent && newTransaction.recurrenceEndDate) {
@@ -1817,10 +1834,13 @@ export default function App() {
     if (t.assignments && t.assignments.length > 0) {
       setAssignmentMode('split');
       setShowPersonSelector(true);
-      setPersonSplits(t.assignments.map(a => ({ 
-        personId: a.personId, 
-        type: 'value', 
-        value: a.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      // Repopula como percentual do valor original (não valor fixo): assim,
+      // se o valor total for editado, a parte da pessoa reescala junto em
+      // vez de ficar travada no valor antigo.
+      setPersonSplits(t.assignments.map(a => ({
+        personId: a.personId,
+        type: 'percentage',
+        value: t.amount > 0 ? ((a.amount / t.amount) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'
       })));
     } else {
       setAssignmentMode('single');
@@ -2959,6 +2979,29 @@ export default function App() {
                                   {split.type === 'value' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
                                 </div>
                               </div>
+
+                              <div className="flex bg-slate-50 dark:bg-[#1C1852] p-0.5 rounded-xl">
+                                <button
+                                  type="button"
+                                  onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                                  className={cn(
+                                    "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
+                                    newTransaction.owedByPerson !== false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                                  )}
+                                >
+                                  Ela me deve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                                  className={cn(
+                                    "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
+                                    newTransaction.owedByPerson === false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                                  )}
+                                >
+                                  Eu pago pra ela
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
@@ -3635,6 +3678,29 @@ export default function App() {
                                     {split.type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
                                     {split.type === 'value' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
                                   </div>
+                                </div>
+
+                                <div className="flex bg-white dark:bg-[#100E3D] p-1 rounded-2xl shadow-sm">
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                                    className={cn(
+                                      "flex-1 py-2.5 rounded-xl text-xs font-medium transition-all",
+                                      newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                    )}
+                                  >
+                                    Ela me deve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                                    className={cn(
+                                      "flex-1 py-2.5 rounded-xl text-xs font-medium transition-all",
+                                      newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                    )}
+                                  >
+                                    Eu pago pra ela
+                                  </button>
                                 </div>
                               </div>
                             );
@@ -5672,6 +5738,12 @@ export default function App() {
                                   <span className="text-white/70 text-[10px] tracking-wider">Pago</span>
                                   <span className="text-white text-xs font-medium">R$ {monthCharges.paidTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
                                 </div>
+                                {monthCharges.payableTotal > 0 && (
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-white/70 text-[10px] tracking-wider">Você paga</span>
+                                    <span className="text-white text-xs font-medium">R$ {monthCharges.payableTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -5784,6 +5856,29 @@ export default function App() {
                               </>
                             )}
                           </div>
+
+                          {charges.payableItems.length > 0 && (
+                            <div className="space-y-3">
+                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest ml-2">
+                                Você paga para {activePerson.name.split(' ')[0]}
+                              </p>
+                              <p className="text-2xl font-heading font-medium tracking-tighter text-rose-400 ml-2">
+                                R$ {charges.payablePendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                              <div className="space-y-2">
+                                {charges.payableItems.map(t => (
+                                  <div key={t.id}>
+                                    <TransactionItem
+                                      transaction={t}
+                                      onClick={() => handleTransactionClick(t)}
+                                      hideStatus
+                                      categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </>
                       );
                     })()}

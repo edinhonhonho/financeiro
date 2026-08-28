@@ -33,6 +33,10 @@ export interface Transaction {
   linkedTransactionId?: string | null;
   seriesId?: string | null;
   actualDate?: string | null; // ISO format for when it was actually paid/received
+  // Direção do vínculo com a pessoa em payerPayee/assignments: false = eu pago
+  // pra ela (aparece em Pessoas como algo que eu devo); null/undefined/true =
+  // ela me deve (comportamento padrão, receita vinculada é criada).
+  owedByPerson?: boolean | null;
 }
 
 export interface Person {
