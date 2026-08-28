@@ -3125,7 +3125,7 @@ export default function App() {
                   <Users size={14} className="text-primary shrink-0" />
                   <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Associar a pessoas</Label>
                 </div>
-                <p className="text-[10px] font-normal leading-relaxed text-slate-400 dark:text-[#8D89AC]">
+                <p className="text-xs font-normal leading-relaxed text-slate-400 dark:text-[#8D89AC]">
                   {newTransaction.type === 'income'
                     ? 'Quem você marcar aqui aparece também em Pessoas como um valor a receber dela.'
                     : 'Quem você marcar aqui aparece também em Pessoas — a receber ou a pagar, conforme a escolha abaixo.'}
@@ -3135,7 +3135,7 @@ export default function App() {
                   <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] pointer-events-none" />
                   <Input
                     placeholder="Buscar pessoa ou @usuário..."
-                    className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs pl-10 pr-3"
+                    className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-10 pr-3"
                     value={quickAssignQuery}
                     onChange={(e) => setQuickAssignQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && personSearchResults.length === 0 && handleQuickAssignPerson()}
@@ -3152,7 +3152,7 @@ export default function App() {
                           type="button"
                           onClick={() => togglePersonSplit(p.id)}
                           className={cn(
-                            "h-10 px-3 rounded-full font-normal text-xs transition-all flex items-center gap-2 border-2",
+                            "h-10 px-3 rounded-full font-normal text-sm transition-all flex items-center gap-2 border-2",
                             isSelected
                               ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
                               : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:border-slate-200 dark:hover:border-[#2A2566]"
@@ -3166,23 +3166,23 @@ export default function App() {
                   </div>
                 ) : quickAssignQuery.trim() ? (
                   <div className="bg-slate-50 dark:bg-[#16133F] rounded-[1.25rem] p-3 space-y-2">
-                    <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
+                    <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
                     <Button
                       type="button"
                       onClick={handleQuickAssignPerson}
                       disabled={quickAssignSubmitting}
-                      className="w-full h-10 rounded-xl font-medium text-xs bg-primary text-white disabled:opacity-40"
+                      className="w-full h-10 rounded-xl font-medium text-sm bg-primary text-white disabled:opacity-40"
                     >
                       {quickAssignQuery.trim().startsWith('@')
                         ? `Buscar @${quickAssignQuery.trim().replace(/^@+/, '')} como usuário`
                         : `Adicionar "${quickAssignQuery.trim()}" como nova pessoa`}
                     </Button>
                     {!quickAssignQuery.trim().startsWith('@') && (
-                      <p className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC]">Ou comece com @ pra procurar alguém que já usa o app.</p>
+                      <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">Ou comece com @ pra procurar alguém que já usa o app.</p>
                     )}
                   </div>
                 ) : (
-                  <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">Nenhuma pessoa cadastrada ainda — digite um nome ou @usuário na busca acima pra adicionar.</p>
+                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Nenhuma pessoa cadastrada ainda — digite um nome ou @usuário na busca acima pra adicionar.</p>
                 )}
 
                 {personSplits.length === 1 && (() => {
@@ -3193,19 +3193,19 @@ export default function App() {
                     <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
                       <div className="flex items-center gap-3">
                         <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-                        <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
+                        <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
                         <div className="flex bg-slate-50 dark:bg-[#16133F] p-0.5 rounded-lg shrink-0">
                           <button
                             type="button"
                             onClick={() => setSinglePersonPartial(false)}
-                            className={cn("px-3 py-1.5 rounded-md text-[10px] font-medium transition-all", !isPartial ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                            className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", !isPartial ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
                           >
                             Cheio
                           </button>
                           <button
                             type="button"
                             onClick={() => setSinglePersonPartial(true)}
-                            className={cn("px-3 py-1.5 rounded-md text-[10px] font-medium transition-all", isPartial ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                            className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", isPartial ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
                           >
                             Parcial
                           </button>
@@ -3215,7 +3215,7 @@ export default function App() {
                       {isPartial ? (
                         <div className="relative">
                           <Input
-                            className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm px-3 pl-9 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
+                            className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-base px-3 pl-9 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
                             inputMode="decimal"
                             autoFocus
                             value={split.value}
@@ -3224,10 +3224,10 @@ export default function App() {
                               setPersonSplits(prev => prev.map(s => ({ ...s, value })));
                             }}
                           />
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
                         </div>
                       ) : (
-                        <p className="text-sm font-medium text-primary text-right">
+                        <p className="text-base font-medium text-primary text-right">
                           {parseCurrency(amountInput).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </p>
                       )}
@@ -3235,7 +3235,7 @@ export default function App() {
                       {newTransaction.type === 'income' ? (
                         <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 rounded-lg">
                           <ArrowUpCircle size={12} className="text-emerald-500 shrink-0" />
-                          <p className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
+                          <p className="text-xs font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
                         </div>
                       ) : (
                         <>
@@ -3244,24 +3244,24 @@ export default function App() {
                               type="button"
                               onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
                               className={cn(
-                                "flex-1 py-2 rounded-md text-[10px] font-medium transition-all flex items-center justify-center gap-1.5",
+                                "flex-1 py-2 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5",
                                 newTransaction.owedByPerson !== false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
                               )}
                             >
-                              <ArrowUpCircle size={11} /> Ela me deve
+                              <ArrowUpCircle size={12} /> Ela me deve
                             </button>
                             <button
                               type="button"
                               onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
                               className={cn(
-                                "flex-1 py-2 rounded-md text-[10px] font-medium transition-all flex items-center justify-center gap-1.5",
+                                "flex-1 py-2 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5",
                                 newTransaction.owedByPerson === false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
                               )}
                             >
-                              <ArrowDownCircle size={11} /> Eu pago pra ela
+                              <ArrowDownCircle size={12} /> Eu pago pra ela
                             </button>
                           </div>
-                          <p className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
                             {newTransaction.owedByPerson === false
                               ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
                               : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
@@ -3274,7 +3274,7 @@ export default function App() {
 
                 {personSplits.length > 1 && (
                   <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
-                    <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">
+                    <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">
                       {globalSplitType === 'parts' ? `Igual entre ${personSplits.length} pessoas` : 'Divisão personalizada'}
                     </p>
                     <div className="grid grid-cols-3 gap-2">
@@ -3301,7 +3301,7 @@ export default function App() {
                             setPersonSplits(newSplits);
                           }}
                           className={cn(
-                            "h-11 rounded-xl text-xs font-semibold transition-all",
+                            "h-11 rounded-xl text-sm font-semibold transition-all",
                             globalSplitType === type ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]"
                           )}
                         >
@@ -3320,18 +3320,18 @@ export default function App() {
                             <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
                             {globalSplitType === 'parts' ? (
                               <>
-                                <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
-                                <p className="text-[10px] font-medium text-primary shrink-0">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
+                                <p className="text-xs font-medium text-primary shrink-0">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                               </>
                             ) : (
                               <>
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                  <p className="text-[9px] font-normal text-primary">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                  <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                  <p className="text-[10px] font-normal text-primary">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                 </div>
                                 <div className="relative w-20 shrink-0">
                                   <input
-                                    className="w-full h-8 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
+                                    className="w-full h-8 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-xs px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
                                     inputMode="decimal"
                                     value={split.value}
                                     onChange={(e) => {
@@ -3342,7 +3342,7 @@ export default function App() {
                                       }));
                                     }}
                                   />
-                                  {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
+                                  {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
                                 </div>
                               </>
                             )}
@@ -3812,7 +3812,7 @@ export default function App() {
                     <Users size={16} className="text-primary shrink-0" />
                     <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Associar a pessoas</Label>
                   </div>
-                  <p className="text-[11px] font-normal leading-relaxed text-slate-400 dark:text-[#8D89AC]">
+                  <p className="text-sm font-normal leading-relaxed text-slate-400 dark:text-[#8D89AC]">
                     {newTransaction.type === 'income'
                       ? 'Quem você marcar aqui aparece também em Pessoas como um valor a receber dela.'
                       : 'Quem você marcar aqui aparece também em Pessoas — a receber ou a pagar, conforme a escolha abaixo.'}
@@ -3853,7 +3853,7 @@ export default function App() {
                     </div>
                   ) : quickAssignQuery.trim() ? (
                     <div className="bg-slate-50 dark:bg-[#16133F] rounded-[1.5rem] p-4 space-y-3">
-                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
+                      <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
                       <Button
                         type="button"
                         onClick={handleQuickAssignPerson}
@@ -3865,11 +3865,11 @@ export default function App() {
                           : `Adicionar "${quickAssignQuery.trim()}" como nova pessoa`}
                       </Button>
                       {!quickAssignQuery.trim().startsWith('@') && (
-                        <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">Ou comece com @ pra procurar alguém que já usa o app.</p>
+                        <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Ou comece com @ pra procurar alguém que já usa o app.</p>
                       )}
                     </div>
                   ) : (
-                    <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Nenhuma pessoa cadastrada ainda — digite um nome ou @usuário na busca acima pra adicionar.</p>
+                    <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Nenhuma pessoa cadastrada ainda — digite um nome ou @usuário na busca acima pra adicionar.</p>
                   )}
 
                   {personSplits.length === 1 && (() => {
@@ -3922,7 +3922,7 @@ export default function App() {
                         {newTransaction.type === 'income' ? (
                           <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2.5 rounded-xl">
                             <ArrowUpCircle size={14} className="text-emerald-500 shrink-0" />
-                            <p className="text-xs font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
+                            <p className="text-sm font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
                           </div>
                         ) : (
                           <>
@@ -3931,24 +3931,24 @@ export default function App() {
                                 type="button"
                                 onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
                                 className={cn(
-                                  "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                                  "flex-1 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5",
                                   newTransaction.owedByPerson !== false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
                                 )}
                               >
-                                <ArrowUpCircle size={12} /> Ela me deve
+                                <ArrowUpCircle size={13} /> Ela me deve
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
                                 className={cn(
-                                  "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                                  "flex-1 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5",
                                   newTransaction.owedByPerson === false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
                                 )}
                               >
-                                <ArrowDownCircle size={12} /> Eu pago pra ela
+                                <ArrowDownCircle size={13} /> Eu pago pra ela
                               </button>
                             </div>
-                            <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+                            <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
                               {newTransaction.owedByPerson === false
                                 ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
                                 : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
@@ -3961,7 +3961,7 @@ export default function App() {
 
                   {personSplits.length > 1 && (
                     <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
-                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">
+                      <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">
                         {globalSplitType === 'parts' ? `Igual entre ${personSplits.length} pessoas` : 'Divisão personalizada'}
                       </p>
                       <div className="grid grid-cols-3 gap-3">
@@ -4007,18 +4007,18 @@ export default function App() {
                               <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
                               {globalSplitType === 'parts' ? (
                                 <>
-                                  <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
-                                  <p className="text-xs font-medium text-primary shrink-0">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                  <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
+                                  <p className="text-sm font-medium text-primary shrink-0">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                 </>
                               ) : (
                                 <>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                    <p className="text-[10px] font-normal text-primary">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                    <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                    <p className="text-xs font-normal text-primary">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                                   </div>
                                   <div className="relative w-28 shrink-0">
                                     <input
-                                      className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
+                                      className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
                                       inputMode="decimal"
                                       value={split.value}
                                       onChange={(e) => {
@@ -4029,7 +4029,7 @@ export default function App() {
                                         }));
                                       }}
                                     />
-                                    {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
+                                    {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
                                   </div>
                                 </>
                               )}
