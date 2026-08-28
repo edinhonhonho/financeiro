@@ -781,7 +781,7 @@ export default function App() {
       return startOfMonth(parseISO(t.date));
     }
     
-    if (t.cardId) {
+    if (t.cardId && t.type === 'card_purchase') {
       const card = cards.find(c => c.id === t.cardId);
       if (card) {
         const tDate = parseISO(t.date);
@@ -848,12 +848,13 @@ export default function App() {
     // Qualquer tipo conta (expense, card_purchase ou income direto marcado
     // como "ela me deve") — o que importa é estar atribuído a essa pessoa;
     // status planned/actual já mapeia certinho pra Pendente/Pago nos três casos.
-    // Exceção: o reembolso automático (linkedToCard) já é o espelho de uma
-    // despesa que também está nessa lista — contar os dois duplicaria a dívida.
+    // Quando uma despesa tem receita vinculada (reembolso automático), a
+    // receita é quem manda — tem a data e o status reais de quando o
+    // dinheiro volta. Contar a despesa original também duplicaria a dívida.
     const relevant = transactions.filter(t => {
-      if (t.linkedToCard) return false;
       const isForPerson = t.payerPayee === personId || (t.assignments && t.assignments.some(a => a.personId === personId));
       if (!isForPerson) return false;
+      if (!t.linkedToCard && transactions.some(other => other.linkedTransactionId === t.id)) return false;
       return format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr;
     });
 
@@ -911,11 +912,15 @@ export default function App() {
   };
 
   /** Um lançamento conta pra "Pendências {pessoa}" quando é 100% atribuído a
-   *  ela sozinha (não split parcial nem multi-pessoa) e ainda não foi pago. */
+   *  ela sozinha (não split parcial nem multi-pessoa) e ainda não foi pago.
+   *  Se já tem receita vinculada, a despesa não conta mais pra Pessoas (a
+   *  receita virou a fonte de verdade) — precisa continuar aparecendo como
+   *  lançamento normal, não sumir "bundled" num total que não a inclui mais. */
   const isBundledIntoPersonBill = (t: Transaction) => {
     if (t.type !== 'expense' || t.status !== 'planned' || t.owedByPerson === false) return false;
     if (!t.payerPayee || t.payerPayee === 'geral' || t.payerPayee === 'multi') return false;
     if (!t.assignments || t.assignments.length !== 1) return false;
+    if (transactions.some(other => other.linkedTransactionId === t.id)) return false;
     return t.assignments[0].personId === t.payerPayee && Math.abs(t.assignments[0].amount - t.amount) < 0.005;
   };
 
@@ -4859,10 +4864,20 @@ export default function App() {
                   <Search size={16} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#6B679C]" />
                   <Input
                     placeholder="Buscar movimentações"
-                    className="h-11 rounded-full border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-11 shadow-sm"
+                    className="h-11 rounded-full border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-11 pr-11 shadow-sm"
                     value={movSearchQuery}
                     onChange={(e) => setMovSearchQuery(e.target.value)}
                   />
+                  {movSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setMovSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+                      aria-label="Limpar busca"
+                    >
+                      <X size={14} strokeWidth={2.5} />
+                    </button>
+                  )}
                 </div>
               </div>
 
