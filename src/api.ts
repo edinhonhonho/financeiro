@@ -199,6 +199,21 @@ export async function deleteAllTransactions(userId: string) {
   if (error) handleSupabaseError(error, OperationType.DELETE, 'transactions');
 }
 
+/** Apaga TODOS os dados financeiros do usuário: lançamentos, cartões, categorias e pessoas. */
+export async function deleteAllUserData(userId: string) {
+  const { error: transactionsError } = await supabase.from('transactions').delete().eq('userId', userId);
+  if (transactionsError) handleSupabaseError(transactionsError, OperationType.DELETE, 'transactions');
+
+  const { error: cardsError } = await supabase.from('cards').delete().eq('userId', userId);
+  if (cardsError) handleSupabaseError(cardsError, OperationType.DELETE, 'cards');
+
+  const { error: categoriesError } = await supabase.from('categories').delete().eq('userId', userId);
+  if (categoriesError) handleSupabaseError(categoriesError, OperationType.DELETE, 'categories');
+
+  const { error: peopleError } = await supabase.from('people').delete().eq('userId', userId);
+  if (peopleError) handleSupabaseError(peopleError, OperationType.DELETE, 'people');
+}
+
 export async function fetchSeriesSiblings(userId: string, seriesId: string): Promise<Transaction[]> {
   const { data, error } = await supabase
     .from('transactions')

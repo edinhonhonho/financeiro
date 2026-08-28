@@ -47,7 +47,8 @@ import {
   ArrowDown,
   Camera,
   Clock,
-  Check
+  Check,
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'motion/react';
 import {
@@ -379,6 +380,7 @@ export default function App() {
   const [transactionFilter, setTransactionFilter] = useState<'pending' | 'all'>('all');
   const [movTab, setMovTab] = useState<'movimentacoes' | 'apagar' | 'areceber'>('movimentacoes');
   const [movStatusFilter, setMovStatusFilter] = useState<'all' | 'planned' | 'actual'>('all');
+  const [movSearchQuery, setMovSearchQuery] = useState('');
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [showCardForm, setShowCardForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -773,12 +775,16 @@ export default function App() {
       .filter(t => t.type === 'card_purchase' && t.cardId === card.id && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(month, 'yyyy-MM'))
       .reduce((acc, t) => acc + t.amount, 0);
 
+    const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    const dueDay = card.dueDay ? Math.min(Number(card.dueDay), daysInMonth) : daysInMonth;
+    const billDate = new Date(month.getFullYear(), month.getMonth(), dueDay);
+
     return {
       id: `bill-${card.id}`,
       type: 'expense',
       description: `Fatura ${card.name}`,
       amount,
-      date: format(endOfMonth(month), 'yyyy-MM-dd'),
+      date: format(billDate, 'yyyy-MM-dd'),
       category: 'Fatura cartão',
       status: 'planned',
       cardId: card.id,
@@ -1018,8 +1024,10 @@ export default function App() {
 
   // Gráfico de evolução da fatura (aba Cartões, mobile) — 6 meses do cartão
   // ativo; clicar numa barra seleciona o mês e mostra os itens logo abaixo.
-  const [selectedBillDate, setSelectedBillDate] = useState<Date>(currentDate);
-  useEffect(() => { setSelectedBillDate(currentDate); }, [currentDate, selectedCard, activeTab]);
+  const [selectedBillDate, setSelectedBillDate] = useState<Date>(new Date());
+  useEffect(() => {
+    if (activeTab === 'cartoes') setSelectedBillDate(new Date());
+  }, [selectedCard, activeTab]);
 
   const CHART_MONTHS_HISTORY = 24;
   const CHART_BAR_WIDTH = 48;
@@ -2077,9 +2085,9 @@ export default function App() {
   const handleDeleteAllTransactions = async () => {
     if (!user) return;
     try {
-      await api.deleteAllTransactions(user.id);
-      await loadTransactions();
-      showAlert('Sucesso', 'Todos os lançamentos foram apagados.');
+      await api.deleteAllUserData(user.id);
+      await Promise.all([loadTransactions(), loadCards(), loadCategories(), loadPeople()]);
+      showAlert('Sucesso', 'Todos os seus dados foram apagados.');
       setIsDeleteAllConfirmOpen(false);
       setIsProfileOpen(false);
     } catch (err) {
@@ -3120,7 +3128,14 @@ export default function App() {
                       className="h-12 w-16 rounded-2xl border-none bg-white dark:bg-[#100E3D] text-center text-xl px-0 shadow-sm"
                       maxLength={4}
                       value={newCategoryIcon}
-                      onChange={(e) => setNewCategoryIcon(e.target.value)}
+                      onChange={(e) => {
+                        const EMOJI_PARTS = new RegExp(
+                          '\\p{Extended_Pictographic}|\\p{Emoji_Presentation}|\\u200D|\\uFE0F|[\\u{1F3FB}-\\u{1F3FF}]|[\\u{1F1E6}-\\u{1F1FF}]',
+                          'gu'
+                        );
+                        const matches = e.target.value.match(EMOJI_PARTS) || [];
+                        setNewCategoryIcon(matches.join(''));
+                      }}
                     />
                   </div>
                   <div className="flex-1 space-y-2">
@@ -4473,6 +4488,16 @@ export default function App() {
                     </button>
                   </div>
                 )}
+
+                <div className="relative">
+                  <Search size={16} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#6B679C]" />
+                  <Input
+                    placeholder="Buscar movimentações"
+                    className="h-11 rounded-full border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-11 shadow-sm"
+                    value={movSearchQuery}
+                    onChange={(e) => setMovSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="hidden md:flex md:items-center justify-between gap-6">
@@ -4640,7 +4665,9 @@ export default function App() {
 
                     <div className="space-y-2">
                       {(() => {
-                        const filtered = movimentacoesLists.all.filter(t => movStatusFilter === 'all' ? true : t.status === movStatusFilter);
+                        const filtered = movimentacoesLists.all
+                          .filter(t => movStatusFilter === 'all' ? true : t.status === movStatusFilter)
+                          .filter(t => t.description.toLowerCase().includes(movSearchQuery.trim().toLowerCase()));
                         return filtered.length === 0 ? (
                           <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">Nenhuma movimentação neste mês.</p>
                         ) : (
@@ -4666,7 +4693,8 @@ export default function App() {
                 )}
 
                 {(movTab === 'apagar' || movTab === 'areceber') && (() => {
-                  const list = movTab === 'apagar' ? movimentacoesLists.aPagar : movimentacoesLists.aReceber;
+                  const list = (movTab === 'apagar' ? movimentacoesLists.aPagar : movimentacoesLists.aReceber)
+                    .filter(t => t.description.toLowerCase().includes(movSearchQuery.trim().toLowerCase()));
                   return (
                     <div className="space-y-3">
                       {list.length === 0 ? (
@@ -4674,36 +4702,51 @@ export default function App() {
                           {movTab === 'apagar' ? 'Nada pendente para pagar neste mês.' : 'Nada pendente para receber neste mês.'}
                         </p>
                       ) : (
-                        list.map(t => (
-                          <SwipeToConfirm
-                            key={t.id}
-                            enabled
-                            actionLabel={movTab === 'apagar' ? 'Pago' : 'Recebido'}
-                            colorClass={movTab === 'apagar' ? 'bg-primary' : 'bg-emerald-400'}
-                            onConfirm={() => handleQuickConfirm(t)}
-                          >
-                            <div className="flex items-center gap-3 border border-slate-200/70 dark:border-white/10 rounded-full pl-3 pr-4 py-3">
-                              <div
-                                className="w-11 h-11 rounded-full flex items-center justify-center text-base shrink-0"
-                                style={{ backgroundColor: categories.find(c => c.name === t.category)?.color || '#9C93BE' }}
+                        list.map(t => {
+                          const category = categories.find(c => c.name === t.category);
+                          const recurrenceLabel = t.installments
+                            ? `${t.installments.current}/${t.installments.total}`
+                            : t.recurrence === 'monthly' ? 'Mensal'
+                            : t.recurrence === 'weekly' ? 'Semanal'
+                            : t.recurrence === 'yearly' ? 'Anual'
+                            : 'Único';
+                          return (
+                            <div key={t.id} className="bg-card rounded-[1.75rem] shadow-soft p-4 space-y-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <div
+                                    className="w-11 h-11 rounded-2xl flex items-center justify-center text-lg shrink-0"
+                                    style={{ backgroundColor: category?.color || '#9C93BE' }}
+                                  >
+                                    {category?.icon || DEFAULT_CATEGORY_ICON}
+                                  </div>
+                                  <p className="text-base font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate">{t.description}</p>
+                                </div>
+                                <p className={cn(
+                                  "font-heading font-medium tracking-tighter whitespace-nowrap text-base shrink-0",
+                                  movTab === 'apagar' ? "text-rose-400" : "text-emerald-500"
+                                )}>
+                                  R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                              <div className="flex items-center justify-between text-xs font-normal text-slate-400 dark:text-[#8D89AC] pl-1">
+                                <span>{format(parseISO(t.date), 'dd/MM/yyyy')}</span>
+                                <span>{recurrenceLabel}</span>
+                                <span className="truncate max-w-[35%]">{t.category || 'Sem categoria'}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleQuickConfirm(t)}
+                                className={cn(
+                                  "w-full h-12 rounded-full font-medium text-sm active:scale-95 transition-all",
+                                  movTab === 'apagar' ? "bg-primary/15 text-primary" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                )}
                               >
-                                {categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight">
-                                  {format(parseISO(t.date), 'dd/MM/yyyy')}
-                                </span>
-                                <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{t.description}</p>
-                              </div>
-                              <p className={cn(
-                                "font-heading font-medium tracking-tighter whitespace-nowrap text-base shrink-0",
-                                movTab === 'apagar' ? "text-rose-400" : "text-emerald-500"
-                              )}>
-                                R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </p>
+                                {movTab === 'apagar' ? 'Pagar agora' : 'Receber agora'}
+                              </button>
                             </div>
-                          </SwipeToConfirm>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   );
@@ -5806,7 +5849,7 @@ export default function App() {
               <div className="space-y-2">
                 <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Apagar tudo</h1>
                 <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
-                  Tem certeza? Isso apagará TODOS os seus lançamentos para sempre.
+                  Tem certeza? Isso apagará TODOS os seus lançamentos, cartões, categorias e pessoas para sempre. Sua conta e login continuam ativos.
                 </p>
                 <div className="pt-4 space-y-2 text-left">
                   <Label className="text-xs font-medium tracking-widest text-slate-400 dark:text-[#8D89AC] ml-1">Para confirmar, digite:</Label>
@@ -6029,17 +6072,20 @@ function SwipeToConfirm({
   const dragX = useMotionValue(0);
   const revealScale = useTransform(dragX, [0, 45], [0.7, 1]);
   const [confirmed, setConfirmed] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   if (!enabled) return <div className="relative">{children}</div>;
 
   return (
     <div className="relative rounded-full overflow-hidden">
-      <motion.div style={{ width: dragX }} className={cn("absolute inset-y-0 left-0 flex items-center pl-6 rounded-full overflow-hidden", colorClass)}>
-        <motion.div style={{ scale: revealScale }} className="flex items-center gap-2 text-white font-medium text-sm whitespace-nowrap">
-          <CheckCircle2 size={18} strokeWidth={2.5} />
-          {actionLabel}
+      {(isDragging || confirmed) && (
+        <motion.div style={{ width: dragX }} className={cn("absolute inset-y-0 left-0 flex items-center pl-6 rounded-full overflow-hidden", colorClass)}>
+          <motion.div style={{ scale: revealScale }} className="flex items-center gap-2 text-white font-medium text-sm whitespace-nowrap">
+            <CheckCircle2 size={18} strokeWidth={2.5} />
+            {actionLabel}
+          </motion.div>
         </motion.div>
-      </motion.div>
+      )}
       <motion.div
         drag={confirmed ? false : "x"}
         dragDirectionLock
@@ -6047,7 +6093,9 @@ function SwipeToConfirm({
         dragElastic={{ left: 0, right: 0.6 }}
         dragMomentum={false}
         style={{ x: dragX }}
+        onDragStart={() => setIsDragging(true)}
         onDragEnd={(_, info) => {
+          setIsDragging(false);
           if (info.offset.x > 56) {
             setConfirmed(true);
             setTimeout(() => onConfirm(), 450);
@@ -6134,9 +6182,7 @@ function TransactionItem({
                 "w-6 h-6 flex items-center justify-center shrink-0",
                 transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
               )}>
-                {transaction.id.startsWith('bill-') ? (
-                  <CreditCard size={19} strokeWidth={2.5} />
-                ) : transaction.status === 'actual' ? (
+                {transaction.status === 'actual' ? (
                   <Check size={20} strokeWidth={2.5} />
                 ) : (
                   <Clock size={19} strokeWidth={2.5} />
