@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   Plus,
   ChevronRight,
@@ -1044,16 +1044,34 @@ export default function App() {
   }, [cards, selectedCard, currentDate, transactions]);
 
   const billChartScrollRef = React.useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  // Metade da largura visível do carrossel — vira respiro (padding) nas duas
+  // pontas do gráfico. Sem isso a última barra (mês atual) nunca consegue
+  // ficar centralizada: o scroll trava assim que a borda dela encosta na
+  // borda do card, não dá pra rolar "além" do fim do conteúdo.
+  const [chartHalfViewport, setChartHalfViewport] = useState(0);
+  useLayoutEffect(() => {
     const el = billChartScrollRef.current;
-    if (!el || cardBillHistory.length === 0) return;
+    if (!el) return;
+    const measured = el.clientWidth / 2;
+    if (Math.abs(measured - chartHalfViewport) > 0.5) setChartHalfViewport(measured);
+  }, [activeTab, selectedCard, chartHalfViewport]);
+
+  // useLayoutEffect (roda antes do navegador pintar o frame) + scrollLeft
+  // aplicado de forma instantânea: evita que o usuário veja o carrossel
+  // "nascer" no mês mais antigo e depois deslizar (scroll-behavior: smooth)
+  // até o mês atual — o valor final já é o que aparece no primeiro paint.
+  useLayoutEffect(() => {
+    const el = billChartScrollRef.current;
+    if (!el || cardBillHistory.length === 0 || chartHalfViewport === 0) return;
     const selectedMonthKey = format(selectedBillDate, 'yyyy-MM');
     const index = cardBillHistory.findIndex(p => p.monthKey === selectedMonthKey);
     const targetIndex = index === -1 ? cardBillHistory.length - 1 : index;
-    const barCenter = targetIndex * CHART_BAR_WIDTH + CHART_BAR_WIDTH / 2;
-    const target = barCenter - el.clientWidth / 2;
+    const target = targetIndex * CHART_BAR_WIDTH + CHART_BAR_WIDTH / 2;
+    const prevBehavior = el.style.scrollBehavior;
+    el.style.scrollBehavior = 'auto';
     el.scrollLeft = Math.max(0, target);
-  }, [selectedCard, currentDate, selectedBillDate, cards.length, activeTab]);
+    el.style.scrollBehavior = prevBehavior;
+  }, [selectedCard, currentDate, selectedBillDate, cards.length, activeTab, chartHalfViewport]);
 
   const cardBillItems = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
@@ -5117,7 +5135,8 @@ export default function App() {
                           <div className="space-y-3">
                             <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Evolução da fatura</p>
                             <div className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2 overflow-hidden">
-                              <div ref={billChartScrollRef} className="overflow-x-auto scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
+                              <div ref={billChartScrollRef} className="overflow-x-auto scrollbar-hide flex items-center" style={{ scrollBehavior: 'smooth' }}>
+                                <div style={{ width: chartHalfViewport, flexShrink: 0 }} />
                                 <ComposedChart key={`${activeCard.id}-${cardBillHistory.length}`} width={cardBillHistory.length * CHART_BAR_WIDTH} height={130} data={cardBillHistory}>
                                   <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: '#9C93BE' }} />
                                   <Bar
@@ -5131,6 +5150,7 @@ export default function App() {
                                     ))}
                                   </Bar>
                                 </ComposedChart>
+                                <div style={{ width: chartHalfViewport, flexShrink: 0 }} />
                               </div>
                             </div>
                           </div>
