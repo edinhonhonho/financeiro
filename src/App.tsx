@@ -871,8 +871,10 @@ export default function App() {
 
     // Dois sentidos: "ela me deve" (padrão, receivable) e "eu pago pra ela"
     // (owedByPerson === false, payable — associação sem divisão, ex: mesada).
-    const items = withAmount.filter(t => t.owedByPerson !== false);
-    const payableItems = withAmount.filter(t => t.owedByPerson === false);
+    // Receita associada a pessoa é sempre receivable, mesmo que algum dado
+    // legado tenha owedByPerson === false gravado.
+    const items = withAmount.filter(t => t.type === 'income' || t.owedByPerson !== false);
+    const payableItems = withAmount.filter(t => t.type !== 'income' && t.owedByPerson === false);
 
     const pending = items.filter(t => t.status === 'planned');
     const paid = items.filter(t => t.status === 'actual');
@@ -1506,6 +1508,9 @@ export default function App() {
     try {
       const assignments = personSplits.length > 0 ? getAssignmentsFromSplits(amount, personSplits) : [];
 
+      // Ensure type is correct based on cardId presence if it was confused
+      const resolvedType: TransactionType = (newTransaction.type === 'expense' && newTransaction.cardId) ? 'card_purchase' : (newTransaction.type as TransactionType);
+
       const baseData = {
         description: newTransaction.description as string,
         amount: amount,
@@ -1514,8 +1519,7 @@ export default function App() {
         cardId: newTransaction.cardId || null,
         payerPayee: personSplits.length > 1 ? 'multi' : (newTransaction.payerPayee || ''),
         assignments: assignments,
-        // Ensure type is correct based on cardId presence if it was confused
-        type: (newTransaction.type === 'expense' && newTransaction.cardId) ? 'card_purchase' : (newTransaction.type as TransactionType),
+        type: resolvedType,
         date: newTransaction.date as string,
         recurrence: (isRecurrent ? 'monthly' : 'none') as RecurrenceType,
         recurrenceEndDate: isRecurrent ? (newTransaction.recurrenceEndDate ?? null) : null,
@@ -1527,8 +1531,9 @@ export default function App() {
         linkedToCard: false,
         // false = "eu pago pra essa pessoa" (não gera receita vinculada,
         // aparece em Pessoas como algo que eu devo); só relevante quando há
-        // exatamente uma pessoa associada.
-        owedByPerson: personSplits.length === 1 ? (newTransaction.owedByPerson ?? true) : true
+        // exatamente uma pessoa associada numa despesa. Receita associada a
+        // pessoa é sempre "ela me deve" — não existe a direção inversa.
+        owedByPerson: resolvedType === 'income' ? true : (personSplits.length === 1 ? (newTransaction.owedByPerson ?? true) : true)
       };
 
       if (editingTransaction) {
@@ -3075,6 +3080,11 @@ export default function App() {
 
                 {showPersonSelector && (
                   <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
+                    <p className="text-[10px] font-normal leading-relaxed text-slate-400 dark:text-[#8D89AC] ml-1">
+                      {newTransaction.type === 'income'
+                        ? 'A pessoa continua aparecendo aqui em Movimentações e também vai para Pessoas como um valor a receber dela.'
+                        : 'A despesa continua aparecendo aqui em Movimentações e também vai para Pessoas — como valor a receber ou a pagar, conforme a escolha abaixo.'}
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {people.filter(p => p.visible !== false).map(p => {
                         const isSelected = personSplits.some(s => s.personId === p.id);
@@ -3218,28 +3228,42 @@ export default function App() {
                                     </div>
                                   </div>
 
-                                  <div className="flex bg-white dark:bg-[#100E3D] p-0.5 rounded-lg">
-                                    <button
-                                      type="button"
-                                      onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
-                                      className={cn(
-                                        "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
-                                        newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                      )}
-                                    >
-                                      Ela me deve
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
-                                      className={cn(
-                                        "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
-                                        newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                      )}
-                                    >
-                                      Eu pago pra ela
-                                    </button>
-                                  </div>
+                                  {newTransaction.type === 'income' ? (
+                                    <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 rounded-lg">
+                                      <ArrowUpCircle size={12} className="text-emerald-500 shrink-0" />
+                                      <p className="text-[10px] font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex bg-white dark:bg-[#100E3D] p-0.5 rounded-lg">
+                                        <button
+                                          type="button"
+                                          onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                                          className={cn(
+                                            "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
+                                            newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                          )}
+                                        >
+                                          Ela me deve
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                                          className={cn(
+                                            "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
+                                            newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                          )}
+                                        >
+                                          Eu pago pra ela
+                                        </button>
+                                      </div>
+                                      <p className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed px-1">
+                                        {newTransaction.owedByPerson === false
+                                          ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
+                                          : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
+                                      </p>
+                                    </>
+                                  )}
                                 </div>
                               );
                             })}
@@ -3399,7 +3423,7 @@ export default function App() {
                 )}
               </div>
 
-                {newTransaction.type === 'card_purchase' && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
+                {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
                   <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-5 h-14 rounded-2xl">
                     <Label htmlFor="linked-income-m" className="text-sm font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
                       Associar receita
@@ -3749,6 +3773,11 @@ export default function App() {
 
                   {showPersonSelector && (
                     <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
+                      <p className="text-[11px] font-normal leading-relaxed text-slate-400 dark:text-[#8D89AC]">
+                        {newTransaction.type === 'income'
+                          ? 'A pessoa continua aparecendo aqui em Movimentações e também vai para Pessoas como um valor a receber dela.'
+                          : 'A despesa continua aparecendo aqui em Movimentações e também vai para Pessoas — como valor a receber ou a pagar, conforme a escolha abaixo.'}
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         {people.filter(p => p.visible !== false).map(p => {
                           const isSelected = personSplits.some(s => s.personId === p.id);
@@ -3892,28 +3921,42 @@ export default function App() {
                                       </div>
                                     </div>
 
-                                    <div className="flex bg-white dark:bg-[#100E3D] p-1 rounded-xl">
-                                      <button
-                                        type="button"
-                                        onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
-                                        className={cn(
-                                          "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
-                                          newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                        )}
-                                      >
-                                        Ela me deve
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
-                                        className={cn(
-                                          "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
-                                          newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                        )}
-                                      >
-                                        Eu pago pra ela
-                                      </button>
-                                    </div>
+                                    {newTransaction.type === 'income' ? (
+                                      <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2.5 rounded-xl">
+                                        <ArrowUpCircle size={14} className="text-emerald-500 shrink-0" />
+                                        <p className="text-xs font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <div className="flex bg-white dark:bg-[#100E3D] p-1 rounded-xl">
+                                          <button
+                                            type="button"
+                                            onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                                            className={cn(
+                                              "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
+                                              newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                            )}
+                                          >
+                                            Ela me deve
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                                            className={cn(
+                                              "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
+                                              newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
+                                            )}
+                                          >
+                                            Eu pago pra ela
+                                          </button>
+                                        </div>
+                                        <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed px-1">
+                                          {newTransaction.owedByPerson === false
+                                            ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
+                                            : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
+                                        </p>
+                                      </>
+                                    )}
                                   </div>
                                 );
                               })}
