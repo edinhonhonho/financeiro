@@ -639,18 +639,18 @@ export default function App() {
         const isPastMonth = mi === 0;
         const mk = (day: number) => format(new Date(y, m, day), 'yyyy-MM-dd');
 
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'income', description: 'Salário', amount: 5200, date: mk(5), category: catName('Salário'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [] } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'income', description: 'Freelance de design', amount: 850, date: mk(16), category: catName('Salário'), status: isPastMonth ? 'actual' : 'planned', recurrence: 'none', payerPayee: 'geral', assignments: [] } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: 'Aluguel', amount: 1800, date: mk(10), category: catName('Moradia'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [] } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: 'Internet', amount: 119.9, date: mk(8), category: catName('Moradia'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [] } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: `Conta de luz dividida com ${personAName}`, amount: 240, date: mk(12), category: catName('Moradia'), status: isPastMonth ? 'actual' : 'planned', recurrence: 'none', payerPayee: personA, assignments: [] } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: 'Curso de inglês', amount: 350, date: mk(20), category: catName('Lazer'), status: 'planned', recurrence: 'none', payerPayee: 'geral', assignments: [] } as Transaction & { userId: string });
+        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'income', description: 'Salário', amount: 5200, date: mk(5), category: catName('Salário'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
+        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'income', description: 'Freelance de design', amount: 850, date: mk(16), category: catName('Salário'), status: isPastMonth ? 'actual' : 'planned', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
+        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: 'Aluguel', amount: 1800, date: mk(10), category: catName('Moradia'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
+        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: 'Internet', amount: 119.9, date: mk(8), category: catName('Moradia'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
+        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: `Conta de luz dividida com ${personAName}`, amount: 240, date: mk(12), category: catName('Moradia'), status: isPastMonth ? 'actual' : 'planned', recurrence: 'none', payerPayee: personA, assignments: [], linkedToCard: false } as Transaction & { userId: string });
+        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: 'Curso de inglês', amount: 350, date: mk(20), category: catName('Lazer'), status: 'planned', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
         if (cardA) {
-          rows.push({ id: api.newTransactionId(), userId: user.id, type: 'card_purchase', description: 'Supermercado', amount: 430.5, date: mk(7), category: catName('Alimentação'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], cardId: cardA } as Transaction & { userId: string });
-          rows.push({ id: api.newTransactionId(), userId: user.id, type: 'card_purchase', description: `Cinema com ${personBName}`, amount: 90, date: mk(18), category: catName('Lazer'), status: 'actual', recurrence: 'none', payerPayee: personB, assignments: [], cardId: cardA } as Transaction & { userId: string });
+          rows.push({ id: api.newTransactionId(), userId: user.id, type: 'card_purchase', description: 'Supermercado', amount: 430.5, date: mk(7), category: catName('Alimentação'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], cardId: cardA, linkedToCard: false } as Transaction & { userId: string });
+          rows.push({ id: api.newTransactionId(), userId: user.id, type: 'card_purchase', description: `Cinema com ${personBName}`, amount: 90, date: mk(18), category: catName('Lazer'), status: 'actual', recurrence: 'none', payerPayee: personB, assignments: [], cardId: cardA, linkedToCard: false } as Transaction & { userId: string });
         }
         if (cardB) {
-          rows.push({ id: api.newTransactionId(), userId: user.id, type: 'card_purchase', description: 'Assinatura streaming', amount: 39.9, date: mk(3), category: catName('Lazer'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], cardId: cardB } as Transaction & { userId: string });
+          rows.push({ id: api.newTransactionId(), userId: user.id, type: 'card_purchase', description: 'Assinatura streaming', amount: 39.9, date: mk(3), category: catName('Lazer'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], cardId: cardB, linkedToCard: false } as Transaction & { userId: string });
         }
       });
 
@@ -1423,7 +1423,9 @@ export default function App() {
         installments: isInstallment ? {
           total: installmentCount,
           current: editingTransaction?.installments?.current || 1
-        } : null
+        } : null,
+        // Coluna NOT NULL no banco — precisa ir explícito em todo insert.
+        linkedToCard: false
       };
 
       if (editingTransaction) {
@@ -2070,7 +2072,8 @@ export default function App() {
           cardId: card?.id ?? null, // permite checar se a fatura do mês já foi paga
           payerPayee: 'geral',
           recurrence: 'none',
-          assignments: []
+          assignments: [],
+          linkedToCard: false
         } as Transaction & { userId: string }]);
       } else {
         await api.updateTransaction(id, {
