@@ -431,10 +431,8 @@ export default function App() {
   const [sortMode, setSortMode] = useState<'date' | 'min' | 'max'>('date');
   const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string }>({ open: false, title: '', message: '' });
   const [tempNickname, setTempNickname] = useState('');
-  const [createLinkedIncome, setCreateLinkedIncome] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingCard, setIsSubmittingCard] = useState(false);
-  const [deleteLinked, setDeleteLinked] = useState(false);
   const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
   const [linkedIncomeDate, setLinkedIncomeDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
@@ -565,6 +563,21 @@ export default function App() {
     const text = generateChargeMessage(person, charges, currentDate);
     const phone = person.phone ? person.phone.replace(/\D/g, '') : '';
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+  // Marca como pagas todas as pendências do mês com a pessoa (o que ela me deve
+  // e o que eu devo a ela), zerando o saldo.
+  const settlePersonMonth = async (charges: ReturnType<typeof getPersonMonthlyCharges>) => {
+    const toSettle = [...charges.pending, ...charges.payablePending].filter(t => !t.id.startsWith('person-bill-'));
+    if (toSettle.length === 0) return;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    try {
+      for (const t of toSettle) {
+        await api.updateTransaction(t.id, { status: 'actual', actualDate: today });
+      }
+      await loadTransactions();
+    } catch (err) {
+      showAlert('Erro', extractErrorMessage(err));
+    }
   };
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [editingCard, setEditingCard] = useState<Card | null>(null);
@@ -841,20 +854,35 @@ export default function App() {
     format(parseISO(t.date), 'yyyy-MM') === format(month, 'yyyy-MM')
   );
 
-  /** Despesas atribuídas a uma pessoa (via payerPayee ou split) num mês específico — usado para cobrança. */
+  // Ids de lançamentos que já têm uma receita de reembolso vinculada — o
+  // Set evita varrer a lista inteira a cada consulta (era O(n²) por pessoa/mês).
+  const linkedParentIds = useMemo(() => {
+    const ids = new Set<string>();
+    transactions.forEach(t => { if (t.linkedTransactionId) ids.add(t.linkedTransactionId); });
+    return ids;
+  }, [transactions]);
+
+  /**
+   * Livro-razão de uma pessoa num mês (usado em Pessoas, cobrança e totais).
+   *
+   * Modelo: cada lançamento atribuído a uma pessoa é uma dívida entre vocês.
+   * - "Ela me deve" (owedByPerson !== false): a despesa é paga por mim e a
+   *   parte dela vira uma RECEITA vinculada (linkedToCard) — é essa receita
+   *   que Pessoas acompanha, porque tem a data e o status reais de quando o
+   *   dinheiro volta. Contar a despesa original também duplicaria a dívida.
+   *   (Despesas antigas, sem receita vinculada, continuam contando pelo
+   *   status da própria despesa.) Receitas lançadas direto e associadas a
+   *   ela também entram aqui.
+   * - "Eu pago pra ela" (owedByPerson === false): despesa que eu devo a ela.
+   * `balance` = o que ela me deve − o que eu devo a ela (pendentes).
+   */
   const getPersonMonthlyCharges = (personId: string, month: Date) => {
     const monthStr = format(month, 'yyyy-MM');
 
-    // Qualquer tipo conta (expense, card_purchase ou income direto marcado
-    // como "ela me deve") — o que importa é estar atribuído a essa pessoa;
-    // status planned/actual já mapeia certinho pra Pendente/Pago nos três casos.
-    // Quando uma despesa tem receita vinculada (reembolso automático), a
-    // receita é quem manda — tem a data e o status reais de quando o
-    // dinheiro volta. Contar a despesa original também duplicaria a dívida.
     const relevant = transactions.filter(t => {
       const isForPerson = t.payerPayee === personId || (t.assignments && t.assignments.some(a => a.personId === personId));
       if (!isForPerson) return false;
-      if (!t.linkedToCard && transactions.some(other => other.linkedTransactionId === t.id)) return false;
+      if (!t.linkedToCard && linkedParentIds.has(t.id)) return false;
       return format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr;
     });
 
@@ -886,24 +914,50 @@ export default function App() {
 
     return {
       items, pending, paid, pendingTotal, paidTotal, total: pendingTotal + paidTotal,
-      payableItems, payablePending, payablePaid, payablePendingTotal, payablePaidTotal, payableTotal: payablePendingTotal + payablePaidTotal
+      payableItems, payablePending, payablePaid, payablePendingTotal, payablePaidTotal, payableTotal: payablePendingTotal + payablePaidTotal,
+      balance: pendingTotal - payablePendingTotal
     };
   };
 
   /**
-   * Fatura sintética das pendências de uma pessoa num mês — mesmo padrão de
-   * computeCardBill: agrupa os lançamentos "ela me deve" (planned) numa única
-   * entrada, análoga à "Fatura {Cartão}" nas Movimentações.
+   * Compensação: o que ela me deve e o que eu devo a ela se anulam ("zero a
+   * zero") — esse vai-e-vem não é receita nem despesa de verdade, então sai
+   * dos totais do mês. Só entra o que é receita (reembolso) do lado dela e
+   * despesa do lado meu, separado por status pra nunca deixar total negativo.
+   */
+  const getNettedOut = (month: Date) => {
+    const out = { incomePlanned: 0, incomeActual: 0, expensesPlanned: 0, expensesActual: 0 };
+    people.forEach(person => {
+      const c = getPersonMonthlyCharges(person.id, month);
+      const sumIncome = (list: Transaction[]) => list.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
+      const sumExpense = (list: Transaction[]) => list.filter(t => t.type !== 'income').reduce((acc, t) => acc + t.amount, 0);
+      const planned = Math.min(sumIncome(c.pending), sumExpense(c.payablePending));
+      const actual = Math.min(sumIncome(c.paid), sumExpense(c.payablePaid));
+      out.incomePlanned += planned;
+      out.expensesPlanned += planned;
+      out.incomeActual += actual;
+      out.expensesActual += actual;
+    });
+    return out;
+  };
+
+  /**
+   * "A receber de {pessoa}" — agrupa as receitas de reembolso pendentes de
+   * uma pessoa num mês numa única entrada, no mesmo padrão da Fatura do
+   * cartão nas Movimentações (uma linha por pessoa, em vez de uma por item).
    */
   const computePersonBill = (person: Person, month: Date): Transaction => {
-    const amount = getPersonMonthlyCharges(person.id, month).pendingTotal;
+    const monthStr = format(month, 'yyyy-MM');
+    const amount = transactions
+      .filter(t => isBundledIntoPersonBill(t) && t.payerPayee === person.id && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr)
+      .reduce((acc, t) => acc + t.amount, 0);
     return {
       id: `person-bill-${person.id}`,
-      type: 'expense',
-      description: `Pendências ${person.name}`,
+      type: 'income',
+      description: `A receber de ${person.name}`,
       amount,
       date: format(endOfMonth(month), 'yyyy-MM-dd'),
-      category: 'Pendência pessoa',
+      category: 'Reembolso',
       status: 'planned',
       payerPayee: person.id,
       recurrence: 'none',
@@ -911,18 +965,9 @@ export default function App() {
     };
   };
 
-  /** Um lançamento conta pra "Pendências {pessoa}" quando é 100% atribuído a
-   *  ela sozinha (não split parcial nem multi-pessoa) e ainda não foi pago.
-   *  Se já tem receita vinculada, a despesa não conta mais pra Pessoas (a
-   *  receita virou a fonte de verdade) — precisa continuar aparecendo como
-   *  lançamento normal, não sumir "bundled" num total que não a inclui mais. */
-  const isBundledIntoPersonBill = (t: Transaction) => {
-    if (t.type !== 'expense' || t.status !== 'planned' || t.owedByPerson === false) return false;
-    if (!t.payerPayee || t.payerPayee === 'geral' || t.payerPayee === 'multi') return false;
-    if (!t.assignments || t.assignments.length !== 1) return false;
-    if (transactions.some(other => other.linkedTransactionId === t.id)) return false;
-    return t.assignments[0].personId === t.payerPayee && Math.abs(t.assignments[0].amount - t.amount) < 0.005;
-  };
+  /** Receita de reembolso pendente — é o que "A receber de {pessoa}" agrupa. */
+  const isBundledIntoPersonBill = (t: Transaction) =>
+    t.type === 'income' && !!t.linkedToCard && t.status === 'planned' && !!t.payerPayee && t.payerPayee !== 'geral' && t.payerPayee !== 'multi';
 
   // Grouping logic
   const groupedTransactions = useMemo(() => {
@@ -1411,21 +1456,25 @@ export default function App() {
       return format(effectiveMonth, 'yyyy-MM') === targetMonthStr;
     });
 
+    // O que se anula entre mim e cada pessoa (ela me deve X / eu devo X) não
+    // é receita nem despesa de verdade — sai dos totais.
+    const netted = getNettedOut(currentDate);
+
     const incomePlanned = monthTransactions
       .filter(t => t.type === 'income' && t.status === 'planned')
-      .reduce((acc, t) => acc + t.amount, 0);
-    
+      .reduce((acc, t) => acc + t.amount, 0) - netted.incomePlanned;
+
     const incomeActual = monthTransactions
       .filter(t => t.type === 'income' && t.status === 'actual')
-      .reduce((acc, t) => acc + t.amount, 0);
+      .reduce((acc, t) => acc + t.amount, 0) - netted.incomeActual;
 
     const expensesPlanned = monthTransactions
       .filter(t => (t.type === 'expense' || t.type === 'card_purchase') && t.status === 'planned')
-      .reduce((acc, t) => acc + t.amount, 0);
+      .reduce((acc, t) => acc + t.amount, 0) - netted.expensesPlanned;
 
     const expensesActual = monthTransactions
       .filter(t => (t.type === 'expense' || t.type === 'card_purchase') && t.status === 'actual')
-      .reduce((acc, t) => acc + t.amount, 0);
+      .reduce((acc, t) => acc + t.amount, 0) - netted.expensesActual;
 
     const incomeTotal = incomeActual + incomePlanned;
     const expenseTotal = expensesActual + expensesPlanned;
@@ -1447,7 +1496,7 @@ export default function App() {
       balance: incomeActual - expensesActual,
       cardTotals
     };
-  }, [transactions, cards, currentDate]);
+  }, [transactions, cards, people, currentDate]);
 
   const chartData = useMemo(() => {
     const start = startOfMonth(currentDate);
@@ -1475,9 +1524,10 @@ export default function App() {
         isWithinInterval(parseISO(t.date), { start, end })
       );
       
-      const income = monthTransactions.filter(t => t.type === 'income' && t.status === 'actual').reduce((acc, t) => acc + t.amount, 0);
-      const expense = monthTransactions.filter(t => (t.type === 'expense' || t.type === 'card_purchase') && t.status === 'actual').reduce((acc, t) => acc + t.amount, 0);
-      
+      const netted = getNettedOut(date);
+      const income = monthTransactions.filter(t => t.type === 'income' && t.status === 'actual').reduce((acc, t) => acc + t.amount, 0) - netted.incomeActual;
+      const expense = monthTransactions.filter(t => (t.type === 'expense' || t.type === 'card_purchase') && t.status === 'actual').reduce((acc, t) => acc + t.amount, 0) - netted.expensesActual;
+
       data.push({
         name: format(date, 'MMM', { locale: ptBR }),
         receitas: income,
@@ -1485,7 +1535,7 @@ export default function App() {
       });
     }
     return data;
-  }, [transactions, currentDate]);
+  }, [transactions, people, currentDate]);
 
   const COLORS = ['#8A7FF5', '#37D6A3', '#FF6F61', '#FDB8D7', '#6FA8FF', '#FFC168'];
 
@@ -1528,7 +1578,7 @@ export default function App() {
         // false = "eu pago pra essa pessoa" (não gera receita vinculada,
         // aparece em Pessoas como algo que eu devo); só relevante quando há
         // exatamente uma pessoa associada.
-        owedByPerson: personSplits.length === 1 ? (newTransaction.owedByPerson ?? true) : true
+        owedByPerson: personSplits.length === 1 && newTransaction.type !== 'income' ? (newTransaction.owedByPerson ?? true) : true
       };
 
       if (editingTransaction) {
@@ -1559,17 +1609,61 @@ export default function App() {
 
         const finalBaseData = {
           ...baseData,
-          seriesId: seriesIdToUse
+          seriesId: seriesIdToUse,
+          // Editar uma receita de reembolso não pode "desvincular" ela.
+          linkedToCard: !!editingTransaction.linkedToCard
+        };
+
+        // Reembolso automático (receita vinculada) de um lançamento existente:
+        // cria o que faltar, atualiza valor/descrição do que já existe (a data
+        // é da própria receita — quem controla é o usuário) e apaga o que não
+        // faz mais sentido (pessoa removida, virou "eu pago pra ela"...).
+        const wantsLinkedIncome = !editingTransaction.linkedToCard &&
+          (baseData.type === 'card_purchase' || baseData.type === 'expense') &&
+          !!baseData.payerPayee && baseData.payerPayee !== 'geral' && baseData.owedByPerson !== false;
+        const wantedIncomes = (assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }]).filter(a => a.amount > 0);
+        const syncLinkedIncomes = async (mainId: string, mainDate: string, existing: Transaction[], mainExtra: Partial<Transaction>) => {
+          if (editingTransaction.linkedToCard) return;
+          const targets = wantsLinkedIncome ? wantedIncomes : [];
+          const dateOffset = differenceInCalendarDays(parseISO(linkedIncomeDate), parseISO(newTransaction.date as string));
+          for (const target of targets) {
+            const found = existing.find(l => l.payerPayee === target.personId);
+            if (found) {
+              await api.updateTransaction(found.id, { amount: target.amount, description: baseData.description });
+            } else {
+              await api.insertTransactions([{
+                id: api.newTransactionId(),
+                userId,
+                type: 'income',
+                description: baseData.description,
+                amount: target.amount,
+                date: format(addDays(parseISO(mainDate), dateOffset), 'yyyy-MM-dd'),
+                category: 'Associado',
+                status: 'planned',
+                payerPayee: target.personId,
+                recurrence: 'none',
+                installments: null,
+                cardId: baseData.cardId,
+                linkedToCard: true,
+                linkedTransactionId: mainId,
+                assignments: [],
+                ...mainExtra
+              } as Transaction & { userId: string }]);
+            }
+          }
+          const staleIds = existing.filter(l => !targets.some(t => t.personId === l.payerPayee)).map(l => l.id);
+          if (staleIds.length > 0) await api.deleteTransactions(staleIds);
         };
 
         if (becomingSeries) {
           await api.updateTransaction(editingTransaction.id, finalBaseData);
+          await syncLinkedIncomes(editingTransaction.id, baseData.date, await api.fetchLinkedTransactions(userId, editingTransaction.id), {});
 
           const newRows: Array<Transaction & { userId: string }> = [];
           let startingLinkedRunner = parseISO(linkedIncomeDate);
           const shouldLinkIncome = (baseData.type === 'card_purchase' || baseData.type === 'expense') &&
-            baseData.payerPayee && baseData.payerPayee !== 'geral' && createLinkedIncome && baseData.owedByPerson !== false;
-          const incomeAssignments = assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }];
+            baseData.payerPayee && baseData.payerPayee !== 'geral' && baseData.owedByPerson !== false;
+          const incomeAssignments = (assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }]).filter(a => a.amount > 0);
 
           if (isRecurrent && newTransaction.recurrenceEndDate) {
             let runner = addMonths(parseISO(newTransaction.date as string), 1);
@@ -1681,7 +1775,7 @@ export default function App() {
 
             // Update future "main" siblings (same type as the edited transaction)
             const futureMainSiblings = siblings.filter(s =>
-              s.id !== editingTransaction.id && s.type === editingTransaction.type && s.date >= editingTransaction.date
+              s.id !== editingTransaction.id && s.type === editingTransaction.type && !!s.linkedToCard === !!editingTransaction.linkedToCard && s.date >= editingTransaction.date
             );
             futureMainSiblings.forEach(s => {
               const siblingNewDate = daysOffset !== 0 ? format(addDays(parseISO(s.date), daysOffset), 'yyyy-MM-dd') : s.date;
@@ -1693,22 +1787,6 @@ export default function App() {
               });
             });
 
-            // Sync linked income entries: only amount/description/date per matched person, not the whole payload
-            const futureLinkedIncome = siblings.filter(s =>
-              s.linkedToCard && s.date >= editingTransaction.date
-            );
-            futureLinkedIncome.forEach(s => {
-              const match = assignments.find(a => a.personId === s.payerPayee);
-              if (match) {
-                const linkedNewDate = daysOffset !== 0 ? format(addDays(parseISO(s.date), daysOffset), 'yyyy-MM-dd') : s.date;
-                rowsToUpsert.push({
-                  id: s.id,
-                  amount: match.amount,
-                  description: finalBaseData.description,
-                  date: linkedNewDate
-                });
-              }
-            });
 
             // Atualiza cada linha individualmente (update, não upsert): a RPC
             // upsert_transactions exige todas as colunas NOT NULL mesmo em
@@ -1720,6 +1798,16 @@ export default function App() {
               const { id, ...data } = row;
               await api.updateTransaction(id as string, data);
             }
+            // Reembolsos vinculados de cada ocorrência afetada (a que foi
+            // editada + as futuras): mantém valor/descrição em dia.
+            for (const row of rowsToUpsert) {
+              await syncLinkedIncomes(
+                row.id as string,
+                (row.date as string) || baseData.date,
+                siblings.filter(s => s.linkedTransactionId === row.id),
+                { seriesId: seriesIdToUse, recurrence: baseData.recurrence, recurrenceEndDate: baseData.recurrenceEndDate }
+              );
+            }
             showAlert('Sucesso', 'Sequência atualizada com sucesso.');
           } catch (err) {
             console.error('Erro ao atualizar sequência:', err);
@@ -1727,20 +1815,12 @@ export default function App() {
           }
         } else {
           await api.updateTransaction(editingTransaction.id, finalBaseData);
-
-          // Sync linked transactions (per-person amount, not the whole payload)
-          const linked = await api.fetchLinkedTransactions(userId, editingTransaction.id);
-          if (linked.length > 0) {
-            const rows = linked
-              .map(l => {
-                const match = assignments.find(a => a.personId === l.payerPayee);
-                return match ? { id: l.id, amount: match.amount, description: finalBaseData.description, date: finalBaseData.date } : null;
-              })
-              .filter((r): r is { id: string; amount: number; description: string; date: string } => r !== null);
-            for (const row of rows) {
-              await api.updateTransaction(row.id, { amount: row.amount, description: row.description, date: row.date });
-            }
-          }
+          await syncLinkedIncomes(
+            editingTransaction.id,
+            finalBaseData.date,
+            await api.fetchLinkedTransactions(userId, editingTransaction.id),
+            { seriesId: seriesIdToUse, recurrence: editingTransaction.recurrence, installments: editingTransaction.installments ?? null }
+          );
         }
         setEditingTransaction(null);
         setShowSeriesEditDialog(false);
@@ -1753,8 +1833,8 @@ export default function App() {
         // Use the synced linkedIncomeDate which matches newTransaction.date by default
         let startingLinkedRunner = parseISO(linkedIncomeDate);
         const shouldLinkIncome = (baseData.type === 'card_purchase' || baseData.type === 'expense') &&
-          baseData.payerPayee && baseData.payerPayee !== 'geral' && createLinkedIncome && baseData.owedByPerson !== false;
-        const incomeAssignments = assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }];
+          baseData.payerPayee && baseData.payerPayee !== 'geral' && baseData.owedByPerson !== false;
+        const incomeAssignments = (assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }]).filter(a => a.amount > 0);
 
         if (isRecurrent && newTransaction.recurrenceEndDate) {
           const startDate = parseISO(newTransaction.date as string);
@@ -1896,7 +1976,6 @@ export default function App() {
 
       await loadTransactions();
       setIsRegistrarOpen(false);
-      setCreateLinkedIncome(true);
       setNewTransaction({
         type: 'expense',
         date: format(new Date(), 'yyyy-MM-dd'),
@@ -2020,7 +2099,8 @@ export default function App() {
     } else {
       setNewTransaction(t);
     }
-    setLinkedIncomeDate(t.date || format(new Date(), 'yyyy-MM-dd'));
+    const existingLinked = transactions.find(x => x.linkedTransactionId === t.id);
+    setLinkedIncomeDate(existingLinked?.date || t.date || format(new Date(), 'yyyy-MM-dd'));
     if (t.assignments && t.assignments.length > 0) {
       setAssignmentMode('split');
       setShowPersonSelector(true);
@@ -2363,28 +2443,29 @@ export default function App() {
             (tx.recurrence !== 'none' || tx.installments)
           );
         } else {
-          txsToDelete = (await api.fetchSeriesSiblings(user.id, t.seriesId)).filter(tx => tx.date >= t.date);
+          // A série compartilha o seriesId com as receitas de reembolso — se o
+          // que foi apagado é uma dessas receitas, só as da mesma pessoa saem
+          // (senão apagaria as despesas originais junto).
+          txsToDelete = (await api.fetchSeriesSiblings(user.id, t.seriesId)).filter(tx =>
+            tx.date >= t.date &&
+            (!t.linkedToCard || (!!tx.linkedToCard && tx.payerPayee === t.payerPayee))
+          );
         }
 
-        const idsToDelete = txsToDelete.map(tx => tx.id);
+        const idsToDelete = new Set(txsToDelete.map(tx => tx.id));
 
-        // Also handle linked transactions for EACH item in the series if requested
-        // (paralelo — buscar um por um aqui era muito lento numa série longa)
-        if (deleteLinked) {
-          const linkedLists = await Promise.all(txsToDelete.map(tx => api.fetchLinkedTransactions(user.id, tx.id)));
-          linkedLists.forEach(linked => idsToDelete.push(...linked.map(l => l.id)));
-        }
+        // Reembolsos vinculados nunca ficam órfãos: sempre saem junto com a
+        // despesa (paralelo — um por um era lento numa série longa).
+        const linkedLists = await Promise.all(txsToDelete.map(tx => api.fetchLinkedTransactions(user.id, tx.id)));
+        linkedLists.forEach(linked => linked.forEach(l => idsToDelete.add(l.id)));
 
-        await api.deleteTransactions(idsToDelete);
+        await api.deleteTransactions(Array.from(idsToDelete));
         showAlert('Sucesso', 'Lançamentos apagados com sucesso.');
       } else {
         const idsToDelete = [id];
 
-        // Handle linked transactions for single delete
-        if (deleteLinked) {
-          const linked = await api.fetchLinkedTransactions(user.id, id);
-          idsToDelete.push(...linked.map(l => l.id));
-        }
+        const linked = await api.fetchLinkedTransactions(user.id, id);
+        idsToDelete.push(...linked.map(l => l.id));
 
         await api.deleteTransactions(idsToDelete);
         showAlert('Sucesso', 'Lançamento apagado com sucesso.');
@@ -2396,7 +2477,6 @@ export default function App() {
       setEditingTransaction(null);
       setConfirmingTransaction(null);
       setIsRegistrarOpen(false);
-      setDeleteLinked(false);
     } catch (err) {
       console.error('Erro ao apagar lançamento:', err);
       showAlert('Não foi possível apagar', extractErrorMessage(err));
@@ -2821,7 +2901,6 @@ export default function App() {
                     if (confirmingTransaction) {
                       setTransactionToDelete(confirmingTransaction);
                       setIsDeleteDialogOpen(true);
-                      setDeleteLinked(false);
                     }
                   }}>
                     <Trash2 size={16} className="mr-2" />
@@ -3218,7 +3297,7 @@ export default function App() {
                                     </div>
                                   </div>
 
-                                  <div className="flex bg-white dark:bg-[#100E3D] p-0.5 rounded-lg">
+                                  <div className={cn("flex bg-white dark:bg-[#100E3D] p-0.5 rounded-lg", newTransaction.type === 'income' && "hidden")}>
                                     <button
                                       type="button"
                                       onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
@@ -3399,24 +3478,25 @@ export default function App() {
                 )}
               </div>
 
-                {newTransaction.type === 'card_purchase' && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
-                  <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-5 h-14 rounded-2xl">
-                    <Label htmlFor="linked-income-m" className="text-sm font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
-                      Associar receita
-                      <Popover>
-                        <PopoverTrigger render={
-                          <button className="h-5 w-5 flex items-center justify-center rounded-full bg-white dark:bg-[#100E3D] shadow-sm outline-none">
-                            <Info size={12} className="text-indigo-400" />
-                          </button>
-                        } />
-                        <PopoverContent className="w-56 p-4 rounded-3xl bg-indigo-600 text-white border-none shadow-deep z-[70]">
-                          <p className="text-[10px] font-normal leading-relaxed tracking-tight">
-                            Cria uma receita automática para a pessoa selecionada. Útil para reembolsos.
-                          </p>
-                        </PopoverContent>
-                      </Popover>
+                {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && !editingTransaction?.linkedToCard && (
+                  <div className="p-4 bg-indigo-50/80 dark:bg-indigo-950/20 rounded-2xl space-y-2">
+                    <Label className="text-[10px] font-medium tracking-wider text-indigo-500 dark:text-indigo-300 ml-1">
+                      Quando ela vai te pagar?
                     </Label>
-                    <ToggleSwitch checked={createLinkedIncome} onChange={setCreateLinkedIncome} />
+                    {editingTransaction && linkedParentIds.has(editingTransaction.id) ? (
+                      <p className="text-xs font-normal text-indigo-600/80 dark:text-indigo-300/80">
+                        A data e o status do reembolso ficam na receita vinculada (aba Pessoas).
+                      </p>
+                    ) : (
+                      <DateField
+                        value={linkedIncomeDate}
+                        onChange={setLinkedIncomeDate}
+                        className="h-12 rounded-xl text-sm text-indigo-600 bg-white dark:bg-[#100E3D]"
+                      />
+                    )}
+                    <p className="text-[10px] font-normal text-indigo-500/70 dark:text-indigo-300/60 ml-1">
+                      Vira uma receita a receber, acompanhada em Pessoas. O que ela te deve e o que você deve a ela se anulam nos totais.
+                    </p>
                   </div>
                 )}
 
@@ -3892,7 +3972,7 @@ export default function App() {
                                       </div>
                                     </div>
 
-                                    <div className="flex bg-white dark:bg-[#100E3D] p-1 rounded-xl">
+                                    <div className={cn("flex bg-white dark:bg-[#100E3D] p-1 rounded-xl", newTransaction.type === 'income' && "hidden")}>
                                       <button
                                         type="button"
                                         onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
@@ -4080,39 +4160,25 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && (
-                    <div className="space-y-3 flex-1">
-                      <div className="flex items-center gap-3 bg-indigo-50/80 dark:bg-indigo-950/20 px-5 h-16 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm">
-                        <Label htmlFor="linked-income-d" className="text-xs font-medium text-indigo-600 dark:text-indigo-300 cursor-pointer flex items-center gap-2 flex-1">
-                          Associar receita
-                          <Popover>
-                            <PopoverTrigger render={
-                              <button className="h-6 w-6 flex items-center justify-center rounded-full bg-white dark:bg-[#100E3D] shadow-sm hover:scale-110 active:scale-95 transition-all outline-none">
-                                <Info size={14} className="text-indigo-400" />
-                              </button>
-                            } />
-                            <PopoverContent className="w-64 p-4 rounded-[1.5rem] bg-indigo-600 text-white border-none shadow-deep z-[70]">
-                              <p className="text-[11px] font-normal leading-relaxed tracking-tight">
-                                Ao ativar, o sistema gerará automaticamente uma receita correspondente para a pessoa selecionada. Útil para quando você paga algo para alguém e quer controlar o reembolso.
-                              </p>
-                            </PopoverContent>
-                          </Popover>
-                        </Label>
-                        <ToggleSwitch checked={createLinkedIncome} onChange={setCreateLinkedIncome} />
-                      </div>
-
-                      {createLinkedIncome && (
-                        <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/10 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/30 space-y-2 animate-in fade-in slide-in-from-top-2">
-                          <Label className="text-[10px] font-medium tracking-wider text-indigo-400 ml-1">
-                            Data limite para reembolso
-                          </Label>
-                          <DateField
-                            value={linkedIncomeDate}
-                            onChange={setLinkedIncomeDate}
-                            className="h-12 rounded-xl text-sm text-indigo-600"
-                          />
-                        </div>
+                  {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && !editingTransaction?.linkedToCard && (
+                    <div className="p-4 bg-indigo-50/80 dark:bg-indigo-950/20 rounded-2xl space-y-2 flex-1">
+                      <Label className="text-[10px] font-medium tracking-wider text-indigo-500 dark:text-indigo-300 ml-1">
+                        Quando ela vai te pagar?
+                      </Label>
+                      {editingTransaction && linkedParentIds.has(editingTransaction.id) ? (
+                        <p className="text-xs font-normal text-indigo-600/80 dark:text-indigo-300/80">
+                          A data e o status do reembolso ficam na receita vinculada (aba Pessoas).
+                        </p>
+                      ) : (
+                        <DateField
+                          value={linkedIncomeDate}
+                          onChange={setLinkedIncomeDate}
+                          className="h-12 rounded-xl text-sm text-indigo-600 bg-white dark:bg-[#100E3D]"
+                        />
                       )}
+                      <p className="text-[10px] font-normal text-indigo-500/70 dark:text-indigo-300/60 ml-1">
+                        Vira uma receita a receber, acompanhada em Pessoas. O que ela te deve e o que você deve a ela se anulam nos totais.
+                      </p>
                     </div>
                   )}
 
@@ -4727,8 +4793,8 @@ export default function App() {
                 {(() => {
                   const debtors = people
                     .map(p => ({ person: p, charges: getPersonMonthlyCharges(p.id, currentDate) }))
-                    .filter(d => d.charges.pendingTotal > 0)
-                    .sort((a, b) => b.charges.pendingTotal - a.charges.pendingTotal);
+                    .filter(d => d.charges.balance > 0)
+                    .sort((a, b) => b.charges.balance - a.charges.balance);
                   if (debtors.length === 0) {
                     return (
                       <div className="bg-card rounded-[1.75rem] shadow-soft p-10 text-center">
@@ -4746,7 +4812,7 @@ export default function App() {
                         >
                           <img src={person.image || `https://picsum.photos/seed/${person.name}/100/100`} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
                           <span className="flex-1 min-w-0 font-medium text-slate-700 dark:text-[#EDEAF9] text-sm truncate tracking-tight">{person.name}</span>
-                          <span className="font-heading font-medium text-rose-400 text-base tracking-tighter shrink-0">R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span className="font-heading font-medium text-rose-400 text-base tracking-tighter shrink-0">R$ {charges.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           <div
                             className="w-9 h-9 rounded-full bg-emerald-400 text-white flex items-center justify-center shrink-0"
                             onClick={(e) => { e.stopPropagation(); shareChargeOnWhatsApp(person, charges); }}
@@ -6031,18 +6097,26 @@ export default function App() {
                                 onClick={() => shareChargeOnWhatsApp(activePerson, charges)}
                                 className={cn(
                                   "flex items-center gap-1.5 text-[11px] font-medium pl-2.5 pr-3 py-1.5 rounded-full shrink-0 transition-all",
-                                  charges.pendingTotal === 0
+                                  charges.balance === 0
                                     ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                     : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 active:scale-95"
                                 )}
                               >
-                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", charges.pendingTotal === 0 ? "bg-emerald-500" : "bg-amber-500")} />
-                                {charges.pendingTotal === 0 ? 'Em dia' : 'Pendente'}
+                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", charges.balance === 0 ? "bg-emerald-500" : "bg-amber-500")} />
+                                {charges.balance === 0 ? 'Em dia' : 'Pendente'}
                               </button>
                             </div>
                             <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] ml-2">
                               R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
+                            {charges.payablePendingTotal > 0 && (
+                              <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] ml-2">
+                                Você deve R$ {charges.payablePendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · Saldo{' '}
+                                <span className={charges.balance >= 0 ? "text-emerald-500" : "text-rose-400"}>
+                                  {charges.balance >= 0 ? 'a receber' : 'a pagar'} R$ {Math.abs(charges.balance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </p>
+                            )}
                             {charges.items.length === 0 ? (
                               <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
                                 <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nenhuma despesa neste mês.</p>
@@ -6068,6 +6142,14 @@ export default function App() {
                                 >
                                   Cobrar no WhatsApp
                                 </button>
+                                {(charges.pending.length > 0 || charges.payablePending.length > 0) && (
+                                  <button
+                                    onClick={() => settlePersonMonth(charges)}
+                                    className="w-full h-12 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium text-sm active:scale-95 transition-all"
+                                  >
+                                    Quitar mês
+                                  </button>
+                                )}
                               </>
                             )}
                           </div>
@@ -6469,16 +6551,9 @@ export default function App() {
               </div>
 
               {transactionToDelete && transactions.some(tx => tx.linkedTransactionId === transactionToDelete.id) && (
-                <div className="flex items-center gap-3 justify-center p-4 bg-rose-50/50 dark:bg-rose-500/5 rounded-2xl">
-                  <input
-                    type="checkbox"
-                    id="del-linked"
-                    checked={deleteLinked}
-                    onChange={e => setDeleteLinked(e.target.checked)}
-                    className="w-5 h-5 rounded-lg border-2 border-rose-200 text-rose-500 focus:ring-rose-500 cursor-pointer"
-                  />
-                  <Label htmlFor="del-linked" className="text-xs font-medium text-rose-500 cursor-pointer">Excluir também receitas associadas</Label>
-                </div>
+                <p className="text-xs font-normal text-rose-500/80 dark:text-rose-400/80">
+                  As receitas de reembolso vinculadas também serão apagadas.
+                </p>
               )}
 
               <div className="space-y-2">
