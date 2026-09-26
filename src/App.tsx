@@ -591,7 +591,6 @@ export default function App() {
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [amountInput, setAmountInput] = useState('0,00');
-  const [showPersonSelector, setShowPersonSelector] = useState(false);
   const [globalSplitType, setGlobalSplitType] = useState<'parts' | 'percentage' | 'value'>('parts');
   // Etapa do "Novo lançamento" em tela cheia (mobile): 0 Tipo+Valor, 1
   // Descrição/Data/Categoria, 2 Dividir/Repetição/Status/Salvar.
@@ -899,8 +898,10 @@ export default function App() {
 
     // Dois sentidos: "ela me deve" (padrão, receivable) e "eu pago pra ela"
     // (owedByPerson === false, payable — associação sem divisão, ex: mesada).
-    const items = withAmount.filter(t => t.owedByPerson !== false);
-    const payableItems = withAmount.filter(t => t.owedByPerson === false);
+    // Receita associada a pessoa é sempre receivable, mesmo que algum dado
+    // legado tenha owedByPerson === false gravado.
+    const items = withAmount.filter(t => t.type === 'income' || t.owedByPerson !== false);
+    const payableItems = withAmount.filter(t => t.type !== 'income' && t.owedByPerson === false);
 
     const pending = items.filter(t => t.status === 'planned');
     const paid = items.filter(t => t.status === 'actual');
@@ -1342,11 +1343,53 @@ export default function App() {
       const remainder = 100 % newSplits.length;
       newSplits = newSplits.map((s, idx) => ({ ...s, value: (idx === 0 ? perPerson + remainder : perPerson).toString() }));
     }
+    // Com exatamente uma pessoa, sempre volta pro estado "valor cheio" — sem
+    // isso, sobras de um split anterior (ex: 50% de uma divisão de 2 pessoas)
+    // ficariam presas nessa pessoa de um jeito que a UI de pessoa única não
+    // deixa claro nem editar.
+    if (newSplits.length === 1) {
+      newSplits = [{ ...newSplits[0], type: 'parts', value: '1' }];
+    }
     setPersonSplits(newSplits);
     if (newSplits.length === 0) setNewTransaction(prev => ({ ...prev, payerPayee: 'geral' }));
     else if (newSplits.length === 1) setNewTransaction(prev => ({ ...prev, payerPayee: newSplits[0].personId }));
     else setNewTransaction(prev => ({ ...prev, payerPayee: 'multi', category: 'Emprestado' }));
   };
+
+  /** Alterna a pessoa única entre "recebe o valor cheio do lançamento" (padrão) e "recebe um valor parcial digitado". */
+  const setSinglePersonPartial = (partial: boolean) => {
+    setPersonSplits(prev => prev.map(s => partial
+      ? { ...s, type: 'value' as const, value: amountInput }
+      : { ...s, type: 'parts' as const, value: '1' }
+    ));
+  };
+
+  /** Pessoas ordenadas por quantas vezes já foram associadas a um lançamento — base pros chips "frequentes" do buscador de Associar a pessoas. */
+  const frequentPeople = useMemo(() => {
+    const counts = new Map<string, number>();
+    transactions.forEach(t => {
+      if (t.payerPayee && t.payerPayee !== 'geral' && t.payerPayee !== 'multi') {
+        counts.set(t.payerPayee, (counts.get(t.payerPayee) || 0) + 1);
+      }
+      t.assignments?.forEach(a => counts.set(a.personId, (counts.get(a.personId) || 0) + 1));
+    });
+    return [...people]
+      .filter(p => p.visible !== false)
+      .sort((a, b) => (counts.get(b.id) || 0) - (counts.get(a.id) || 0));
+  }, [people, transactions]);
+
+  const FREQUENT_PEOPLE_COUNT = 6;
+
+  /** Sem busca: só as pessoas mais frequentes (+ quem já está selecionado, mesmo se não for frequente). Buscando: filtra todo mundo pelo nome. */
+  const personSearchResults = useMemo(() => {
+    const query = quickAssignQuery.trim().toLowerCase();
+    if (!query) {
+      const top = frequentPeople.slice(0, FREQUENT_PEOPLE_COUNT);
+      const selectedExtra = frequentPeople.filter(p => !top.some(t => t.id === p.id) && personSplits.some(s => s.personId === p.id));
+      return [...top, ...selectedExtra];
+    }
+    return frequentPeople.filter(p => p.name.toLowerCase().includes(query));
+  }, [frequentPeople, quickAssignQuery, personSplits]);
 
   /** Atribui alguém a um lançamento buscando por @usuário; se a pessoa ainda não existir, cadastra na hora. */
   const handleQuickAssignPerson = async () => {
@@ -1556,6 +1599,9 @@ export default function App() {
     try {
       const assignments = personSplits.length > 0 ? getAssignmentsFromSplits(amount, personSplits) : [];
 
+      // Ensure type is correct based on cardId presence if it was confused
+      const resolvedType: TransactionType = (newTransaction.type === 'expense' && newTransaction.cardId) ? 'card_purchase' : (newTransaction.type as TransactionType);
+
       const baseData = {
         description: newTransaction.description as string,
         amount: amount,
@@ -1564,8 +1610,7 @@ export default function App() {
         cardId: newTransaction.cardId || null,
         payerPayee: personSplits.length > 1 ? 'multi' : (newTransaction.payerPayee || ''),
         assignments: assignments,
-        // Ensure type is correct based on cardId presence if it was confused
-        type: (newTransaction.type === 'expense' && newTransaction.cardId) ? 'card_purchase' : (newTransaction.type as TransactionType),
+        type: resolvedType,
         date: newTransaction.date as string,
         recurrence: (isRecurrent ? 'monthly' : 'none') as RecurrenceType,
         recurrenceEndDate: isRecurrent ? (newTransaction.recurrenceEndDate ?? null) : null,
@@ -1577,8 +1622,9 @@ export default function App() {
         linkedToCard: false,
         // false = "eu pago pra essa pessoa" (não gera receita vinculada,
         // aparece em Pessoas como algo que eu devo); só relevante quando há
-        // exatamente uma pessoa associada.
-        owedByPerson: personSplits.length === 1 && newTransaction.type !== 'income' ? (newTransaction.owedByPerson ?? true) : true
+        // exatamente uma pessoa associada numa despesa. Receita associada a
+        // pessoa é sempre "ela me deve" — não existe a direção inversa.
+        owedByPerson: resolvedType === 'income' ? true : (personSplits.length === 1 ? (newTransaction.owedByPerson ?? true) : true)
       };
 
       if (editingTransaction) {
@@ -2101,21 +2147,38 @@ export default function App() {
     }
     const existingLinked = transactions.find(x => x.linkedTransactionId === t.id);
     setLinkedIncomeDate(existingLinked?.date || t.date || format(new Date(), 'yyyy-MM-dd'));
-    if (t.assignments && t.assignments.length > 0) {
+    setQuickAssignQuery('');
+    if (t.assignments && t.assignments.length === 1) {
+      // Uma pessoa só: representa como valor cheio ou parcial (não %), que é
+      // como a tela de pessoa única entende o split — ela nunca usa percentual.
+      setAssignmentMode('single');
+      const a0 = t.assignments[0];
+      const wasFull = Math.abs(a0.amount - t.amount) < 0.005;
+      setGlobalSplitType('parts');
+      setPersonSplits([{
+        personId: a0.personId,
+        type: wasFull ? 'parts' : 'value',
+        value: wasFull ? '1' : a0.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      }]);
+    } else if (t.assignments && t.assignments.length > 1) {
       setAssignmentMode('split');
-      setShowPersonSelector(true);
       // Repopula como percentual do valor original (não valor fixo): assim,
-      // se o valor total for editado, a parte da pessoa reescala junto em
-      // vez de ficar travada no valor antigo.
+      // se o valor total for editado, a parte de cada pessoa reescala junto
+      // em vez de ficar travada no valor antigo.
+      setGlobalSplitType('percentage');
       setPersonSplits(t.assignments.map(a => ({
         personId: a.personId,
         type: 'percentage',
         value: t.amount > 0 ? ((a.amount / t.amount) * 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0,00'
       })));
+    } else if (t.payerPayee && t.payerPayee !== 'geral') {
+      setAssignmentMode('single');
+      setGlobalSplitType('parts');
+      setPersonSplits([{ personId: t.payerPayee, type: 'parts', value: '1' }]);
     } else {
       setAssignmentMode('single');
+      setGlobalSplitType('parts');
       setPersonSplits([]);
-      setShowPersonSelector(t.payerPayee !== 'geral');
     }
 
     setIsRegistrarOpen(true);
@@ -2148,7 +2211,8 @@ export default function App() {
     setEditingTransaction(null);
     setAssignmentMode('single');
     setPersonSplits([]);
-    setShowPersonSelector(false);
+    setQuickAssignQuery('');
+    setGlobalSplitType('parts');
     setForcedSeriesMode(null);
     setLinkedIncomeDate(format(new Date(), 'yyyy-MM-dd'));
     setRecurrenceDateMode('fixed');
@@ -3068,7 +3132,7 @@ export default function App() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
                     <DateField
@@ -3135,241 +3199,248 @@ export default function App() {
             )}
 
             {registrarStep === 2 && (
-              <div className="space-y-8 pt-4">
-              {/* Associar a pessoas — sempre visível, sem toggle de "mais opções" */}
-              <div className="p-5 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="assign-someone-m" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Associar a pessoas</Label>
-                  <ToggleSwitch
-                    checked={showPersonSelector}
-                    onChange={(checked) => {
-                      setShowPersonSelector(checked);
-                      if (!checked) {
-                        setPersonSplits([]);
-                        setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                      }
-                    }}
+              <div className="space-y-6 pt-4">
+              {/* Associar a pessoas */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Users size={14} className="text-primary shrink-0" />
+                  <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Associar a pessoas</Label>
+                </div>
+                <p className="text-xs font-normal leading-relaxed text-slate-400 dark:text-[#8D89AC]">
+                  {newTransaction.type === 'income'
+                    ? 'Quem você marcar aqui aparece também em Pessoas como um valor a receber dela.'
+                    : 'Quem você marcar aqui aparece também em Pessoas — a receber ou a pagar, conforme a escolha abaixo.'}
+                </p>
+
+                <div className="relative">
+                  <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] pointer-events-none" />
+                  <Input
+                    placeholder="Buscar pessoa ou @usuário..."
+                    className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-10 pr-3"
+                    value={quickAssignQuery}
+                    onChange={(e) => setQuickAssignQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && personSearchResults.length === 0 && handleQuickAssignPerson()}
                   />
                 </div>
 
-                {showPersonSelector && (
-                  <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      {people.filter(p => p.visible !== false).map(p => {
-                        const isSelected = personSplits.some(s => s.personId === p.id);
-                        return (
+                {personSearchResults.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {personSearchResults.map(p => {
+                      const isSelected = personSplits.some(s => s.personId === p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => togglePersonSplit(p.id)}
+                          className={cn(
+                            "h-10 px-3 rounded-full font-normal text-sm transition-all flex items-center gap-2 border-2",
+                            isSelected
+                              ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
+                              : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:border-slate-200 dark:hover:border-[#2A2566]"
+                          )}
+                        >
+                          <img src={p.image} alt="" className="w-5 h-5 rounded-full object-cover" />
+                          {p.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : quickAssignQuery.trim() ? (
+                  <div className="bg-slate-50 dark:bg-[#16133F] rounded-[1.25rem] p-3 space-y-2">
+                    <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
+                    <Button
+                      type="button"
+                      onClick={handleQuickAssignPerson}
+                      disabled={quickAssignSubmitting}
+                      className="w-full h-10 rounded-xl font-medium text-sm bg-primary text-white disabled:opacity-40"
+                    >
+                      {quickAssignQuery.trim().startsWith('@')
+                        ? `Buscar @${quickAssignQuery.trim().replace(/^@+/, '')} como usuário`
+                        : `Adicionar "${quickAssignQuery.trim()}" como nova pessoa`}
+                    </Button>
+                    {!quickAssignQuery.trim().startsWith('@') && (
+                      <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">Ou comece com @ pra procurar alguém que já usa o app.</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Nenhuma pessoa cadastrada ainda — digite um nome ou @usuário na busca acima pra adicionar.</p>
+                )}
+
+                {personSplits.length === 1 && (() => {
+                  const split = personSplits[0];
+                  const person = people.find(p => p.id === split.personId);
+                  const isPartial = split.type === 'value';
+                  return (
+                    <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
+                      <div className="flex items-center gap-3">
+                        <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                        <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
+                        <div className="flex bg-slate-50 dark:bg-[#16133F] p-0.5 rounded-lg shrink-0">
                           <button
-                            key={p.id}
                             type="button"
-                            onClick={() => {
-                              let newSplits = [...personSplits];
-                              if (isSelected) {
-                                newSplits = newSplits.filter(s => s.personId !== p.id);
-                              } else {
-                                newSplits.push({ personId: p.id, type: globalSplitType, value: globalSplitType === 'parts' ? '1' : '0,00' });
-                              }
-
-                              if (globalSplitType === 'percentage' && newSplits.length > 0) {
-                                const perPerson = Math.floor(100 / newSplits.length);
-                                const remainder = 100 % newSplits.length;
-                                newSplits = newSplits.map((s, idx) => ({
-                                  ...s,
-                                  value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                }));
-                              }
-
-                              setPersonSplits(newSplits);
-                              if (newSplits.length === 0) {
-                                setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                              } else if (newSplits.length === 1) {
-                                setNewTransaction({...newTransaction, payerPayee: newSplits[0].personId});
-                              } else {
-                                setNewTransaction({...newTransaction, payerPayee: 'multi', category: 'Emprestado'});
-                              }
-                            }}
-                            className={cn(
-                              "h-10 px-3 rounded-full font-normal text-xs transition-all flex items-center gap-2 border-2",
-                              isSelected
-                                ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
-                                : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:border-slate-200 dark:hover:border-[#2A2566]"
-                            )}
+                            onClick={() => setSinglePersonPartial(false)}
+                            className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", !isPartial ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
                           >
-                            <img src={p.image} alt="" className="w-5 h-5 rounded-full object-cover" />
-                            {p.name}
+                            Cheio
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => setSinglePersonPartial(true)}
+                            className={cn("px-3 py-1.5 rounded-md text-xs font-medium transition-all", isPartial ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                          >
+                            Parcial
+                          </button>
+                        </div>
+                      </div>
+
+                      {isPartial ? (
+                        <div className="relative">
+                          <Input
+                            className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-base px-3 pl-9 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
+                            inputMode="decimal"
+                            autoFocus
+                            value={split.value}
+                            onChange={(e) => {
+                              const value = maskCurrency(e.target.value);
+                              setPersonSplits(prev => prev.map(s => ({ ...s, value })));
+                            }}
+                          />
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
+                        </div>
+                      ) : (
+                        <p className="text-base font-medium text-primary text-right">
+                          {parseCurrency(amountInput).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </p>
+                      )}
+
+                      {newTransaction.type === 'income' ? (
+                        <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-2 rounded-lg">
+                          <ArrowUpCircle size={12} className="text-emerald-500 shrink-0" />
+                          <p className="text-xs font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex bg-slate-50 dark:bg-[#16133F] p-0.5 rounded-lg">
+                            <button
+                              type="button"
+                              onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                              className={cn(
+                                "flex-1 py-2 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                                newTransaction.owedByPerson !== false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                              )}
+                            >
+                              <ArrowUpCircle size={12} /> Ela me deve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                              className={cn(
+                                "flex-1 py-2 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5",
+                                newTransaction.owedByPerson === false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                              )}
+                            >
+                              <ArrowDownCircle size={12} /> Eu pago pra ela
+                            </button>
+                          </div>
+                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+                            {newTransaction.owedByPerson === false
+                              ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
+                              : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {personSplits.length > 1 && (
+                  <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
+                    <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">
+                      {globalSplitType === 'parts' ? `Igual entre ${personSplits.length} pessoas` : 'Divisão personalizada'}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['parts', 'percentage', 'value'] as const).map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            setGlobalSplitType(type);
+                            let newSplits = personSplits.map(s => ({
+                              ...s,
+                              type: type,
+                              value: type === 'parts' ? '1' : '0,00'
+                            }));
+
+                            if (type === 'percentage' && newSplits.length > 0) {
+                              const perPerson = Math.floor(100 / newSplits.length);
+                              const remainder = 100 % newSplits.length;
+                              newSplits = newSplits.map((s, idx) => ({
+                                ...s,
+                                value: (idx === 0 ? perPerson + remainder : perPerson).toString()
+                              }));
+                            }
+                            setPersonSplits(newSplits);
+                          }}
+                          className={cn(
+                            "h-11 rounded-xl text-sm font-semibold transition-all",
+                            globalSplitType === type ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]"
+                          )}
+                        >
+                          {type === 'parts' ? 'Igual' : type === 'percentage' ? '%' : 'R$'}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
+                      {personSplits.map((split, index) => {
+                        const person = people.find(p => p.id === split.personId);
+                        const amount = parseCurrency(amountInput);
+                        const computed = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                        return (
+                          <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                            <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                            {globalSplitType === 'parts' ? (
+                              <>
+                                <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
+                                <p className="text-xs font-medium text-primary shrink-0">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                  <p className="text-[10px] font-normal text-primary">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                </div>
+                                <div className="relative w-20 shrink-0">
+                                  <input
+                                    className="w-full h-8 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-xs px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
+                                    inputMode="decimal"
+                                    value={split.value}
+                                    onChange={(e) => {
+                                      setPersonSplits(prev => prev.map((s, i) => {
+                                        if (i !== index) return s;
+                                        if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
+                                        return { ...s, value: maskPercentage(e.target.value) };
+                                      }));
+                                    }}
+                                  />
+                                  {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="relative flex-1">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] font-medium text-xs pointer-events-none">@</span>
-                        <Input
-                          placeholder="usuário ou nome novo"
-                          className="h-10 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs pl-8 pr-3"
-                          value={quickAssignQuery}
-                          onChange={(e) => setQuickAssignQuery(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleQuickAssignPerson()}
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        onClick={handleQuickAssignPerson}
-                        disabled={!quickAssignQuery.trim() || quickAssignSubmitting}
-                        className="h-10 px-4 rounded-xl font-medium text-xs bg-primary text-white disabled:opacity-40 shrink-0"
-                      >
-                        Adicionar
-                      </Button>
-                    </div>
-
-                    {personSplits.length > 0 && (
-                      <div className="pt-3 border-t border-slate-100 dark:border-[#201C56] space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Configurar divisões</Label>
-                          <div className="flex bg-slate-50 dark:bg-[#16133F] p-0.5 rounded-lg overflow-hidden min-w-[120px]">
-                            {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
-                              <button
-                                key={type}
-                                type="button"
-                                onClick={() => {
-                                  setGlobalSplitType(type);
-                                  let newSplits = personSplits.map(s => ({
-                                    ...s,
-                                    type: type,
-                                    value: type === 'parts' ? '1' : '0,00'
-                                  }));
-
-                                  if (type === 'percentage' && newSplits.length > 0) {
-                                    const perPerson = Math.floor(100 / newSplits.length);
-                                    const remainder = 100 % newSplits.length;
-                                    newSplits = newSplits.map((s, idx) => ({
-                                      ...s,
-                                      value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                    }));
-                                  }
-                                  setPersonSplits(newSplits);
-                                }}
-                                className={cn(
-                                  "flex-1 py-1 rounded-md text-[8px] font-medium transition-all",
-                                  globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
-                                )}
-                              >
-                                {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {personSplits.length === 1 ? (
-                          <div className="grid gap-3">
-                            {personSplits.map((split, index) => {
-                              const person = people.find(p => p.id === split.personId);
-                              return (
-                                <div key={index} className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
-                                  <div className="flex items-center gap-3">
-                                    <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                      <p className="text-[10px] font-normal text-primary">
-                                        {(() => {
-                                          const amount = parseCurrency(amountInput);
-                                          const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                          return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                        })()}
-                                      </p>
-                                    </div>
-                                    <div className="relative w-28 shrink-0">
-                                      <Input
-                                        className="h-10 rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20"
-                                        inputMode="decimal"
-                                        value={split.value}
-                                        onChange={(e) => {
-                                          setPersonSplits(prev => prev.map((s, i) => {
-                                            if (i !== index) return s;
-                                            if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                            if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                            return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                          }));
-                                        }}
-                                      />
-                                      {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                      {split.type === 'value' && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
-                                    </div>
-                                  </div>
-
-                                  <div className={cn("flex bg-white dark:bg-[#100E3D] p-0.5 rounded-lg", newTransaction.type === 'income' && "hidden")}>
-                                    <button
-                                      type="button"
-                                      onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
-                                      className={cn(
-                                        "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
-                                        newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                      )}
-                                    >
-                                      Ela me deve
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
-                                      className={cn(
-                                        "flex-1 py-2 rounded-md text-[10px] font-medium transition-all",
-                                        newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                      )}
-                                    >
-                                      Eu pago pra ela
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="bg-slate-50 dark:bg-[#16133F] p-3 rounded-xl space-y-3">
-                            {personSplits.map((split, index) => {
-                              const person = people.find(p => p.id === split.personId);
-                              return (
-                                <div key={index} className="flex items-center gap-3 pb-3 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
-                                  <img src={person?.image} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                    <p className="text-[9px] font-normal text-primary">
-                                      {(() => {
-                                        const amount = parseCurrency(amountInput);
-                                        const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                        return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                      })()}
-                                    </p>
-                                  </div>
-                                  <div className="relative w-20 shrink-0">
-                                    <input
-                                      className="w-full h-8 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-[10px] px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/20"
-                                      inputMode="decimal"
-                                      value={split.value}
-                                      onChange={(e) => {
-                                        setPersonSplits(prev => prev.map((s, i) => {
-                                          if (i !== index) return s;
-                                          if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                          if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                          return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                        }));
-                                      }}
-                                    />
-                                    {split.type === 'percentage' && <span className="absolute right-1 top-1/2 -translate-y-1/2 text-[8px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
 
-              {/* Repetição — sempre visível */}
-              <div className="p-5 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
-                <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+              {/* Repetição */}
+              <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                <div className="flex items-center gap-2">
+                  <Repeat size={14} className="text-primary shrink-0" />
+                  <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+                </div>
                 <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-xl p-1">
                   <button
                     type="button"
@@ -3436,13 +3507,21 @@ export default function App() {
                     </div>
 
                     <div className="space-y-2 pt-1">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Quando lançar todo mês</Label>
-                      <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-xl p-1">
-                        <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
-                          Dia fixo
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Em que dia lançar todo mês</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRecurrenceDateMode('fixed')}
+                          className={cn("h-11 rounded-xl text-[10px] font-medium transition-all px-2", recurrenceDateMode === 'fixed' ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]")}
+                        >
+                          Mesmo dia{newTransaction.date ? ` (dia ${parseISO(newTransaction.date).getDate()})` : ''}
                         </button>
-                        <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-9 rounded-lg text-[10px] font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
-                          Dia útil
+                        <button
+                          type="button"
+                          onClick={() => setRecurrenceDateMode('businessDay')}
+                          className={cn("h-11 rounded-xl text-[10px] font-medium transition-all px-2", recurrenceDateMode === 'businessDay' ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]")}
+                        >
+                          Nº dia útil do mês
                         </button>
                       </div>
                       {recurrenceDateMode === 'businessDay' && (
@@ -3451,7 +3530,7 @@ export default function App() {
                             type="number"
                             min="1"
                             max="23"
-                            className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2"
+                            className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
                             value={recurrenceBusinessDay}
                             onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
                           />
@@ -3478,30 +3557,25 @@ export default function App() {
                 )}
               </div>
 
-                {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && !editingTransaction?.linkedToCard && (
-                  <div className="p-4 bg-indigo-50/80 dark:bg-indigo-950/20 rounded-2xl space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-indigo-500 dark:text-indigo-300 ml-1">
-                      Quando ela vai te pagar?
-                    </Label>
-                    {editingTransaction && linkedParentIds.has(editingTransaction.id) ? (
-                      <p className="text-xs font-normal text-indigo-600/80 dark:text-indigo-300/80">
-                        A data e o status do reembolso ficam na receita vinculada (aba Pessoas).
-                      </p>
-                    ) : (
+                {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && !editingTransaction?.linkedToCard && !(editingTransaction && linkedParentIds.has(editingTransaction.id)) && (
+                  <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                    <div className="flex items-start gap-2 text-indigo-600 dark:text-indigo-300">
+                      <ArrowUpCircle size={14} className="shrink-0 mt-0.5" />
+                      <p className="text-xs font-normal leading-relaxed">Isso cria automaticamente uma receita de reembolso para {people.find(p => p.id === newTransaction.payerPayee)?.name}.</p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Data limite para reembolso</Label>
                       <DateField
                         value={linkedIncomeDate}
                         onChange={setLinkedIncomeDate}
-                        className="h-12 rounded-xl text-sm text-indigo-600 bg-white dark:bg-[#100E3D]"
+                        className="h-11 rounded-xl text-sm bg-slate-50 dark:bg-[#16133F]"
                       />
-                    )}
-                    <p className="text-[10px] font-normal text-indigo-500/70 dark:text-indigo-300/60 ml-1">
-                      Vira uma receita a receber, acompanhada em Pessoas. O que ela te deve e o que você deve a ela se anulam nos totais.
-                    </p>
+                    </div>
                   </div>
                 )}
 
                 {newTransaction.type !== 'card_purchase' && (
-                  <div className="flex items-center justify-between px-1 py-1">
+                  <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#201C56]">
                     <Label htmlFor="status-m" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
@@ -3516,20 +3590,22 @@ export default function App() {
                   const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
                   if (!linked) return null;
                   return (
-                    <div
-                      onClick={() => handleEditClick(linked)}
-                      className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
-                          {linked.type === 'income' ? <ArrowUpCircle size={16} strokeWidth={3} /> : <CreditCard size={16} strokeWidth={3} />}
+                    <div className="pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                      <div
+                        onClick={() => handleEditClick(linked)}
+                        className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-[1.25rem] cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
+                            {linked.type === 'income' ? <ArrowUpCircle size={16} strokeWidth={3} /> : <CreditCard size={16} strokeWidth={3} />}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-normal text-slate-700 dark:text-[#EDEAF9] truncate">Vinculado a: {linked.description}</p>
+                            <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-normal text-slate-700 dark:text-[#EDEAF9] truncate">Vinculado a: {linked.description}</p>
-                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                        </div>
+                        <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
                       </div>
-                      <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
                     </div>
                   );
                 })()}
@@ -3746,7 +3822,7 @@ export default function App() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <div className="space-y-2">
                       <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
                       <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
@@ -3811,240 +3887,247 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Associar a pessoas — sempre visível */}
-                <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="assign-someone-d" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">Associar a pessoas</Label>
-                    <ToggleSwitch
-                      checked={showPersonSelector}
-                      onChange={(checked) => {
-                        setShowPersonSelector(checked);
-                        if (!checked) {
-                          setPersonSplits([]);
-                          setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                        }
-                      }}
+                {/* Associar a pessoas */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Users size={16} className="text-primary shrink-0" />
+                    <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Associar a pessoas</Label>
+                  </div>
+                  <p className="text-sm font-normal leading-relaxed text-slate-400 dark:text-[#8D89AC]">
+                    {newTransaction.type === 'income'
+                      ? 'Quem você marcar aqui aparece também em Pessoas como um valor a receber dela.'
+                      : 'Quem você marcar aqui aparece também em Pessoas — a receber ou a pagar, conforme a escolha abaixo.'}
+                  </p>
+
+                  <div className="relative">
+                    <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] pointer-events-none" />
+                    <Input
+                      placeholder="Buscar pessoa ou @usuário..."
+                      className="h-12 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-11 pr-4"
+                      value={quickAssignQuery}
+                      onChange={(e) => setQuickAssignQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && personSearchResults.length === 0 && handleQuickAssignPerson()}
                     />
                   </div>
 
-                  {showPersonSelector && (
-                    <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
-                      <div className="flex flex-wrap gap-2">
-                        {people.filter(p => p.visible !== false).map(p => {
-                          const isSelected = personSplits.some(s => s.personId === p.id);
-                          return (
+                  {personSearchResults.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {personSearchResults.map(p => {
+                        const isSelected = personSplits.some(s => s.personId === p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => togglePersonSplit(p.id)}
+                            className={cn(
+                              "h-12 px-4 rounded-2xl font-normal text-sm transition-all flex items-center gap-3 border-2 outline-none",
+                              isSelected
+                                ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
+                                : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]"
+                            )}
+                          >
+                            <img src={p.image} alt="" className="w-6 h-6 rounded-full object-cover shadow-sm" />
+                            {p.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : quickAssignQuery.trim() ? (
+                    <div className="bg-slate-50 dark:bg-[#16133F] rounded-[1.5rem] p-4 space-y-3">
+                      <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
+                      <Button
+                        type="button"
+                        onClick={handleQuickAssignPerson}
+                        disabled={quickAssignSubmitting}
+                        className="h-11 px-5 rounded-xl font-medium text-sm bg-primary text-white disabled:opacity-40"
+                      >
+                        {quickAssignQuery.trim().startsWith('@')
+                          ? `Buscar @${quickAssignQuery.trim().replace(/^@+/, '')} como usuário`
+                          : `Adicionar "${quickAssignQuery.trim()}" como nova pessoa`}
+                      </Button>
+                      {!quickAssignQuery.trim().startsWith('@') && (
+                        <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Ou comece com @ pra procurar alguém que já usa o app.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Nenhuma pessoa cadastrada ainda — digite um nome ou @usuário na busca acima pra adicionar.</p>
+                  )}
+
+                  {personSplits.length === 1 && (() => {
+                    const split = personSplits[0];
+                    const person = people.find(p => p.id === split.personId);
+                    const isPartial = split.type === 'value';
+                    return (
+                      <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
+                        <div className="flex items-center gap-4">
+                          <img src={person?.image} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
+                          <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] flex-1 min-w-0 truncate">{person?.name}</p>
+                          <div className="flex bg-slate-50 dark:bg-[#16133F] p-1 rounded-xl shrink-0">
                             <button
-                              key={p.id}
                               type="button"
-                              onClick={() => {
-                                let newSplits = [...personSplits];
-                                if (isSelected) {
-                                  newSplits = newSplits.filter(s => s.personId !== p.id);
-                                } else {
-                                  newSplits.push({ personId: p.id, type: globalSplitType, value: globalSplitType === 'parts' ? '1' : '0,00' });
-                                }
-
-                                if (globalSplitType === 'percentage' && newSplits.length > 0) {
-                                  const perPerson = Math.floor(100 / newSplits.length);
-                                  const remainder = 100 % newSplits.length;
-                                  newSplits = newSplits.map((s, idx) => ({
-                                    ...s,
-                                    value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                  }));
-                                }
-
-                                setPersonSplits(newSplits);
-                                if (newSplits.length === 0) {
-                                  setNewTransaction({...newTransaction, payerPayee: 'geral'});
-                                } else if (newSplits.length === 1) {
-                                  setNewTransaction({...newTransaction, payerPayee: newSplits[0].personId});
-                                } else {
-                                  setNewTransaction({...newTransaction, payerPayee: 'multi', category: 'Emprestado'});
-                                }
-                              }}
-                              className={cn(
-                                "h-12 px-4 rounded-2xl font-normal text-sm transition-all flex items-center gap-3 border-2 outline-none",
-                                isSelected
-                                  ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
-                                  : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]"
-                              )}
+                              onClick={() => setSinglePersonPartial(false)}
+                              className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all", !isPartial ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
                             >
-                              <img src={p.image} alt="" className="w-6 h-6 rounded-full object-cover shadow-sm" />
-                              {p.name}
+                              Cheio
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => setSinglePersonPartial(true)}
+                              className={cn("px-3 py-1.5 rounded-lg text-xs font-medium transition-all", isPartial ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                            >
+                              Parcial
+                            </button>
+                          </div>
+                        </div>
+
+                        {isPartial ? (
+                          <div className="relative">
+                            <Input
+                              className="h-12 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm px-6 pl-10 text-right shadow-sm focus:ring-2 focus:ring-primary/10"
+                              inputMode="decimal"
+                              autoFocus
+                              value={split.value}
+                              onChange={(e) => {
+                                const value = maskCurrency(e.target.value);
+                                setPersonSplits(prev => prev.map(s => ({ ...s, value })));
+                              }}
+                            />
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
+                          </div>
+                        ) : (
+                          <p className="text-base font-medium text-primary text-right">
+                            {parseCurrency(amountInput).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        )}
+
+                        {newTransaction.type === 'income' ? (
+                          <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2.5 rounded-xl">
+                            <ArrowUpCircle size={14} className="text-emerald-500 shrink-0" />
+                            <p className="text-sm font-normal text-emerald-600 dark:text-emerald-400 leading-relaxed">Vira um valor a receber de {person?.name} em Pessoas.</p>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex bg-slate-50 dark:bg-[#16133F] p-1 rounded-xl">
+                              <button
+                                type="button"
+                                onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
+                                className={cn(
+                                  "flex-1 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5",
+                                  newTransaction.owedByPerson !== false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                                )}
+                              >
+                                <ArrowUpCircle size={13} /> Ela me deve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
+                                className={cn(
+                                  "flex-1 py-2.5 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1.5",
+                                  newTransaction.owedByPerson === false ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                                )}
+                              >
+                                <ArrowDownCircle size={13} /> Eu pago pra ela
+                              </button>
+                            </div>
+                            <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+                              {newTransaction.owedByPerson === false
+                                ? `Vira um valor a pagar para ${person?.name} em Pessoas (ex: mesada) — não gera receita automática.`
+                                : `Vira um valor a receber de ${person?.name} em Pessoas — pode gerar uma receita de reembolso automática.`}
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {personSplits.length > 1 && (
+                    <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
+                      <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">
+                        {globalSplitType === 'parts' ? `Igual entre ${personSplits.length} pessoas` : 'Divisão personalizada'}
+                      </p>
+                      <div className="grid grid-cols-3 gap-3">
+                        {(['parts', 'percentage', 'value'] as const).map(type => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => {
+                              setGlobalSplitType(type);
+                              let newSplits = personSplits.map(s => ({
+                                ...s,
+                                type: type,
+                                value: type === 'parts' ? '1' : '0,00'
+                              }));
+
+                              if (type === 'percentage' && newSplits.length > 0) {
+                                const perPerson = Math.floor(100 / newSplits.length);
+                                const remainder = 100 % newSplits.length;
+                                newSplits = newSplits.map((s, idx) => ({
+                                  ...s,
+                                  value: (idx === 0 ? perPerson + remainder : perPerson).toString()
+                                }));
+                              }
+                              setPersonSplits(newSplits);
+                            }}
+                            className={cn(
+                              "h-12 rounded-xl text-sm font-semibold transition-all",
+                              globalSplitType === type ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5] hover:bg-slate-100 dark:hover:bg-[#1C1852]"
+                            )}
+                          >
+                            {type === 'parts' ? 'Igual' : type === 'percentage' ? '%' : 'R$'}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
+                        {personSplits.map((split, index) => {
+                          const person = people.find(p => p.id === split.personId);
+                          const amount = parseCurrency(amountInput);
+                          const computed = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
+                          return (
+                            <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
+                              <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                              {globalSplitType === 'parts' ? (
+                                <>
+                                  <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate flex-1 min-w-0">{person?.name}</p>
+                                  <p className="text-sm font-medium text-primary shrink-0">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
+                                    <p className="text-xs font-normal text-primary">{computed.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                                  </div>
+                                  <div className="relative w-28 shrink-0">
+                                    <input
+                                      className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
+                                      inputMode="decimal"
+                                      value={split.value}
+                                      onChange={(e) => {
+                                        setPersonSplits(prev => prev.map((s, i) => {
+                                          if (i !== index) return s;
+                                          if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
+                                          return { ...s, value: maskPercentage(e.target.value) };
+                                        }));
+                                      }}
+                                    />
+                                    {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
-
-                      <div className="flex items-center gap-2">
-                        <div className="relative flex-1">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] font-medium text-sm pointer-events-none">@</span>
-                          <Input
-                            placeholder="usuário ou nome novo"
-                            className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-9 pr-4"
-                            value={quickAssignQuery}
-                            onChange={(e) => setQuickAssignQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleQuickAssignPerson()}
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          onClick={handleQuickAssignPerson}
-                          disabled={!quickAssignQuery.trim() || quickAssignSubmitting}
-                          className="h-11 px-5 rounded-xl font-medium text-sm bg-primary text-white disabled:opacity-40 shrink-0"
-                        >
-                          Adicionar
-                        </Button>
-                      </div>
-
-                      {personSplits.length > 0 && (
-                        <div className="pt-4 border-t border-slate-100 dark:border-[#201C56] space-y-4">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Configurar divisões</Label>
-                            <div className="flex bg-slate-50 dark:bg-[#16133F] p-1 rounded-xl overflow-hidden min-w-[180px]">
-                              {(['parts', 'percentage', 'value'] as const).filter(t => personSplits.length > 1 || t !== 'parts').map(type => (
-                                <button
-                                  key={type}
-                                  type="button"
-                                  onClick={() => {
-                                    setGlobalSplitType(type);
-                                    let newSplits = personSplits.map(s => ({
-                                      ...s,
-                                      type: type,
-                                      value: type === 'parts' ? '1' : '0,00'
-                                    }));
-
-                                    if (type === 'percentage' && newSplits.length > 0) {
-                                      const perPerson = Math.floor(100 / newSplits.length);
-                                      const remainder = 100 % newSplits.length;
-                                      newSplits = newSplits.map((s, idx) => ({
-                                        ...s,
-                                        value: (idx === 0 ? perPerson + remainder : perPerson).toString()
-                                      }));
-                                    }
-                                    setPersonSplits(newSplits);
-                                  }}
-                                  className={cn(
-                                    "flex-1 py-2 rounded-lg text-[10px] font-medium transition-all",
-                                    globalSplitType === type ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
-                                  )}
-                                >
-                                  {type === 'parts' ? 'Partes' : type === 'percentage' ? '%' : 'R$'}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {personSplits.length === 1 ? (
-                            <div className="grid gap-4">
-                              {personSplits.map((split, index) => {
-                                const person = people.find(p => p.id === split.personId);
-                                return (
-                                  <div key={index} className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
-                                    <div className="flex items-center gap-4">
-                                      <img src={person?.image} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{person?.name}</p>
-                                        <p className="text-xs font-medium text-primary">
-                                          {(() => {
-                                            const amount = parseCurrency(amountInput);
-                                            const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                            return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                          })()}
-                                        </p>
-                                      </div>
-                                      <div className="relative w-36 shrink-0">
-                                        <Input
-                                          className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-sm px-6 text-right shadow-sm focus:ring-2 focus:ring-primary/10"
-                                          inputMode="decimal"
-                                          value={split.value}
-                                          onChange={(e) => {
-                                            setPersonSplits(prev => prev.map((s, i) => {
-                                              if (i !== index) return s;
-                                              if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                              if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                              return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                            }));
-                                          }}
-                                        />
-                                        {split.type === 'percentage' && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                        {split.type === 'value' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-200 dark:text-[#5C5686]">R$</span>}
-                                      </div>
-                                    </div>
-
-                                    <div className={cn("flex bg-white dark:bg-[#100E3D] p-1 rounded-xl", newTransaction.type === 'income' && "hidden")}>
-                                      <button
-                                        type="button"
-                                        onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: true })}
-                                        className={cn(
-                                          "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
-                                          newTransaction.owedByPerson !== false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                        )}
-                                      >
-                                        Ela me deve
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => setNewTransaction({ ...newTransaction, owedByPerson: false })}
-                                        className={cn(
-                                          "flex-1 py-2.5 rounded-lg text-xs font-medium transition-all",
-                                          newTransaction.owedByPerson === false ? "bg-primary/10 text-primary" : "text-slate-400 dark:text-[#8D89AC]"
-                                        )}
-                                      >
-                                        Eu pago pra ela
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="bg-slate-50 dark:bg-[#16133F] p-4 rounded-2xl space-y-4">
-                              {personSplits.map((split, index) => {
-                                const person = people.find(p => p.id === split.personId);
-                                return (
-                                  <div key={index} className="flex items-center gap-4 pb-4 border-b border-slate-200/70 dark:border-white/10 last:border-0 last:pb-0">
-                                    <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
-                                      <p className="text-[10px] font-normal text-primary">
-                                        {(() => {
-                                          const amount = parseCurrency(amountInput);
-                                          const result = getAssignmentsFromSplits(amount, personSplits)[index]?.amount || 0;
-                                          return result.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-                                        })()}
-                                      </p>
-                                    </div>
-                                    <div className="relative w-28 shrink-0">
-                                      <input
-                                        className="h-10 w-full rounded-xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-3 text-right shadow-sm focus:ring-1 focus:ring-primary/20 outline-none"
-                                        inputMode="decimal"
-                                        value={split.value}
-                                        onChange={(e) => {
-                                          setPersonSplits(prev => prev.map((s, i) => {
-                                            if (i !== index) return s;
-                                            if (split.type === 'value') return { ...s, value: maskCurrency(e.target.value) };
-                                            if (split.type === 'percentage') return { ...s, value: maskPercentage(e.target.value) };
-                                            return { ...s, value: e.target.value.replace(/[^0-9]/g, '') };
-                                          }));
-                                        }}
-                                      />
-                                      {split.type === 'percentage' && <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-medium text-slate-300 dark:text-[#6B679C]">%</span>}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
 
-                {/* Repetição — sempre visível */}
-                <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-4">
-                  <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+                {/* Repetição */}
+                <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                  <div className="flex items-center gap-2">
+                    <Repeat size={16} className="text-primary shrink-0" />
+                    <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
+                  </div>
                   <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-2xl p-1">
                     <button
                       type="button"
@@ -4116,14 +4199,22 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="space-y-2 pt-1">
-                        <Label className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">Quando lançar todo mês</Label>
-                        <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-2xl p-1">
-                          <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'fixed' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
-                            Dia fixo
+                      <div className="space-y-1.5">
+                        <Label className="text-[9px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1">Em que dia lançar todo mês</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setRecurrenceDateMode('fixed')}
+                            className={cn("h-12 rounded-xl text-sm font-medium transition-all px-3", recurrenceDateMode === 'fixed' ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]")}
+                          >
+                            Mesmo dia{newTransaction.date ? ` (dia ${parseISO(newTransaction.date).getDate()})` : ''}
                           </button>
-                          <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={cn("flex-1 h-10 rounded-xl text-xs font-medium transition-all", recurrenceDateMode === 'businessDay' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}>
-                            Dia útil
+                          <button
+                            type="button"
+                            onClick={() => setRecurrenceDateMode('businessDay')}
+                            className={cn("h-12 rounded-xl text-sm font-medium transition-all px-3", recurrenceDateMode === 'businessDay' ? "bg-primary text-white shadow-sm" : "bg-slate-50 dark:bg-[#16133F] text-slate-500 dark:text-[#C5C1E5]")}
+                          >
+                            Nº dia útil do mês
                           </button>
                         </div>
                         {recurrenceDateMode === 'businessDay' && (
@@ -4132,11 +4223,11 @@ export default function App() {
                               type="number"
                               min="1"
                               max="23"
-                              className="h-11 w-20 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2"
+                              className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
                               value={recurrenceBusinessDay}
                               onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
                             />
-                            <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] flex-1">º dia útil do mês (seg-sex, varia conforme os fins de semana)</span>
+                            <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] leading-snug flex-1">º dia útil (seg-sex, varia conforme os fins de semana)</span>
                           </div>
                         )}
                       </div>
@@ -4159,32 +4250,26 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-4">
-                  {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && !editingTransaction?.linkedToCard && (
-                    <div className="p-4 bg-indigo-50/80 dark:bg-indigo-950/20 rounded-2xl space-y-2 flex-1">
-                      <Label className="text-[10px] font-medium tracking-wider text-indigo-500 dark:text-indigo-300 ml-1">
-                        Quando ela vai te pagar?
-                      </Label>
-                      {editingTransaction && linkedParentIds.has(editingTransaction.id) ? (
-                        <p className="text-xs font-normal text-indigo-600/80 dark:text-indigo-300/80">
-                          A data e o status do reembolso ficam na receita vinculada (aba Pessoas).
-                        </p>
-                      ) : (
-                        <DateField
-                          value={linkedIncomeDate}
-                          onChange={setLinkedIncomeDate}
-                          className="h-12 rounded-xl text-sm text-indigo-600 bg-white dark:bg-[#100E3D]"
-                        />
-                      )}
-                      <p className="text-[10px] font-normal text-indigo-500/70 dark:text-indigo-300/60 ml-1">
-                        Vira uma receita a receber, acompanhada em Pessoas. O que ela te deve e o que você deve a ela se anulam nos totais.
-                      </p>
+                {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && !editingTransaction?.linkedToCard && !(editingTransaction && linkedParentIds.has(editingTransaction.id)) && (
+                  <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                    <div className="flex items-start gap-2 text-indigo-600 dark:text-indigo-300">
+                      <ArrowUpCircle size={16} className="shrink-0 mt-0.5" />
+                      <p className="text-sm font-normal leading-relaxed">Isso cria automaticamente uma receita de reembolso para {people.find(p => p.id === newTransaction.payerPayee)?.name}.</p>
                     </div>
-                  )}
+                    <div className="space-y-1.5 max-w-xs">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Data limite para reembolso</Label>
+                      <DateField
+                        value={linkedIncomeDate}
+                        onChange={setLinkedIncomeDate}
+                        className="h-12 rounded-xl text-sm bg-slate-50 dark:bg-[#16133F]"
+                      />
+                    </div>
+                  </div>
+                )}
 
-                  {newTransaction.type !== 'card_purchase' && (
-                    <div className="flex items-center gap-3 bg-slate-50 dark:bg-[#16133F] px-5 h-16 rounded-2xl border border-slate-100 dark:border-[#201C56] shadow-sm flex-1">
-                    <Label htmlFor="status-d" className="text-sm font-medium text-slate-500 dark:text-[#A8A4CC] cursor-pointer flex-1">
+                {newTransaction.type !== 'card_purchase' && (
+                  <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                    <Label htmlFor="status-d" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
                     <ToggleSwitch
@@ -4193,10 +4278,9 @@ export default function App() {
                     />
                   </div>
                 )}
-                </div>
 
                 {editingTransaction?.linkedTransactionId && (
-                  <div>
+                  <div className="pt-6 border-t border-slate-100 dark:border-[#201C56]">
                     <p className="text-[10px] font-medium tracking-wider text-indigo-400 ml-1 mb-2">Lançamento vinculado</p>
                     {(() => {
                       const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
@@ -4204,7 +4288,7 @@ export default function App() {
                       return (
                         <div
                           onClick={() => handleEditClick(linked)}
-                          className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-2xl border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
+                          className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-[1.5rem] border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
                         >
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center text-indigo-500">
