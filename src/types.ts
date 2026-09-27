@@ -82,3 +82,23 @@ export interface Category {
   icon: string;
   color: string;
 }
+
+export interface PersonConsent {
+  id: string;
+  ownerId: string;
+  targetUserId: string;
+  status: 'pending' | 'accepted' | 'declined';
+}
+
+export interface AppNotification {
+  id: string;
+  userId: string;
+  fromUserId?: string | null;
+  type: 'consent_request' | 'assigned' | 'consent_response';
+  title: string;
+  body?: string | null;
+  transactionId?: string | null;
+  consentId?: string | null;
+  read: boolean;
+  createdAt: string;
+}

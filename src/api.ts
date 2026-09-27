@@ -1,5 +1,5 @@
 import { supabase, handleSupabaseError, OperationType } from './supabaseClient';
-import { Transaction, Card, Person, Category, UserProfile, PublicProfile } from './types';
+import { Transaction, Card, Person, Category, UserProfile, PublicProfile, AppNotification, PersonConsent } from './types';
 
 // ----------------------------------------------------------------------------
 // Realtime
@@ -262,4 +262,60 @@ export async function fetchLinkedTransactions(userId: string, linkedTransactionI
     .eq('linkedTransactionId', linkedTransactionId);
   if (error) handleSupabaseError(error, OperationType.LIST, 'transactions');
   return (data ?? []) as Transaction[];
+}
+
+// ----------------------------------------------------------------------------
+// Compartilhamento com pessoas vinculadas (ver supabase/sharing.sql)
+// ----------------------------------------------------------------------------
+
+/** Movimentações de outros usuários em que fui associado (a RLS só devolve as compartilhadas comigo). */
+export async function fetchSharedTransactions(userId: string): Promise<Array<Transaction & { userId: string }>> {
+  const { data, error } = await supabase.from('transactions').select('*').neq('userId', userId);
+  if (error) handleSupabaseError(error, OperationType.LIST, 'transactions');
+  return (data ?? []) as Array<Transaction & { userId: string }>;
+}
+
+/** Ids das "pessoas" (nos cadastros de outros usuários) que apontam para mim. */
+export async function fetchMySharedPeople(): Promise<Array<{ id: string; userId: string }>> {
+  const { data, error } = await supabase.rpc('my_shared_people');
+  if (error) handleSupabaseError(error, OperationType.LIST, 'people');
+  return (data ?? []) as Array<{ id: string; userId: string }>;
+}
+
+export async function fetchPublicProfiles(ids: string[]): Promise<PublicProfile[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, nickname, firstName, lastName, username')
+    .in('id', ids);
+  if (error) handleSupabaseError(error, OperationType.LIST, 'profiles');
+  return (data ?? []) as PublicProfile[];
+}
+
+export async function fetchNotifications(userId: string): Promise<AppNotification[]> {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('userId', userId)
+    .order('createdAt', { ascending: false })
+    .limit(50);
+  if (error) handleSupabaseError(error, OperationType.LIST, 'notifications');
+  return (data ?? []) as AppNotification[];
+}
+
+export async function markNotificationsRead(ids: string[]) {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from('notifications').update({ read: true }).in('id', ids);
+  if (error) handleSupabaseError(error, OperationType.UPDATE, 'notifications');
+}
+
+export async function fetchConsent(consentId: string): Promise<PersonConsent | null> {
+  const { data, error } = await supabase.from('person_consents').select('*').eq('id', consentId).maybeSingle();
+  if (error) handleSupabaseError(error, OperationType.GET, 'person_consents');
+  return data as PersonConsent | null;
+}
+
+export async function respondConsent(consentId: string, status: 'accepted' | 'declined') {
+  const { error } = await supabase.from('person_consents').update({ status }).eq('id', consentId);
+  if (error) handleSupabaseError(error, OperationType.UPDATE, 'person_consents');
 }

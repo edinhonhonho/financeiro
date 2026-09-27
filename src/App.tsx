@@ -104,12 +104,60 @@ import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths
 import { ptBR } from 'date-fns/locale';
 import Papa from 'papaparse';
 
-import { Transaction, Card, TransactionType, RecurrenceType, Person, UserProfile, Category, PublicProfile } from './types';
+import { Transaction, Card, TransactionType, RecurrenceType, Person, UserProfile, Category, PublicProfile, AppNotification } from './types';
 import { mockCategories } from './mockData';
 import { cn } from '@/lib/utils';
 import { supabase, signInWithPassword, signUpWithPassword, resetPasswordForEmail, updatePassword, logout, OperationType, handleSupabaseError, translateAuthError } from './supabaseClient';
 import * as api from './api';
 import type { User } from '@supabase/supabase-js';
+
+/**
+ * Converte movimentações que OUTRA pessoa associou a mim no meu ponto de vista
+ * (somente leitura, ids "shared-…"): o que ela diz que eu devo vira despesa
+ * minha; o que ela paga pra mim vira receita minha. A receita de reembolso
+ * vinculada é o registro principal — a despesa que a originou só entra quando
+ * não há uma receita vinculada visível (dados antigos).
+ */
+function buildSharedMirrors(
+  shared: Array<Transaction & { userId: string }>,
+  myPeople: Array<{ id: string; userId: string }>,
+  ownerNames: Record<string, string>
+): Transaction[] {
+  const myIds = new Set(myPeople.map(p => p.id));
+  const parentsWithChild = new Set<string>();
+  shared.forEach(t => { if (t.linkedTransactionId) parentsWithChild.add(t.linkedTransactionId); });
+
+  const mirrors: Transaction[] = [];
+  shared.forEach(t => {
+    const assignment = t.assignments?.find(a => myIds.has(a.personId));
+    const isDirect = myIds.has(t.payerPayee);
+    if (!assignment && !isDirect) return;
+    if (!t.linkedToCard && parentsWithChild.has(t.id)) return;
+
+    const share = assignment ? assignment.amount : t.amount;
+    const iReceive = t.type !== 'income' && t.owedByPerson === false;
+    mirrors.push({
+      id: `shared-${t.id}`,
+      type: iReceive ? 'income' : 'expense',
+      description: `${t.description} · ${ownerNames[t.userId] || 'Alguém'}`,
+      amount: share,
+      date: t.date,
+      category: 'Compartilhado',
+      recurrence: 'none',
+      installments: t.installments ?? null,
+      status: t.status,
+      cardId: null,
+      payerPayee: 'geral',
+      assignments: [],
+      linkedToCard: false,
+      linkedTransactionId: null,
+      seriesId: null,
+      actualDate: t.actualDate ?? null,
+      owedByPerson: null
+    });
+  });
+  return mirrors;
+}
 
 // Currency Helpers
 // Telefone brasileiro com código do país: +55 (XX) XXXXX-XXXX. O +55 é
@@ -464,6 +512,9 @@ export default function App() {
   const [sortMode, setSortMode] = useState<'date' | 'min' | 'max'>('date');
   const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string }>({ open: false, title: '', message: '' });
   const [tempNickname, setTempNickname] = useState('');
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [respondingConsentId, setRespondingConsentId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingCard, setIsSubmittingCard] = useState(false);
   const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
@@ -761,11 +812,62 @@ export default function App() {
     if (!user) return;
     try {
       const data = await api.fetchTransactions(user.id);
-      setTransactions(data);
+      let mirrors: Transaction[] = [];
+      // Movimentações que outras pessoas associaram a mim. Se o SQL de
+      // compartilhamento ainda não foi rodado, isso só é ignorado.
+      try {
+        const shared = await api.fetchSharedTransactions(user.id);
+        if (shared.length > 0) {
+          const [myPeople, owners] = await Promise.all([
+            api.fetchMySharedPeople(),
+            api.fetchPublicProfiles(Array.from(new Set(shared.map(t => t.userId))))
+          ]);
+          const ownerNames: Record<string, string> = {};
+          owners.forEach(o => { ownerNames[o.id] = o.nickname || o.firstName || (o.username ? `@${o.username}` : 'Alguém'); });
+          mirrors = buildSharedMirrors(shared, myPeople, ownerNames);
+        }
+      } catch (sharedErr) {
+        console.warn('Compartilhamento indisponível:', sharedErr);
+      }
+      setTransactions([...data, ...mirrors]);
     } catch (err) {
       handleSupabaseError(err, OperationType.LIST, 'transactions');
     }
   }, [user]);
+
+  const loadNotifications = React.useCallback(async () => {
+    if (!user) return;
+    try {
+      setNotifications(await api.fetchNotifications(user.id));
+    } catch (err) {
+      console.warn('Notificações indisponíveis:', err);
+    }
+  }, [user]);
+
+  const handleConsentResponse = async (n: AppNotification, status: 'accepted' | 'declined') => {
+    if (!n.consentId) return;
+    setRespondingConsentId(n.consentId);
+    try {
+      await api.respondConsent(n.consentId, status);
+      await api.markNotificationsRead([n.id]);
+      await Promise.all([loadNotifications(), loadTransactions()]);
+    } catch (err) {
+      showAlert('Não foi possível responder', extractErrorMessage(err));
+    } finally {
+      setRespondingConsentId(null);
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    const ids = notifications.filter(n => !n.read).map(n => n.id);
+    if (ids.length === 0) return;
+    try {
+      await api.markNotificationsRead(ids);
+      await loadNotifications();
+    } catch (err) {
+      showAlert('Erro', extractErrorMessage(err));
+    }
+  };
 
   const loadCards = React.useCallback(async () => {
     if (!user) return;
@@ -805,6 +907,7 @@ export default function App() {
   React.useEffect(() => {
     if (!user) {
       setTransactions([]);
+      setNotifications([]);
       setCards([]);
       setPeople([]);
       setUserProfile(null);
@@ -813,11 +916,13 @@ export default function App() {
 
     loadProfile();
     loadTransactions();
+    loadNotifications();
     loadCards();
     loadPeople();
     loadCategories();
 
     const unsubscribeProfile = api.subscribeToTable('profiles', user.id, loadProfile);
+    const unsubscribeNotifications = api.subscribeToTable('notifications', user.id, () => { loadNotifications(); loadTransactions(); });
     const unsubscribeTransactions = api.subscribeToTable('transactions', user.id, loadTransactions);
     const unsubscribeCards = api.subscribeToTable('cards', user.id, loadCards);
     const unsubscribePeople = api.subscribeToTable('people', user.id, loadPeople);
@@ -825,12 +930,13 @@ export default function App() {
 
     return () => {
       unsubscribeProfile();
+      unsubscribeNotifications();
       unsubscribeTransactions();
       unsubscribeCards();
       unsubscribePeople();
       unsubscribeCategories();
     };
-  }, [user, loadProfile, loadTransactions, loadCards, loadPeople, loadCategories]);
+  }, [user, loadProfile, loadTransactions, loadNotifications, loadCards, loadPeople, loadCategories]);
 
   const getTransactionEffectiveMonth = (t: Transaction) => {
     if (t.category === 'Fatura cartão' || t.category === 'Fatura Cartão') {
@@ -2274,6 +2380,10 @@ export default function App() {
       setActiveTab('cartoes');
       return;
     }
+    if (t.id.startsWith('shared-')) {
+      showAlert('Movimentação compartilhada', 'Essa movimentação foi associada a você por outra pessoa. Só quem a criou pode editá-la.');
+      return;
+    }
     if (t.id.startsWith('person-bill-')) {
       setSelectedPersonId(t.id.replace('person-bill-', ''));
       setActiveTab('pessoas');
@@ -2569,6 +2679,7 @@ export default function App() {
 
   /** Marca um lançamento planejado como pago/recebido com um clique, sem abrir o modal de confirmação. */
   const handleQuickConfirm = (t: Transaction) => {
+    if (t.id.startsWith('shared-')) return;
     handleConfirmTransaction(t.id, t.amount, format(new Date(), 'yyyy-MM-dd'), t.date);
   };
 
@@ -2943,11 +3054,16 @@ export default function App() {
         </button>
         <button
           type="button"
-          onClick={() => setAlertConfig({ open: true, title: 'Notificações', message: 'Você não tem notificações novas.' })}
-          className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
+          onClick={() => setIsNotificationsOpen(true)}
+          className="relative w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
           aria-label="Notificações"
         >
           <Bell size={18} />
+          {notifications.some(n => !n.read) && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-400 text-white text-[10px] font-medium flex items-center justify-center">
+              {notifications.filter(n => !n.read).length}
+            </span>
+          )}
         </button>
       </div>
     </div>
@@ -4483,6 +4599,60 @@ export default function App() {
           onClick={() => setActiveTab('pessoas')}
           icon={<Users />}
         />
+
+        <Dialog open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+          <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E] max-h-[85vh] flex flex-col">
+            <div className="p-6 pb-3 shrink-0 flex items-start justify-between gap-3">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Notificações</DialogTitle>
+                <DialogDescription className="text-xs">Avisos de quem associa movimentações a você</DialogDescription>
+              </DialogHeader>
+              {notifications.some(n => !n.read) && (
+                <button type="button" onClick={markAllNotificationsRead} className="text-xs font-medium text-primary shrink-0 mt-1">
+                  Marcar como lidas
+                </button>
+              )}
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-2 scrollbar-hide">
+              {notifications.length === 0 ? (
+                <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-10">Você não tem notificações.</p>
+              ) : notifications.map(n => (
+                <div key={n.id} className={cn("rounded-2xl p-4 space-y-2 bg-card shadow-soft", !n.read && "ring-1 ring-primary/30")}>
+                  <div className="flex items-start gap-3">
+                    <span className={cn("mt-1.5 w-2 h-2 rounded-full shrink-0", n.read ? "bg-transparent" : "bg-primary")} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{n.title}</p>
+                      {n.body && <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">{n.body}</p>}
+                      <p className="text-[10px] font-normal text-slate-300 dark:text-[#6B679C] mt-1">
+                        {format(parseISO(n.createdAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
+                  </div>
+                  {n.type === 'consent_request' && !n.read && (
+                    <div className="flex gap-2 pl-5">
+                      <button
+                        type="button"
+                        disabled={respondingConsentId === n.consentId}
+                        onClick={() => handleConsentResponse(n, 'accepted')}
+                        className="flex-1 h-10 rounded-full bg-primary text-white text-xs font-medium disabled:opacity-50"
+                      >
+                        Aceitar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={respondingConsentId === n.consentId}
+                        onClick={() => handleConsentResponse(n, 'declined')}
+                        className="flex-1 h-10 rounded-full bg-secondary text-secondary-foreground text-xs font-medium disabled:opacity-50"
+                      >
+                        Recusar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <ImageCropper src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />
 
@@ -7184,7 +7354,7 @@ function TransactionItem({
   categoryIcon?: string
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
-  const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-') && !transaction.id.startsWith('person-bill-');
+  const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-') && !transaction.id.startsWith('person-bill-') && !transaction.id.startsWith('shared-');
 
   return (
     <SwipeToConfirm
