@@ -161,6 +161,12 @@ function buildSharedMirrors(
   return mirrors;
 }
 
+/** "Setembro de 2026": só a primeira letra maiúscula. */
+const monthLabel = (date: Date) => {
+  const label = format(date, "MMMM 'de' yyyy", { locale: ptBR });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+};
+
 // Currency Helpers
 // Telefone brasileiro com código do país: +55 (XX) XXXXX-XXXX. O +55 é
 // fixo; o usuário digita só DDD + número. Aceita valores antigos (só dígitos,
@@ -3310,88 +3316,97 @@ export default function App() {
     else applyRecurrenceCount(Math.min(120, Math.max(2, recurrenceCount + delta)));
   };
 
-  const repeatSection = (
-    <div className="space-y-2">
-      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Repete?</Label>
-      <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-2xl p-1">
-        {(['Não', 'Todo mês', 'Parcelado'] as const).map((label, k) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => chooseRepeatKind(k as 0 | 1 | 2)}
-            className={cn("flex-1 h-11 rounded-xl text-sm font-medium transition-all", repeatKind === k ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
-          >
-            {label}
-          </button>
-        ))}
+  const repeatSection = (() => {
+    const entered = parseCurrency(amountInput);
+    const perParcel = installmentValueMode === 'total' && !editingTransaction ? entered / repeatCount : entered;
+    const startDate = newTransaction.date || format(new Date(), 'yyyy-MM-dd');
+    const chip = (active: boolean) => cn(
+      "h-8 px-3 rounded-full text-xs font-medium transition-all whitespace-nowrap",
+      active ? "bg-primary text-white shadow-sm" : "bg-white dark:bg-[#100E3D] text-slate-500 dark:text-[#C5C1E5]"
+    );
+    const stepper = (value: React.ReactNode, onMinus: () => void, onPlus: () => void, label: string) => (
+      <div className="flex items-center bg-white dark:bg-[#100E3D] rounded-full p-1 shadow-sm shrink-0">
+        <button type="button" onClick={onMinus} aria-label={`Diminuir ${label}`} className="w-8 h-8 rounded-full text-primary flex items-center justify-center active:scale-90 transition-transform">
+          <Minus size={15} />
+        </button>
+        <span className="min-w-[2rem] text-center font-heading font-medium text-base text-slate-800 dark:text-[#EDE9E3] tabular-nums">{value}</span>
+        <button type="button" onClick={onPlus} aria-label={`Aumentar ${label}`} className="w-8 h-8 rounded-full text-primary flex items-center justify-center active:scale-90 transition-transform">
+          <Plus size={15} />
+        </button>
       </div>
-      {repeatKind > 0 && (() => {
-        const entered = parseCurrency(amountInput);
-        const perParcel = installmentValueMode === 'total' && !editingTransaction ? entered / repeatCount : entered;
-        const startDate = newTransaction.date || format(new Date(), 'yyyy-MM-dd');
-        const pill = (active: boolean) => cn("flex-1 h-9 rounded-lg text-xs font-medium transition-all", active ? "bg-primary text-white shadow-sm" : "text-slate-500 dark:text-[#C5C1E5]");
-        return (
-          <div className="bg-slate-50 dark:bg-[#16133F] rounded-2xl p-2 space-y-2">
-            <div className="flex items-center justify-between gap-3 pl-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{repeatCount} {repeatKind === 2 ? 'parcelas' : 'meses'}</p>
-                <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">
-                  {repeatKind === 2
-                    ? `${repeatCount}x de ${brlFmt(perParcel)} · total ${brlFmt(perParcel * repeatCount)}`
-                    : `${brlFmt(entered)} por mês, até ${format(addMonths(parseISO(startDate), repeatCount - 1), 'MMM/yyyy', { locale: ptBR })}`}
-                </p>
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <button type="button" onClick={() => changeRepeatCount(-1)} aria-label="Menos" className="w-10 h-10 rounded-full bg-white dark:bg-[#100E3D] text-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform">
-                  <Minus size={16} />
-                </button>
-                <button type="button" onClick={() => changeRepeatCount(1)} aria-label="Mais" className="w-10 h-10 rounded-full bg-white dark:bg-[#100E3D] text-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform">
-                  <Plus size={16} />
-                </button>
-              </div>
-            </div>
-
-            {repeatKind === 1 && (
-              <div className="bg-white dark:bg-[#100E3D] rounded-xl p-2 space-y-2">
-                <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Em que dia lançar todo mês?</p>
-                <div className="flex gap-1">
-                  <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={pill(recurrenceDateMode === 'fixed')}>
-                    Todo dia {parseISO(startDate).getDate()}
-                  </button>
-                  <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={pill(recurrenceDateMode === 'businessDay')}>
-                    Dia útil
-                  </button>
-                </div>
-                {recurrenceDateMode === 'businessDay' && (
-                  <div className="flex items-center justify-between gap-2 pl-1">
-                    <span className="text-xs font-normal text-slate-500 dark:text-[#C5C1E5]">{recurrenceBusinessDay}º dia útil do mês</span>
-                    <div className="flex gap-1.5">
-                      <button type="button" onClick={() => setRecurrenceBusinessDay(d => Math.max(1, d - 1))} aria-label="Dia útil anterior" className="w-8 h-8 rounded-full bg-slate-50 dark:bg-[#16133F] text-primary flex items-center justify-center"><Minus size={14} /></button>
-                      <button type="button" onClick={() => setRecurrenceBusinessDay(d => Math.min(23, d + 1))} aria-label="Próximo dia útil" className="w-8 h-8 rounded-full bg-slate-50 dark:bg-[#16133F] text-primary flex items-center justify-center"><Plus size={14} /></button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {repeatKind === 2 && !editingTransaction && (
-              <div className="bg-white dark:bg-[#100E3D] rounded-xl p-2 space-y-2">
-                <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{brlFmt(entered)} é o valor</p>
-                <div className="flex gap-1">
-                  <button type="button" onClick={() => setInstallmentValueMode('parcel')} className={pill(installmentValueMode === 'parcel')}>
-                    De cada parcela
-                  </button>
-                  <button type="button" onClick={() => setInstallmentValueMode('total')} className={pill(installmentValueMode === 'total')}>
-                    Total da compra
-                  </button>
-                </div>
-              </div>
-            )}
+    );
+    return (
+      <div className="space-y-2">
+        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Repete?</Label>
+        <div className="rounded-2xl bg-slate-50 dark:bg-[#16133F] p-1">
+          <div className="flex">
+            {(['Não', 'Todo mês', 'Parcelado'] as const).map((label, k) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => chooseRepeatKind(k as 0 | 1 | 2)}
+                className={cn("flex-1 h-11 rounded-xl text-sm font-medium transition-all", repeatKind === k ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        );
-      })()}
-    </div>
-  );
+
+          {repeatKind > 0 && (
+            <div className="px-3 pt-4 pb-3 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{repeatKind === 2 ? 'Parcelas' : 'Meses'}</p>
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">
+                    {repeatKind === 2
+                      ? `${repeatCount}x de ${brlFmt(perParcel)} · total ${brlFmt(perParcel * repeatCount)}`
+                      : `Até ${format(addMonths(parseISO(startDate), repeatCount - 1), "MMM 'de' yyyy", { locale: ptBR })}`}
+                  </p>
+                </div>
+                {stepper(repeatCount, () => changeRepeatCount(-1), () => changeRepeatCount(1), repeatKind === 2 ? 'parcelas' : 'meses')}
+              </div>
+
+              {repeatKind === 1 && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC]">Lançar em</p>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={chip(recurrenceDateMode === 'fixed')}>
+                        Todo dia {parseISO(startDate).getDate()}
+                      </button>
+                      <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={chip(recurrenceDateMode === 'businessDay')}>
+                        Dia útil
+                      </button>
+                    </div>
+                    {recurrenceDateMode === 'businessDay' && stepper(
+                      `${recurrenceBusinessDay}º`,
+                      () => setRecurrenceBusinessDay(d => Math.max(1, d - 1)),
+                      () => setRecurrenceBusinessDay(d => Math.min(23, d + 1)),
+                      'dia útil'
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {repeatKind === 2 && !editingTransaction && (
+                <div className="space-y-2">
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC]">Os {brlFmt(entered)} são</p>
+                  <div className="flex gap-1.5">
+                    <button type="button" onClick={() => setInstallmentValueMode('parcel')} className={chip(installmentValueMode === 'parcel')}>
+                      O valor da parcela
+                    </button>
+                    <button type="button" onClick={() => setInstallmentValueMode('total')} className={chip(installmentValueMode === 'total')}>
+                      O total da compra
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  })();
 
   const shareTotal = parseCurrency(amountInput);
   const shareAssignments = personSplits.length > 0 ? computeShareAssignments(shareTotal) : [];
@@ -3555,6 +3570,38 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+
+  const floatingMonthPicker = (
+  <div className="md:hidden fixed bottom-24 right-6 z-30 flex items-center gap-0.5 bg-white dark:bg-[#100E3D] rounded-full p-1.5 shadow-bubbly">
+    <button
+      type="button"
+      onClick={prevMonth}
+      className="w-8 h-8 rounded-full flex items-center justify-center text-primary active:scale-90 transition-transform"
+      aria-label="Mês anterior"
+    >
+      <ChevronLeft size={16} strokeWidth={3} />
+    </button>
+    <button
+      type="button"
+      onClick={() => {
+        setPickerMonth(format(currentDate, 'MM'));
+        setPickerYear(format(currentDate, 'yyyy'));
+        setIsMonthPickerOpen(true);
+      }}
+      className="px-1.5 text-[11px] font-medium text-slate-700 dark:text-[#EDEAF9] capitalize whitespace-nowrap"
+    >
+      {format(currentDate, 'MMM yyyy', { locale: ptBR })}
+    </button>
+    <button
+      type="button"
+      onClick={nextMonth}
+      className="w-8 h-8 rounded-full flex items-center justify-center text-primary active:scale-90 transition-transform"
+      aria-label="Próximo mês"
+    >
+      <ChevronRight size={16} strokeWidth={3} />
+    </button>
+  </div>
   );
 
   // Cabeçalho mobile compartilhado (foto + "Oi, Nome!" + calendário + notificações),
@@ -4733,7 +4780,7 @@ export default function App() {
                   <h2 className="text-3xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
                     Olá, {userProfile?.nickname || 'de novo'} 👋
                   </h2>
-                  <p className="text-slate-400 dark:text-[#8D89AC] font-normal text-sm mt-1 capitalize">{format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}</p>
+                  <p className="text-slate-400 dark:text-[#8D89AC] font-normal text-sm mt-1">{monthLabel(currentDate)}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1 bg-white dark:bg-[#100E3D] px-1.5 py-1.5 rounded-full shadow-soft">
@@ -4772,7 +4819,7 @@ export default function App() {
                 {mobileTopHeader}
 
                 <div>
-                  <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight capitalize">{format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}</p>
+                  <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight">{monthLabel(currentDate)}</p>
                   <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">Balanço do mês</h1>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     {(() => {
@@ -4789,63 +4836,6 @@ export default function App() {
                     )}>
                       {stats.balance >= 0 ? '↑ Positivo' : '↓ Negativo'}
                     </span>
-                  </div>
-                </div>
-
-                {people.filter(p => p.visible !== false).length > 0 && (
-                  <div>
-                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight mb-3">Pessoas</p>
-                    <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide pb-1">
-                      <button
-                        onClick={() => setIsPessoasOpen(true)}
-                        className="w-12 h-12 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
-                      >
-                        <Plus size={18} strokeWidth={2.5} />
-                      </button>
-                      {people.filter(p => p.visible !== false).map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => { setSelectedPersonId(p.id); setActiveTab('pessoas'); }}
-                          className="w-12 h-12 rounded-full overflow-hidden shrink-0 shadow-soft"
-                        >
-                          <img src={p.image || `https://picsum.photos/seed/${p.name}/100/100`} alt={p.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight mb-3">Cartões</p>
-                  <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide pb-1">
-                    <button
-                      onClick={() => {
-                        setEditingCard(null);
-                        setNewCardName('');
-                        setLimitInput('0,00');
-                        setNewCardClosingDay('');
-                        setNewCardDueDay('');
-                        setNewCardColor('#8A7FF5');
-                        setShowCardForm(true);
-                        setActiveTab('cartoes');
-                      }}
-                      className="w-12 h-12 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
-                      aria-label="Adicionar cartão"
-                    >
-                      <Plus size={18} strokeWidth={2.5} />
-                    </button>
-                    {cards.map(c => (
-                      <button
-                        key={c.id}
-                        onClick={() => { setSelectedCard(c.id); setShowCardForm(false); setActiveTab('cartoes'); }}
-                        className="h-12 w-[76px] rounded-xl shrink-0 shadow-soft relative overflow-hidden px-2 py-1.5 flex flex-col justify-between text-left"
-                        style={{ backgroundColor: c.color }}
-                        aria-label={`Abrir cartão ${c.name}`}
-                      >
-                        <span className="w-4 h-3 rounded-[3px] bg-white/40" />
-                        <span className="text-[10px] font-medium text-white truncate drop-shadow-sm">{c.name}</span>
-                      </button>
-                    ))}
                   </div>
                 </div>
 
@@ -4871,7 +4861,75 @@ export default function App() {
                     );
                   })()}
                 </div>
+
+                {(() => {
+                  const thumbLabel = "text-[10px] font-normal text-slate-500 dark:text-[#A8A4CC] truncate w-14 text-center";
+                  const addButton = (onClick: () => void, label: string) => (
+                    <button type="button" onClick={onClick} className="flex flex-col items-center gap-1.5 shrink-0" aria-label={label}>
+                      <span className="w-12 h-12 rounded-full border-2 border-dashed border-slate-200 dark:border-[#2A2566] text-slate-400 dark:text-[#8D89AC] flex items-center justify-center">
+                        <Plus size={18} strokeWidth={2.5} />
+                      </span>
+                      <span className={thumbLabel}>Adicionar</span>
+                    </button>
+                  );
+                  const visiblePeople = people.filter(p => p.visible !== false);
+                  return (
+                    <>
+                      <div>
+                        <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight mb-3">Pessoas</p>
+                        <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1">
+                          {visiblePeople.map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => { setSelectedPersonId(p.id); setActiveTab('pessoas'); }}
+                              className="flex flex-col items-center gap-1.5 shrink-0"
+                            >
+                              <span className="w-12 h-12 rounded-full overflow-hidden shadow-soft">
+                                <img src={p.image || `https://picsum.photos/seed/${p.name}/100/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              </span>
+                              <span className={thumbLabel}>{p.name.split(' ')[0]}</span>
+                            </button>
+                          ))}
+                          {addButton(() => { setActiveTab('pessoas'); handleCancelEditPerson(); setShowPersonForm(true); }, 'Adicionar pessoa')}
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight mb-3">Cartões</p>
+                        <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1">
+                          {cards.map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => { setSelectedCard(c.id); setShowCardForm(false); setActiveTab('cartoes'); }}
+                              className="flex flex-col items-center gap-1.5 shrink-0"
+                              aria-label={`Abrir cartão ${c.name}`}
+                            >
+                              <span className="w-12 h-12 rounded-full shadow-soft flex items-center justify-center text-white" style={{ backgroundColor: c.color }}>
+                                <CreditCard size={20} strokeWidth={2} />
+                              </span>
+                              <span className={thumbLabel}>{c.name}</span>
+                            </button>
+                          ))}
+                          {addButton(() => {
+                            setEditingCard(null);
+                            setNewCardName('');
+                            setLimitInput('0,00');
+                            setNewCardClosingDay('');
+                            setNewCardDueDay('');
+                            setNewCardColor('#8A7FF5');
+                            setShowCardForm(true);
+                            setActiveTab('cartoes');
+                          }, 'Adicionar cartão')}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
+
+              {floatingMonthPicker}
 
               <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard
@@ -5337,7 +5395,7 @@ export default function App() {
                         </div>
                       )}
                       {list.length === 0 ? (
-                        <div className="bg-card rounded-[1.75rem] shadow-soft p-10 text-center space-y-2">
+                        <div className="border border-dashed border-slate-200/70 dark:border-white/10 rounded-[1.75rem] p-10 text-center space-y-2">
                           <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
                             <Check size={22} strokeWidth={2.5} />
                           </div>
@@ -5361,7 +5419,7 @@ export default function App() {
                               role="button"
                               tabIndex={0}
                               onClick={() => handleTransactionClick(t)}
-                              className="bg-card rounded-[1.5rem] shadow-soft p-4 space-y-3 cursor-pointer active:scale-[0.99] transition-transform"
+                              className="border border-slate-200/70 dark:border-white/10 rounded-[1.5rem] p-4 space-y-3 cursor-pointer active:scale-[0.99] transition-transform"
                             >
                               <div className="flex items-center gap-3">
                                 {billPerson ? (
@@ -5509,35 +5567,7 @@ export default function App() {
               ))}
               </div>
 
-              <div className="md:hidden fixed bottom-24 right-6 z-30 flex items-center gap-0.5 bg-white dark:bg-[#100E3D] rounded-full p-1.5 shadow-bubbly">
-                <button
-                  type="button"
-                  onClick={prevMonth}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-primary active:scale-90 transition-transform"
-                  aria-label="Mês anterior"
-                >
-                  <ChevronLeft size={16} strokeWidth={3} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPickerMonth(format(currentDate, 'MM'));
-                    setPickerYear(format(currentDate, 'yyyy'));
-                    setIsMonthPickerOpen(true);
-                  }}
-                  className="px-1.5 text-[11px] font-medium text-slate-700 dark:text-[#EDEAF9] capitalize whitespace-nowrap"
-                >
-                  {format(currentDate, 'MMM yyyy', { locale: ptBR })}
-                </button>
-                <button
-                  type="button"
-                  onClick={nextMonth}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-primary active:scale-90 transition-transform"
-                  aria-label="Próximo mês"
-                >
-                  <ChevronRight size={16} strokeWidth={3} />
-                </button>
-              </div>
+              {floatingMonthPicker}
             </motion.div>
           )}
 
