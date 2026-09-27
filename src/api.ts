@@ -182,6 +182,16 @@ export async function updateTransaction(id: string, data: Partial<Transaction>) 
   if (error) handleSupabaseError(error, OperationType.UPDATE, 'transactions');
 }
 
+/** Renomeia a categoria em todos os lançamentos que a usam (a categoria é guardada pelo nome). */
+export async function renameTransactionCategory(userId: string, oldName: string, newName: string) {
+  const { error } = await supabase
+    .from('transactions')
+    .update({ category: newName })
+    .eq('userId', userId)
+    .eq('category', oldName);
+  if (error) handleSupabaseError(error, OperationType.UPDATE, 'transactions');
+}
+
 export async function deleteTransactions(ids: string[]) {
   if (ids.length === 0) return;
   const { error } = await supabase.from('transactions').delete().in('id', ids);

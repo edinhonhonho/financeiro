@@ -58,6 +58,8 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ImageCropper } from './ImageCropper';
+import { useDragScroll } from './useDragScroll';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -98,7 +100,7 @@ import {
   XAxis,
   YAxis
 } from 'recharts';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth, getDaysInMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Papa from 'papaparse';
 
@@ -110,6 +112,16 @@ import * as api from './api';
 import type { User } from '@supabase/supabase-js';
 
 // Currency Helpers
+// Formata como (XX) XXXXX-XXXX (ou (XX) XXXX-XXXX enquanto tem só 10 dígitos).
+const maskPhone = (value: string) => {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+};
+
 const maskCurrency = (value: string) => {
   const cleanValue = value.replace(/\D/g, '');
   if (!cleanValue) return '0,00';
@@ -179,6 +191,15 @@ const monthPickerYears = Array.from({ length: 9 }, (_, i) => ({
 }));
 
 const DEFAULT_CATEGORY_ICON = '🏷️';
+const CATEGORY_EMOJIS = [
+  '🏷️','🍔','🍕','🍟','🌮','🍣','🥗','🍎','🥖','☕','🍺','🍷','🛒','🥩','🍰','🍫',
+  '🏠','🛋️','💡','🚿','🔧','🧹','📶','📱','💻','🖥️','🎮','🎧','📺','🎬','🎵','🎟️',
+  '🚗','⛽','🚌','🚇','🚕','✈️','🏖️','🧳','🏨','🚲','🛵','🅿️','🛞','🚢','🗺️','⛰️',
+  '💊','🏥','🦷','🩺','🧘','🏋️','⚽','🏊','💇','💅','🧴','👕','👗','👟','👜','🕶️',
+  '📚','🎓','✏️','🎒','👶','🍼','🧸','🐶','🐱','🐾','🌱','🌳','🎁','🎉','💐','💍',
+  '💰','💵','💳','🏦','📈','📉','🧾','🪙','💼','🤝','📊','🧮','🏢','🛠️','📦','🚚',
+  '📄','🧑‍💼','⚖️','🔒','🛡️','📞','📮','⛪','🙏','❤️','⭐','🔥','🎯','🧩','🎨','🌎'
+];
 
 const CARD_COLOR_PRESETS = [
   '#8A7FF5', '#37D6A3', '#FDB8D7', '#FF6F61',
@@ -821,6 +842,17 @@ export default function App() {
     return startOfMonth(parseISO(t.date));
   };
 
+  /** Data em que a pessoa deve reembolsar: no cartão, é sempre o vencimento da fatura da compra. */
+  const getReimbursementDate = (tx: Partial<Transaction>): string => {
+    const card = tx.type === 'card_purchase' && tx.cardId ? cards.find(c => c.id === tx.cardId) : undefined;
+    if (card?.dueDay && tx.date) {
+      const month = getTransactionEffectiveMonth(tx as Transaction);
+      const day = Math.min(Number(card.dueDay), getDaysInMonth(month));
+      return format(new Date(month.getFullYear(), month.getMonth(), day), 'yyyy-MM-dd');
+    }
+    return linkedIncomeDate;
+  };
+
   /** Fatura sintética de um cartão num mês (soma das compras cuja competência cai nesse mês). */
   const computeCardBill = (card: Card, month: Date): Transaction => {
     const amount = transactions
@@ -1303,6 +1335,20 @@ export default function App() {
     if (person && person.id !== selectedPersonId) setSelectedPersonId(person.id);
   };
 
+  // Ao abrir a aba (ex: tocando numa pessoa na página inicial), leva o
+  // carrossel direto ao card da pessoa selecionada.
+  useEffect(() => {
+    if (activeTab !== 'pessoas') return;
+    const timer = setTimeout(() => {
+      const el = peopleCarouselRef.current;
+      const index = people.findIndex(p => p.id === selectedPersonId);
+      const child = index >= 0 ? el?.children[index] as HTMLElement | undefined : undefined;
+      if (el && child) el.scrollTo({ left: child.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft - (el.clientWidth - child.offsetWidth) / 2, behavior: 'auto' });
+    }, 50);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const [selectedChargeDate, setSelectedChargeDate] = useState<Date>(new Date());
   useEffect(() => {
     if (activeTab === 'pessoas') setSelectedChargeDate(new Date());
@@ -1311,13 +1357,19 @@ export default function App() {
   const personChargeHistory = useMemo(() => {
     const activePerson = people.find(p => p.id === selectedPersonId) || people[0];
     if (!activePerson) return [];
-    const points = Array.from({ length: CHART_MONTHS_HISTORY }).map((_, i) => {
+    // Inclui também os meses futuros (ex: despesas recorrentes do ano que vem).
+    const FUTURE_MONTHS = 36;
+    const points = Array.from({ length: CHART_MONTHS_HISTORY + FUTURE_MONTHS }).map((_, i) => {
       const monthDate = subMonths(currentDate, CHART_MONTHS_HISTORY - 1 - i);
       const charges = getPersonMonthlyCharges(activePerson.id, monthDate);
-      return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: charges.total };
+      return { monthKey: format(monthDate, 'yyyy-MM'), label: format(monthDate, 'MMM', { locale: ptBR }), amount: charges.total + charges.payableTotal };
     });
-    const firstWithCharge = points.findIndex(p => p.amount > 0);
-    return firstWithCharge === -1 ? points.slice(-1) : points.slice(firstWithCharge);
+    const currentIdx = CHART_MONTHS_HISTORY - 1;
+    let lastWithCharge = currentIdx;
+    points.forEach((pt, i) => { if (pt.amount > 0 && i > lastWithCharge) lastWithCharge = i; });
+    const visible = points.slice(0, lastWithCharge + 1);
+    const firstWithCharge = visible.findIndex(p => p.amount > 0);
+    return firstWithCharge === -1 ? visible.slice(currentIdx) : visible.slice(firstWithCharge);
   }, [people, selectedPersonId, currentDate, transactions]);
 
   const personChargeScrollRef = React.useRef<HTMLDivElement>(null);
@@ -1481,16 +1533,22 @@ export default function App() {
     return rounded.map(r => ({ personId: r.personId, amount: r.cents / 100 }));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Foto escolhida aguardando enquadramento (pessoa ou perfil).
+  const carouselDrag = useDragScroll();
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropTarget, setCropTarget] = useState<'person' | 'profile'>('person');
+  const readFileForCrop = (e: React.ChangeEvent<HTMLInputElement>, target: 'person' | 'profile') => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewPersonImage(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCropTarget(target);
+      setCropSrc(reader.result as string);
+    };
+    reader.readAsDataURL(file);
   };
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => readFileForCrop(e, 'person');
 
   // Calculations
   const stats = useMemo(() => {
@@ -1673,7 +1731,7 @@ export default function App() {
         const syncLinkedIncomes = async (mainId: string, mainDate: string, existing: Transaction[], mainExtra: Partial<Transaction>) => {
           if (editingTransaction.linkedToCard) return;
           const targets = wantsLinkedIncome ? wantedIncomes : [];
-          const dateOffset = differenceInCalendarDays(parseISO(linkedIncomeDate), parseISO(newTransaction.date as string));
+          const dateOffset = differenceInCalendarDays(parseISO(getReimbursementDate(newTransaction)), parseISO(newTransaction.date as string));
           for (const target of targets) {
             const found = existing.find(l => l.payerPayee === target.personId);
             if (found) {
@@ -1708,7 +1766,7 @@ export default function App() {
           await syncLinkedIncomes(editingTransaction.id, baseData.date, await api.fetchLinkedTransactions(userId, editingTransaction.id), {});
 
           const newRows: Array<Transaction & { userId: string }> = [];
-          let startingLinkedRunner = parseISO(linkedIncomeDate);
+          let startingLinkedRunner = parseISO(getReimbursementDate(newTransaction));
           const shouldLinkIncome = (baseData.type === 'card_purchase' || baseData.type === 'expense') &&
             baseData.payerPayee && baseData.payerPayee !== 'geral' && baseData.owedByPerson !== false;
           const incomeAssignments = (assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }]).filter(a => a.amount > 0);
@@ -1879,7 +1937,7 @@ export default function App() {
         const rows: Array<Transaction & { userId: string }> = [];
 
         // Use the synced linkedIncomeDate which matches newTransaction.date by default
-        let startingLinkedRunner = parseISO(linkedIncomeDate);
+        let startingLinkedRunner = parseISO(getReimbursementDate(newTransaction));
         const shouldLinkIncome = (baseData.type === 'card_purchase' || baseData.type === 'expense') &&
           baseData.payerPayee && baseData.payerPayee !== 'geral' && baseData.owedByPerson !== false;
         const incomeAssignments = (assignments.length > 0 ? assignments : [{ personId: baseData.payerPayee, amount }]).filter(a => a.amount > 0);
@@ -2048,19 +2106,20 @@ export default function App() {
   };
 
   const profileImageInputRef = React.useRef<HTMLInputElement>(null);
-  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      try {
-        await api.saveProfile(user.id, { photoURL: reader.result as string });
-        await loadProfile();
-      } catch (err) {
-        handleSupabaseError(err, OperationType.WRITE, 'profiles');
-      }
-    };
-    reader.readAsDataURL(file);
+  const handleProfileImageChange = (e: React.ChangeEvent<HTMLInputElement>) => readFileForCrop(e, 'profile');
+  const handleCropConfirm = async (dataUrl: string) => {
+    setCropSrc(null);
+    if (cropTarget === 'person') {
+      setNewPersonImage(dataUrl);
+      return;
+    }
+    if (!user) return;
+    try {
+      await api.saveProfile(user.id, { photoURL: dataUrl });
+      await loadProfile();
+    } catch (err) {
+      showAlert('Não foi possível salvar a foto', extractErrorMessage(err));
+    }
   };
 
   const handleSaveNickname = async () => {
@@ -2275,7 +2334,7 @@ export default function App() {
     setEditingPerson(p);
     setNewPersonName(p.name);
     setNewPersonEmail(p.email || '');
-    setNewPersonPhone(p.phone || '');
+    setNewPersonPhone(maskPhone(p.phone || ''));
     setNewPersonImage(p.image || '');
     if (p.linkedUserId) {
       api.fetchPublicProfile(p.linkedUserId).then(profile => {
@@ -2388,6 +2447,8 @@ export default function App() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState('#8A7FF5');
   const [newCategoryIcon, setNewCategoryIcon] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const categoriesScrollRef = React.useRef<HTMLDivElement>(null);
 
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) {
@@ -2408,6 +2469,11 @@ export default function App() {
 
       if (editingCategory) {
         await api.updateCategory(editingCategory.id, catData);
+        // Lançamentos guardam a categoria pelo nome: acompanha a renomeação.
+        if (editingCategory.name !== catData.name) {
+          await api.renameTransactionCategory(user.id, editingCategory.name, catData.name);
+          await loadTransactions();
+        }
         setEditingCategory(null);
       } else {
         await api.createCategory(user.id, catData);
@@ -2416,6 +2482,7 @@ export default function App() {
       setNewCategoryName('');
       setNewCategoryColor('#8A7FF5');
       setNewCategoryIcon('');
+      setShowEmojiPicker(false);
     } catch (err) {
       handleSupabaseError(err, editingCategory ? OperationType.UPDATE : OperationType.CREATE, 'categories');
     }
@@ -3024,7 +3091,7 @@ export default function App() {
       {/* Novo lançamento (mobile) — tela cheia, em 3 etapas */}
       <div className="md:hidden">
         <Dialog open={isRegistrarOpen && window.innerWidth < 768} onOpenChange={(open) => { setIsRegistrarOpen(open); if (!open) setRegistrarStep(0); }}>
-          <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none flex flex-col p-0 border-none shadow-none overflow-hidden bg-white dark:bg-[#100E3D]">
+          <DialogContent showCloseButton={false} className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none flex flex-col p-0 border-none shadow-none overflow-hidden bg-white dark:bg-[#100E3D]">
             <DialogHeader className="sr-only">
               <DialogTitle>{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
               <DialogDescription>Etapa {registrarStep + 1} de 3</DialogDescription>
@@ -3443,7 +3510,8 @@ export default function App() {
                   <Repeat size={14} className="text-primary shrink-0" />
                   <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
                 </div>
-                <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-xl p-1">
+                <div className="rounded-2xl bg-slate-50 dark:bg-[#16133F] p-1.5">
+                <div className="flex">
                   <button
                     type="button"
                     onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
@@ -3468,7 +3536,7 @@ export default function App() {
                 </div>
 
                 {isRecurrent && (
-                  <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-[#201C56]">
+                  <div className="space-y-3 mt-1.5 p-3 rounded-xl bg-white dark:bg-[#100E3D]">
                     <div className="flex items-center gap-2">
                       <CalendarIcon size={12} className="text-primary" />
                       <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
@@ -3481,7 +3549,7 @@ export default function App() {
                           setNewTransaction({...newTransaction, recurrenceEndDate: `${year}-${m}`});
                         }}
                       >
-                        <SelectTrigger className="h-10 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-xs px-4">
+                        <SelectTrigger className="h-11 data-[size=default]:h-11 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-xs px-4">
                           <SelectValue placeholder="Mês" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -3497,7 +3565,7 @@ export default function App() {
                           setNewTransaction({...newTransaction, recurrenceEndDate: `${y}-${month}`});
                         }}
                       >
-                        <SelectTrigger className="h-10 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-xs px-4">
+                        <SelectTrigger className="h-11 data-[size=default]:h-11 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-xs px-4">
                           <SelectValue placeholder="Ano" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -3532,7 +3600,7 @@ export default function App() {
                             type="number"
                             min="1"
                             max="23"
-                            className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
+                            className="h-11 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
                             value={recurrenceBusinessDay}
                             onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
                           />
@@ -3544,19 +3612,20 @@ export default function App() {
                 )}
 
                 {isInstallment && (
-                  <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-[#201C56]">
+                  <div className="space-y-2 mt-1.5 p-3 rounded-xl bg-white dark:bg-[#100E3D]">
                     <Label className="text-[10px] font-medium tracking-wider text-primary block">Quantidade de Parcelas</Label>
                     <Input
-                      type="number"
+                      type="text"
                       inputMode="numeric"
-                      min="2"
-                      max="84"
-                      className="h-10 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-base px-4"
-                      value={installmentCount ?? 2}
-                      onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value)))}
+                      placeholder="2"
+                      className="h-11 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-base px-4"
+                      value={installmentCount > 0 ? String(installmentCount) : ''}
+                      onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value.replace(/\D/g, '')) || 0))}
+                      onBlur={() => setInstallmentCount(c => Math.max(2, c))}
                     />
                   </div>
                 )}
+                </div>
               </div>
 
                 {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && !editingTransaction?.linkedToCard && !(editingTransaction && linkedParentIds.has(editingTransaction.id)) && (
@@ -3567,11 +3636,17 @@ export default function App() {
                     </div>
                     <div className="space-y-1">
                       <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Data limite para reembolso</Label>
-                      <DateField
-                        value={linkedIncomeDate}
-                        onChange={setLinkedIncomeDate}
-                        className="h-11 rounded-xl text-sm bg-slate-50 dark:bg-[#16133F]"
-                      />
+                      {newTransaction.type === 'card_purchase' && newTransaction.cardId && cards.find(c => c.id === newTransaction.cardId)?.dueDay ? (
+                        <p className="text-sm font-medium text-primary ml-1">
+                          {format(parseISO(getReimbursementDate(newTransaction)), "dd/MM/yyyy")} <span className="font-normal text-slate-400 dark:text-[#8D89AC] text-xs">· vencimento da fatura</span>
+                        </p>
+                      ) : (
+                        <DateField
+                          value={linkedIncomeDate}
+                          onChange={setLinkedIncomeDate}
+                          className="h-11 rounded-xl text-sm bg-slate-50 dark:bg-[#16133F]"
+                        />
+                      )}
                     </div>
                   </div>
                 )}
@@ -3643,7 +3718,7 @@ export default function App() {
                 <DialogDescription className="font-normal text-sm text-slate-500 dark:text-[#A8A4CC] tracking-tight mt-1">Personalize sua organização</DialogDescription>
               </DialogHeader>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+            <div ref={categoriesScrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
               <div className="space-y-4 p-6 bg-slate-50 dark:bg-[#16133F] rounded-[2rem]">
                 {editingCategory && (
                   <div className="flex items-center justify-between bg-primary/10 text-primary text-xs font-medium rounded-xl px-4 py-2.5">
@@ -3656,20 +3731,17 @@ export default function App() {
                 <div className="flex gap-3">
                   <div className="space-y-2">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Emoji</Label>
-                    <Input
-                      placeholder="🏷️"
-                      className="h-12 w-16 rounded-2xl border-none bg-white dark:bg-[#100E3D] text-center text-xl px-0 shadow-sm"
-                      maxLength={4}
-                      value={newCategoryIcon}
-                      onChange={(e) => {
-                        const EMOJI_PARTS = new RegExp(
-                          '\\p{Extended_Pictographic}|\\p{Emoji_Presentation}|\\u200D|\\uFE0F|[\\u{1F3FB}-\\u{1F3FF}]|[\\u{1F1E6}-\\u{1F1FF}]',
-                          'gu'
-                        );
-                        const matches = e.target.value.match(EMOJI_PARTS) || [];
-                        setNewCategoryIcon(matches.join(''));
-                      }}
-                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEmojiPicker(v => !v)}
+                      className={cn(
+                        "h-12 w-16 rounded-2xl bg-white dark:bg-[#100E3D] text-center text-2xl shadow-sm flex items-center justify-center transition-all",
+                        showEmojiPicker && "ring-2 ring-primary"
+                      )}
+                      aria-label="Escolher emoji"
+                    >
+                      {newCategoryIcon || <span className="opacity-40">{DEFAULT_CATEGORY_ICON}</span>}
+                    </button>
                   </div>
                   <div className="flex-1 space-y-2">
                     <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome da categoria</Label>
@@ -3681,6 +3753,25 @@ export default function App() {
                     />
                   </div>
                 </div>
+                {showEmojiPicker && (
+                  <div className="bg-white dark:bg-[#100E3D] rounded-2xl shadow-sm p-3 max-h-52 overflow-y-auto scrollbar-hide">
+                    <div className="grid grid-cols-8 gap-1">
+                      {CATEGORY_EMOJIS.map(emoji => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => { setNewCategoryIcon(emoji); setShowEmojiPicker(false); }}
+                          className={cn(
+                            "h-10 rounded-xl text-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-[#1C1852] transition-colors",
+                            newCategoryIcon === emoji && "bg-primary/15"
+                          )}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Cor</Label>
                   <div className="grid grid-cols-5 gap-2 bg-white dark:bg-[#100E3D] p-3 rounded-2xl shadow-sm">
@@ -3734,9 +3825,12 @@ export default function App() {
                             setNewCategoryName(cat.name);
                             setNewCategoryColor(cat.color);
                             setNewCategoryIcon(cat.icon);
+                            setShowEmojiPicker(false);
+                            categoriesScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
+                          aria-label="Editar categoria"
                         >
-                          <Settings size={14} strokeWidth={2.5} />
+                          <Pencil size={14} strokeWidth={2.5} />
                         </button>
                         <button
                           className="h-9 w-9 flex items-center justify-center text-slate-300 dark:text-[#6B679C] hover:text-rose-400 rounded-full transition-all"
@@ -4130,7 +4224,8 @@ export default function App() {
                     <Repeat size={16} className="text-primary shrink-0" />
                     <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Repetição</Label>
                   </div>
-                  <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-2xl p-1">
+                  <div className="rounded-2xl bg-slate-50 dark:bg-[#16133F] p-1.5">
+                  <div className="flex">
                     <button
                       type="button"
                       onClick={() => { setIsRecurrent(false); setIsInstallment(false); }}
@@ -4155,7 +4250,7 @@ export default function App() {
                   </div>
 
                   {isRecurrent && (
-                    <div className="space-y-4 pt-4 border-t border-slate-100 dark:border-[#201C56]">
+                    <div className="space-y-4 mt-1.5 p-4 rounded-xl bg-white dark:bg-[#100E3D]">
                       <div className="flex items-center gap-2">
                         <CalendarIcon size={14} className="text-primary" />
                         <Label className="text-[10px] font-medium tracking-wider text-primary">Repetir até</Label>
@@ -4170,7 +4265,7 @@ export default function App() {
                               setNewTransaction({...newTransaction, recurrenceEndDate: `${year}-${m}`});
                             }}
                           >
-                            <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-6">
+                            <SelectTrigger className="h-12 data-[size=default]:h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-6">
                               <SelectValue placeholder="Mês" />
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl border-none shadow-deep">
@@ -4189,7 +4284,7 @@ export default function App() {
                               setNewTransaction({...newTransaction, recurrenceEndDate: `${y}-${month}`});
                             }}
                           >
-                            <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-6">
+                            <SelectTrigger className="h-12 data-[size=default]:h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-6">
                               <SelectValue placeholder="Ano" />
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl border-none shadow-deep">
@@ -4225,7 +4320,7 @@ export default function App() {
                               type="number"
                               min="1"
                               max="23"
-                              className="h-10 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
+                              className="h-12 w-16 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm text-center px-2 shrink-0"
                               value={recurrenceBusinessDay}
                               onChange={(e) => setRecurrenceBusinessDay(Math.max(1, Number(e.target.value) || 1))}
                             />
@@ -4237,19 +4332,20 @@ export default function App() {
                   )}
 
                   {isInstallment && (
-                    <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-[#201C56]">
+                    <div className="space-y-2 mt-1.5 p-4 rounded-xl bg-white dark:bg-[#100E3D]">
                       <Label className="text-[10px] font-medium tracking-wider text-primary ml-1">Quantidade de Parcelas</Label>
                       <Input
-                        type="number"
+                        type="text"
                         inputMode="numeric"
-                        min="2"
-                        max="84"
-                        className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-base px-6"
-                        value={installmentCount ?? 2}
-                        onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value)))}
+                        placeholder="2"
+                        className="h-11 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-base px-6"
+                        value={installmentCount > 0 ? String(installmentCount) : ''}
+                        onChange={(e) => setInstallmentCount(Math.min(84, Number(e.target.value.replace(/\D/g, '')) || 0))}
+                        onBlur={() => setInstallmentCount(c => Math.max(2, c))}
                       />
                     </div>
                   )}
+                  </div>
                 </div>
 
                 {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && newTransaction.payerPayee && newTransaction.payerPayee !== 'geral' && newTransaction.owedByPerson !== false && !editingTransaction?.linkedToCard && !(editingTransaction && linkedParentIds.has(editingTransaction.id)) && (
@@ -4260,11 +4356,17 @@ export default function App() {
                     </div>
                     <div className="space-y-1.5 max-w-xs">
                       <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Data limite para reembolso</Label>
-                      <DateField
-                        value={linkedIncomeDate}
-                        onChange={setLinkedIncomeDate}
-                        className="h-12 rounded-xl text-sm bg-slate-50 dark:bg-[#16133F]"
-                      />
+                      {newTransaction.type === 'card_purchase' && newTransaction.cardId && cards.find(c => c.id === newTransaction.cardId)?.dueDay ? (
+                        <p className="text-sm font-medium text-primary ml-1">
+                          {format(parseISO(getReimbursementDate(newTransaction)), "dd/MM/yyyy")} <span className="font-normal text-slate-400 dark:text-[#8D89AC] text-xs">· vencimento da fatura</span>
+                        </p>
+                      ) : (
+                        <DateField
+                          value={linkedIncomeDate}
+                          onChange={setLinkedIncomeDate}
+                          className="h-12 rounded-xl text-sm bg-slate-50 dark:bg-[#16133F]"
+                        />
+                      )}
                     </div>
                   </div>
                 )}
@@ -4361,6 +4463,8 @@ export default function App() {
           icon={<Users />}
         />
 
+        <ImageCropper src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />
+
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
           <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:w-screen sm:max-w-none sm:translate-x-0 sm:rounded-none">
             <div className="px-6 pt-6 pb-2 shrink-0">
@@ -4420,12 +4524,6 @@ export default function App() {
                     description="Personalize as categorias de receitas e despesas"
                     onClick={() => { setIsProfileOpen(false); setIsCategoriasOpen(true); }}
                   />
-                  <AccountRow
-                    icon={<Users size={18} />}
-                    title="Pessoas"
-                    description="Contatos para dividir gastos e ver o resumo de cada um"
-                    onClick={() => { setIsProfileOpen(false); setIsPessoasSummaryOpen(true); }}
-                  />
                 </AccountSection>
 
                 <AccountSection label="Dados">
@@ -4458,9 +4556,8 @@ export default function App() {
                     icon={<LogOut size={18} />}
                     title="Sair do aplicativo"
                     description="Encerra sua sessão neste dispositivo"
-                    onClick={() => logout()}
+                    onClick={() => { setIsProfileOpen(false); logout(); }}
                     danger
-                    right={<></>}
                   />
                 </AccountSection>
 
@@ -5553,7 +5650,8 @@ export default function App() {
                     <div
                       ref={cardsCarouselRef}
                       onScroll={handleCardsCarouselScroll}
-                      className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pb-1"
+                      {...carouselDrag}
+                      className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pt-1 pb-10 -mb-8 cursor-grab"
                     >
                       {cards.map(card => (
                         <div key={card.id} className="w-[280px] shrink-0 snap-center">
@@ -5970,7 +6068,7 @@ export default function App() {
                           placeholder="(00) 00000-0000"
                           className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs px-4 shadow-sm"
                           value={newPersonPhone || ''}
-                          onChange={(e) => setNewPersonPhone(e.target.value)}
+                          onChange={(e) => setNewPersonPhone(maskPhone(e.target.value))}
                         />
                       </div>
                     </div>
@@ -6046,7 +6144,8 @@ export default function App() {
                     <div
                       ref={peopleCarouselRef}
                       onScroll={handlePeopleCarouselScroll}
-                      className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pb-1"
+                      {...carouselDrag}
+                      className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pt-1 pb-10 -mb-8 cursor-grab"
                     >
                       {people.map(person => {
                         const monthCharges = getPersonMonthlyCharges(person.id, currentDate);
@@ -6344,7 +6443,7 @@ export default function App() {
                         placeholder="(00) 00000-0000" 
                         className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-5 shadow-sm"
                         value={newPersonPhone || ''}
-                        onChange={(e) => setNewPersonPhone(e.target.value)}
+                        onChange={(e) => setNewPersonPhone(maskPhone(e.target.value))}
                       />
                     </div>
                   </div>
@@ -6986,8 +7085,8 @@ function SwipeToConfirm({
   return (
     <div className="relative rounded-full overflow-hidden">
       {(isDragging || confirmed) && (
-        <motion.div style={{ width: dragX }} className={cn("absolute inset-y-0 left-0 flex items-center pl-6 rounded-full overflow-hidden", colorClass)}>
-          <motion.div style={{ scale: revealScale }} className="flex items-center gap-2 text-white font-medium text-sm whitespace-nowrap">
+        <motion.div style={{ width: dragX }} className={cn("absolute inset-y-0 left-0 flex items-center rounded-full overflow-hidden", colorClass)}>
+          <motion.div style={{ scale: revealScale }} className="flex items-center gap-2 ml-6 text-white font-medium text-sm whitespace-nowrap shrink-0">
             <CheckCircle2 size={18} strokeWidth={2.5} />
             {actionLabel}
           </motion.div>
