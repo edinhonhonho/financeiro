@@ -319,3 +319,9 @@ export async function respondConsent(consentId: string, status: 'accepted' | 'de
   const { error } = await supabase.from('person_consents').update({ status }).eq('id', consentId);
   if (error) handleSupabaseError(error, OperationType.UPDATE, 'person_consents');
 }
+
+/** Aviso a quem criou a movimentação compartilhada que eu já paguei (ver supabase/shared_payments.sql). */
+export async function signalSharedPayment(transactionId: string) {
+  const { error } = await supabase.rpc('signal_shared_payment', { tx: transactionId });
+  if (error) handleSupabaseError(error, OperationType.UPDATE, 'transactions');
+}

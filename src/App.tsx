@@ -123,7 +123,8 @@ import type { User } from '@supabase/supabase-js';
 function buildSharedMirrors(
   shared: Array<Transaction & { userId: string }>,
   myPeople: Array<{ id: string; userId: string }>,
-  ownerNames: Record<string, string>
+  ownerNames: Record<string, string>,
+  ownerPersonIds: Record<string, string>
 ): Transaction[] {
   const myIds = new Set(myPeople.map(p => p.id));
   const parentsWithChild = new Set<string>();
@@ -138,6 +139,9 @@ function buildSharedMirrors(
 
     const share = assignment ? assignment.amount : t.amount;
     const iReceive = t.type !== 'income' && (assignment?.owedByPerson ?? t.owedByPerson) === false;
+    // Aparece no card da pessoa que criou (em Pessoas): o que ela diz que eu
+    // devo vira "você deve"; o que ela deve a mim vira "te deve".
+    const ownerPersonId = ownerPersonIds[t.userId];
     mirrors.push({
       id: `shared-${t.id}`,
       type: iReceive ? 'income' : 'expense',
@@ -147,15 +151,18 @@ function buildSharedMirrors(
       category: 'Compartilhado',
       recurrence: 'none',
       installments: t.installments ?? null,
-      status: t.status,
+      // "Já paguei" avisado por mim conta como pago do meu lado, mesmo antes
+      // de quem criou confirmar.
+      status: t.status === 'actual' || t.sharedPaidAt ? 'actual' : 'planned',
       cardId: null,
-      payerPayee: 'geral',
+      payerPayee: ownerPersonId || 'geral',
       assignments: [],
       linkedToCard: false,
       linkedTransactionId: null,
       seriesId: null,
-      actualDate: t.actualDate ?? null,
-      owedByPerson: null
+      actualDate: t.actualDate ?? (t.sharedPaidAt ? t.sharedPaidAt.slice(0, 10) : null),
+      owedByPerson: iReceive ? true : false,
+      sharedPaidAt: t.sharedPaidAt ?? null
     });
   });
   return mirrors;
@@ -525,6 +532,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [respondingConsentId, setRespondingConsentId] = useState<string | null>(null);
+  const [sharedTxDetail, setSharedTxDetail] = useState<Transaction | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingCard, setIsSubmittingCard] = useState(false);
   const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
@@ -677,6 +685,10 @@ export default function App() {
     const today = format(new Date(), 'yyyy-MM-dd');
     try {
       for (const t of toSettle) {
+        if (t.id.startsWith('shared-')) {
+          if (t.type !== 'income') await api.signalSharedPayment(t.id.replace('shared-', ''));
+          continue;
+        }
         await api.updateTransaction(t.id, { status: 'actual', actualDate: today });
       }
       await loadTransactions();
@@ -818,6 +830,7 @@ export default function App() {
     }
   }, [user]);
 
+  const creatingOwnerCardsRef = useRef(false);
   const loadTransactions = React.useCallback(async () => {
     if (!user) return;
     try {
@@ -834,7 +847,32 @@ export default function App() {
           ]);
           const ownerNames: Record<string, string> = {};
           owners.forEach(o => { ownerNames[o.id] = o.nickname || o.firstName || (o.username ? `@${o.username}` : 'Alguém'); });
-          mirrors = buildSharedMirrors(shared, myPeople, ownerNames);
+          // Garante um card em Pessoas para cada um que compartilha comigo
+          // (inclusive vínculos aceitos antes de isso existir).
+          let myContacts = await api.fetchPeople(user.id);
+          const missingOwners = owners.filter(o => !myContacts.some(pp => pp.linkedUserId === o.id));
+          if (missingOwners.length > 0 && !creatingOwnerCardsRef.current) {
+            creatingOwnerCardsRef.current = true;
+            try {
+              for (const o of missingOwners) {
+                const fullName = [o.firstName, o.lastName].filter(Boolean).join(' ');
+                const name = fullName || o.nickname || o.username || 'Contato';
+                await api.createPerson(user.id, {
+                  name,
+                  image: o.photoURL || `https://picsum.photos/seed/${name}/100/100`,
+                  visible: true,
+                  linkedUserId: o.id
+                });
+              }
+              myContacts = await api.fetchPeople(user.id);
+              setPeople(myContacts);
+            } finally {
+              creatingOwnerCardsRef.current = false;
+            }
+          }
+          const ownerPersonIds: Record<string, string> = {};
+          myContacts.forEach(pp => { if (pp.linkedUserId) ownerPersonIds[pp.linkedUserId] = pp.id; });
+          mirrors = buildSharedMirrors(shared, myPeople, ownerNames, ownerPersonIds);
         }
       } catch (sharedErr) {
         console.warn('Compartilhamento indisponível:', sharedErr);
@@ -2451,7 +2489,7 @@ export default function App() {
       return;
     }
     if (t.id.startsWith('shared-')) {
-      showAlert('Movimentação compartilhada', 'Essa movimentação foi associada a você por outra pessoa. Só quem a criou pode editá-la.');
+      setSharedTxDetail(t);
       return;
     }
     if (t.id.startsWith('person-bill-')) {
@@ -2763,9 +2801,22 @@ export default function App() {
     }
   };
 
+  /** Movimentação que outra pessoa associou a mim: aviso que já paguei (ela recebe uma notificação). */
+  const signalSharedPayment = async (t: Transaction) => {
+    try {
+      await api.signalSharedPayment(t.id.replace('shared-', ''));
+      await loadTransactions();
+    } catch (err) {
+      showAlert('Não foi possível avisar o pagamento', extractErrorMessage(err));
+    }
+  };
+
   /** Marca um lançamento planejado como pago/recebido com um clique, sem abrir o modal de confirmação. */
   const handleQuickConfirm = (t: Transaction) => {
-    if (t.id.startsWith('shared-')) return;
+    if (t.id.startsWith('shared-')) {
+      if (t.type !== 'income' && t.status !== 'actual') signalSharedPayment(t);
+      return;
+    }
     handleConfirmTransaction(t.id, t.amount, format(new Date(), 'yyyy-MM-dd'), t.date);
   };
 
@@ -4447,6 +4498,26 @@ export default function App() {
                       </p>
                     </div>
                   </div>
+                  {n.type === 'payment_signal' && (() => {
+                    const tx = transactions.find(x => x.id === n.transactionId);
+                    if (!tx) return null;
+                    if (tx.status === 'actual') return <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 pl-5">Recebimento confirmado</p>;
+                    return (
+                      <div className="pl-5">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await handleConfirmTransaction(tx.id, tx.amount, format(new Date(), 'yyyy-MM-dd'), tx.date);
+                            await api.markNotificationsRead([n.id]);
+                            await loadNotifications();
+                          }}
+                          className="w-full h-10 rounded-full bg-emerald-500 text-white text-xs font-medium"
+                        >
+                          Confirmar recebimento
+                        </button>
+                      </div>
+                    );
+                  })()}
                   {n.type === 'consent_request' && !n.read && (
                     <div className="flex gap-2 pl-5">
                       <button
@@ -4470,6 +4541,43 @@ export default function App() {
                 </div>
               ))}
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!sharedTxDetail} onOpenChange={(open) => { if (!open) setSharedTxDetail(null); }}>
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+            {sharedTxDetail && (() => {
+              const t = sharedTxDetail;
+              const iOwe = t.type !== 'income';
+              const owner = people.find(pp => pp.id === t.payerPayee);
+              const ownerName = owner?.name.split(' ')[0] || 'essa pessoa';
+              return (
+                <div className="p-7 space-y-5">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{t.description.split(' · ')[0]}</DialogTitle>
+                    <DialogDescription className="text-xs">Associada a você por {owner?.name || 'outra pessoa'} · {format(parseISO(t.date), 'dd/MM/yyyy')}</DialogDescription>
+                  </DialogHeader>
+                  <div className="rounded-2xl bg-white dark:bg-[#100E3D] p-4 flex items-center justify-between">
+                    <span className={cn("text-sm font-medium", iOwe ? "text-rose-500 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
+                      {iOwe ? `Você deve a ${ownerName}` : `${ownerName} te deve`}
+                    </span>
+                    <span className="font-heading font-medium text-lg text-slate-800 dark:text-[#EDE9E3]">R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  {iOwe && (t.status === 'actual'
+                    ? <p className="text-sm font-normal text-emerald-600 dark:text-emerald-400 text-center">{t.sharedPaidAt ? `Você avisou que pagou. ${ownerName} foi notificado(a).` : 'Pago.'}</p>
+                    : (
+                      <button
+                        type="button"
+                        onClick={async () => { await signalSharedPayment(t); setSharedTxDetail(null); }}
+                        className="w-full h-14 rounded-full bg-primary text-white font-medium active:scale-95 transition-all"
+                      >
+                        Avisar que já paguei
+                      </button>
+                    ))}
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] text-center">Só quem criou pode editar ou excluir essa movimentação.</p>
+                </div>
+              );
+            })()}
           </DialogContent>
         </Dialog>
 
@@ -4992,44 +5100,50 @@ export default function App() {
                     {chartData.length === 0 ? (
                       <p className="text-xs font-normal text-slate-300 dark:text-[#6B679C] py-16 text-center">Sem despesas neste mês.</p>
                     ) : (() => {
-                      // Waffle 10x10: cada quadrado = 1% das despesas do mês. As 4
-                      // maiores categorias aparecem com a cor delas; o resto vira "Outros".
+                      // Barra segmentada (a divisão do mês num relance) + ranking em
+                      // barras horizontais: as 4 maiores categorias e "Outros".
                       const sorted = [...chartData].sort((a, b) => b.value - a.value);
                       const total = sorted.reduce((acc, c) => acc + c.value, 0);
                       const top = sorted.slice(0, 4);
                       const restValue = sorted.slice(4).reduce((acc, c) => acc + c.value, 0);
                       const groups = [
-                        ...top.map((c, idx) => ({ name: c.name, value: c.value, color: categories.find(cat => cat.name === c.name)?.color || COLORS[idx % COLORS.length] })),
-                        ...(restValue > 0 ? [{ name: 'Outros', value: restValue, color: '#B9B4D0' }] : [])
+                        ...top.map((c, idx) => {
+                          const cat = categories.find(cc => cc.name === c.name);
+                          return { name: c.name, value: c.value, icon: cat?.icon || DEFAULT_CATEGORY_ICON, color: cat?.color || COLORS[idx % COLORS.length] };
+                        }),
+                        ...(restValue > 0 ? [{ name: `Outras ${sorted.length - 4}`, value: restValue, icon: '•••', color: '#B9B4D0' }] : [])
                       ];
-                      // Distribui os 100 quadrados pelo maior resto, para somar exatamente 100.
-                      const raw = groups.map(g => (g.value / total) * 100);
-                      const cells = raw.map(Math.floor);
-                      let missing = 100 - cells.reduce((a, b) => a + b, 0);
-                      raw.map((r, idx) => ({ idx, rem: r - Math.floor(r) }))
-                        .sort((a, b) => b.rem - a.rem)
-                        .forEach(({ idx }) => { if (missing > 0) { cells[idx] += 1; missing -= 1; } });
-                      const squares = groups.flatMap((g, idx) => Array.from({ length: cells[idx] }, () => g));
-                      const pct = (v: number) => `${Math.round((v / total) * 100)}%`;
+                      const max = groups[0]?.value || 1;
+                      const pct = (v: number) => Math.round((v / total) * 100);
+                      const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                       return (
-                        <div className="flex items-center gap-4">
-                          <div className="grid grid-cols-10 gap-[2px] w-[112px] shrink-0" role="img" aria-label={groups.map(g => `${g.name} ${pct(g.value)}`).join(', ')}>
-                            {squares.map((g, idx) => (
-                              <span
-                                key={idx}
-                                title={`${g.name}: ${pct(g.value)} · R$ ${g.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                className="aspect-square rounded-[2px]"
-                                style={{ backgroundColor: g.color }}
-                              />
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{brl(total)}</p>
+                            <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC]">em {sorted.length} {sorted.length === 1 ? 'categoria' : 'categorias'}</p>
+                          </div>
+                          <div className="flex h-2.5 gap-[2px] rounded-full overflow-hidden" role="img" aria-label={groups.map(g => `${g.name} ${pct(g.value)}%`).join(', ')}>
+                            {groups.map(g => (
+                              <span key={g.name} title={`${g.name}: ${pct(g.value)}%`} style={{ width: `${(g.value / total) * 100}%`, backgroundColor: g.color }} />
                             ))}
                           </div>
-                          <div className="flex-1 min-w-0 space-y-1.5">
+                          <div className="space-y-1.5">
                             {groups.map(g => (
-                              <div key={g.name} className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ backgroundColor: g.color }} />
-                                <span className="text-xs font-normal text-slate-600 dark:text-[#C5C1E5] flex-1 truncate">{g.name}</span>
-                                <span className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] tabular-nums shrink-0">{pct(g.value)}</span>
-                                <span className="text-xs font-medium text-slate-800 dark:text-[#EDE9E3] tabular-nums shrink-0 text-right">R$ {g.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <div key={g.name} className="flex items-center gap-3" title={`${g.name}: ${brl(g.value)} (${pct(g.value)}%)`}>
+                                <div className="relative flex-1 min-w-0 h-9 rounded-xl bg-slate-50 dark:bg-[#16133F] overflow-hidden">
+                                  <div
+                                    className="absolute inset-y-0 left-0 rounded-xl"
+                                    style={{ width: `${Math.max(6, (g.value / max) * 100)}%`, backgroundColor: `${g.color}40` }}
+                                  />
+                                  <div className="relative h-full flex items-center gap-2 px-3">
+                                    <span className="text-sm shrink-0">{g.icon}</span>
+                                    <span className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{g.name}</span>
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0 w-20">
+                                  <p className="text-xs font-medium text-slate-800 dark:text-[#EDE9E3] tabular-nums">{brl(g.value)}</p>
+                                  <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] tabular-nums">{pct(g.value)}%</p>
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -7043,7 +7157,7 @@ function TransactionItem({
   categoryIcon?: string
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
-  const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-') && !transaction.id.startsWith('person-bill-') && !transaction.id.startsWith('shared-');
+  const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-') && !transaction.id.startsWith('person-bill-') && !(transaction.id.startsWith('shared-') && transaction.type === 'income');
 
   return (
     <SwipeToConfirm

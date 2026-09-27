@@ -39,6 +39,8 @@ export interface Transaction {
   // pra ela (aparece em Pessoas como algo que eu devo); null/undefined/true =
   // ela me deve (comportamento padrão, receita vinculada é criada).
   owedByPerson?: boolean | null;
+  // Quando quem foi associado avisou que já pagou (movimentação compartilhada).
+  sharedPaidAt?: string | null;
 }
 
 export interface Person {
@@ -98,7 +100,7 @@ export interface AppNotification {
   id: string;
   userId: string;
   fromUserId?: string | null;
-  type: 'consent_request' | 'assigned' | 'consent_response';
+  type: 'consent_request' | 'assigned' | 'consent_response' | 'payment_signal';
   title: string;
   body?: string | null;
   transactionId?: string | null;
