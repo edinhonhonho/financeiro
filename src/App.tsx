@@ -4906,10 +4906,8 @@ export default function App() {
                               className="flex flex-col items-center gap-1.5 shrink-0"
                               aria-label={`Abrir cartão ${c.name}`}
                             >
-                              <span className="w-12 h-12 rounded-full shadow-soft flex items-center justify-center text-white" style={{ backgroundColor: c.color }}>
-                                <CreditCard size={20} strokeWidth={2} />
-                              </span>
-                              <span className={thumbLabel}>{c.name}</span>
+                              <span className="w-[74px] h-12 rounded-xl shadow-soft" style={{ backgroundColor: c.color }} />
+                              <span className={cn(thumbLabel, "w-[74px]")}>{c.name}</span>
                             </button>
                           ))}
                           {addButton(() => {
@@ -4955,9 +4953,9 @@ export default function App() {
 
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 <ShadcnCard className="lg:col-span-3 border-none shadow-soft rounded-[2rem] bg-white dark:bg-[#100E3D]">
-                  <CardContent className="p-8">
-                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-6">Receitas x despesas (últimos 6 meses)</h3>
-                    <ResponsiveContainer width="100%" height={260}>
+                  <CardContent className="p-6">
+                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Receitas x despesas (últimos 6 meses)</h3>
+                    <ResponsiveContainer width="100%" height={140}>
                       <AreaChart data={evolutionData}>
                         <defs>
                           <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
@@ -4980,33 +4978,55 @@ export default function App() {
                 </ShadcnCard>
 
                 <ShadcnCard className="lg:col-span-2 border-none shadow-soft rounded-[2rem] bg-white dark:bg-[#100E3D]">
-                  <CardContent className="p-8">
-                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-6">Principais categorias</h3>
+                  <CardContent className="p-6">
+                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4">Principais categorias</h3>
                     {chartData.length === 0 ? (
                       <p className="text-xs font-normal text-slate-300 dark:text-[#6B679C] py-16 text-center">Sem despesas neste mês.</p>
-                    ) : (
-                      <>
-                        <ResponsiveContainer width="100%" height={160}>
-                          <PieChart>
-                            <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={70} paddingAngle={3}>
-                              {chartData.map((entry, i) => (
-                                <Cell key={entry.name} fill={COLORS[i % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="space-y-3 mt-4">
-                          {[...chartData].sort((a, b) => b.value - a.value).slice(0, 5).map((cat, i) => (
-                            <div key={cat.name} className="flex items-center gap-3">
-                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[chartData.findIndex(c => c.name === cat.name) % COLORS.length] }} />
-                              <span className="text-xs font-normal text-slate-600 dark:text-[#C5C1E5] flex-1 truncate">{cat.name}</span>
-                              <span className="text-xs font-medium text-slate-800 dark:text-[#EDE9E3] shrink-0">R$ {cat.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                            </div>
-                          ))}
+                    ) : (() => {
+                      // Waffle 10x10: cada quadrado = 1% das despesas do mês. As 4
+                      // maiores categorias aparecem com a cor delas; o resto vira "Outros".
+                      const sorted = [...chartData].sort((a, b) => b.value - a.value);
+                      const total = sorted.reduce((acc, c) => acc + c.value, 0);
+                      const top = sorted.slice(0, 4);
+                      const restValue = sorted.slice(4).reduce((acc, c) => acc + c.value, 0);
+                      const groups = [
+                        ...top.map((c, idx) => ({ name: c.name, value: c.value, color: categories.find(cat => cat.name === c.name)?.color || COLORS[idx % COLORS.length] })),
+                        ...(restValue > 0 ? [{ name: 'Outros', value: restValue, color: '#B9B4D0' }] : [])
+                      ];
+                      // Distribui os 100 quadrados pelo maior resto, para somar exatamente 100.
+                      const raw = groups.map(g => (g.value / total) * 100);
+                      const cells = raw.map(Math.floor);
+                      let missing = 100 - cells.reduce((a, b) => a + b, 0);
+                      raw.map((r, idx) => ({ idx, rem: r - Math.floor(r) }))
+                        .sort((a, b) => b.rem - a.rem)
+                        .forEach(({ idx }) => { if (missing > 0) { cells[idx] += 1; missing -= 1; } });
+                      const squares = groups.flatMap((g, idx) => Array.from({ length: cells[idx] }, () => g));
+                      const pct = (v: number) => `${Math.round((v / total) * 100)}%`;
+                      return (
+                        <div className="space-y-5">
+                          <div className="grid grid-cols-10 gap-[3px] max-w-[260px] mx-auto" role="img" aria-label={groups.map(g => `${g.name} ${pct(g.value)}`).join(', ')}>
+                            {squares.map((g, idx) => (
+                              <span
+                                key={idx}
+                                title={`${g.name}: ${pct(g.value)} · R$ ${g.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                className="aspect-square rounded-[4px]"
+                                style={{ backgroundColor: g.color }}
+                              />
+                            ))}
+                          </div>
+                          <div className="space-y-2.5">
+                            {groups.map(g => (
+                              <div key={g.name} className="flex items-center gap-3">
+                                <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ backgroundColor: g.color }} />
+                                <span className="text-xs font-normal text-slate-600 dark:text-[#C5C1E5] flex-1 truncate">{g.name}</span>
+                                <span className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] tabular-nums shrink-0">{pct(g.value)}</span>
+                                <span className="text-xs font-medium text-slate-800 dark:text-[#EDE9E3] tabular-nums shrink-0 w-24 text-right">R$ {g.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </>
-                    )}
+                      );
+                    })()}
                   </CardContent>
                 </ShadcnCard>
               </div>
