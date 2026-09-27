@@ -1199,9 +1199,10 @@ export default function App() {
     };
   };
 
-  /** Receita de reembolso pendente — é o que "A receber de {pessoa}" agrupa. */
+  /** Receita pendente de uma pessoa (reembolso ou receita associada a ela) — é o que "A receber de {pessoa}" agrupa. */
   const isBundledIntoPersonBill = (t: Transaction) =>
-    t.type === 'income' && !!t.linkedToCard && t.status === 'planned' && !!t.payerPayee && t.payerPayee !== 'geral' && t.payerPayee !== 'multi';
+    t.type === 'income' && t.status === 'planned' && !t.id.startsWith('shared-') &&
+    !!t.payerPayee && t.payerPayee !== 'geral' && t.payerPayee !== 'multi';
 
   // Grouping logic
   const groupedTransactions = useMemo(() => {
@@ -2530,7 +2531,8 @@ export default function App() {
     setNewTransaction({
       type: initialType,
       date: format(new Date(), 'yyyy-MM-dd'),
-      status: 'actual',
+      // Despesa nasce paga; receita nasce a receber.
+      status: initialType === 'income' ? 'planned' : 'actual',
       recurrence: 'none',
       recurrenceEndDate: format(addMonths(new Date(), 12), 'yyyy-MM'),
       category: '',
@@ -3903,7 +3905,7 @@ export default function App() {
               <div className="h-full flex flex-col">
                 <div className="flex gap-3 mb-8">
                   <button
-                    onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null})}
+                    onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null, ...(editingTransaction ? {} : { status: 'planned' as const })})}
                     className={cn(
                       "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
                       newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
@@ -3913,7 +3915,7 @@ export default function App() {
                     Receita
                   </button>
                   <button
-                    onClick={() => setNewTransaction({...newTransaction, type: 'expense'})}
+                    onClick={() => setNewTransaction({...newTransaction, type: 'expense', ...(editingTransaction ? {} : { status: 'actual' as const })})}
                     className={cn(
                       "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
                       (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
@@ -4262,7 +4264,7 @@ export default function App() {
             <div className="flex-1 overflow-y-auto p-8 pb-12 space-y-8 scrollbar-hide">
               <div className="flex gap-3">
                 <button
-                  onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null})}
+                  onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null, ...(editingTransaction ? {} : { status: 'planned' as const })})}
                   className={cn(
                     "flex-1 h-14 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
                     newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
@@ -4272,7 +4274,7 @@ export default function App() {
                   Receita
                 </button>
                 <button
-                  onClick={() => setNewTransaction({...newTransaction, type: 'expense'})}
+                  onClick={() => setNewTransaction({...newTransaction, type: 'expense', ...(editingTransaction ? {} : { status: 'actual' as const })})}
                   className={cn(
                     "flex-1 h-14 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
                     (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
