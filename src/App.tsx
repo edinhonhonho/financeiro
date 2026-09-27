@@ -3338,14 +3338,14 @@ export default function App() {
     return (
       <div className="space-y-2">
         <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Repete?</Label>
-        <div className="rounded-2xl bg-slate-50 dark:bg-[#16133F] p-1">
+        <div className="rounded-[18px] bg-slate-50 dark:bg-[#16133F] p-1">
           <div className="flex">
             {(['Não', 'Todo mês', 'Parcelado'] as const).map((label, k) => (
               <button
                 key={label}
                 type="button"
                 onClick={() => chooseRepeatKind(k as 0 | 1 | 2)}
-                className={cn("flex-1 h-11 rounded-xl text-sm font-medium transition-all", repeatKind === k ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                className={cn("flex-1 h-11 rounded-[14px] text-sm font-medium transition-colors", repeatKind === k ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
               >
                 {label}
               </button>
@@ -4906,8 +4906,17 @@ export default function App() {
                               className="flex flex-col items-center gap-1.5 shrink-0"
                               aria-label={`Abrir cartão ${c.name}`}
                             >
-                              <span className="w-[74px] h-12 rounded-xl shadow-soft" style={{ backgroundColor: c.color }} />
-                              <span className={cn(thumbLabel, "w-[74px]")}>{c.name}</span>
+                              <span className="h-12 flex items-center">
+                                <span
+                                  className="relative w-[66px] h-[42px] rounded-[8px] overflow-hidden shadow-soft"
+                                  style={{ background: `linear-gradient(135deg, rgba(255,255,255,0.28), rgba(255,255,255,0) 60%), ${c.color}` }}
+                                >
+                                  <span className="absolute left-[7px] top-[8px] w-[11px] h-[8px] rounded-[2px] bg-white/55" />
+                                  <span className="absolute right-[13px] bottom-[6px] w-[11px] h-[11px] rounded-full bg-white/45" />
+                                  <span className="absolute right-[6px] bottom-[6px] w-[11px] h-[11px] rounded-full bg-white/30" />
+                                </span>
+                              </span>
+                              <span className={cn(thumbLabel, "w-[66px]")}>{c.name}</span>
                             </button>
                           ))}
                           {addButton(() => {
@@ -4952,8 +4961,8 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                <ShadcnCard className="lg:col-span-3 border-none shadow-soft rounded-[2rem] bg-white dark:bg-[#100E3D]">
-                  <CardContent className="p-6">
+                <ShadcnCard className="lg:col-span-3 border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#100E3D] py-0 gap-0">
+                  <CardContent className="px-5 py-4">
                     <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Receitas x despesas (últimos 6 meses)</h3>
                     <ResponsiveContainer width="100%" height={140}>
                       <AreaChart data={evolutionData}>
@@ -4977,9 +4986,9 @@ export default function App() {
                   </CardContent>
                 </ShadcnCard>
 
-                <ShadcnCard className="lg:col-span-2 border-none shadow-soft rounded-[2rem] bg-white dark:bg-[#100E3D]">
-                  <CardContent className="p-6">
-                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4">Principais categorias</h3>
+                <ShadcnCard className="lg:col-span-2 border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#100E3D] py-0 gap-0">
+                  <CardContent className="px-5 py-4">
+                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Principais categorias</h3>
                     {chartData.length === 0 ? (
                       <p className="text-xs font-normal text-slate-300 dark:text-[#6B679C] py-16 text-center">Sem despesas neste mês.</p>
                     ) : (() => {
@@ -5003,24 +5012,24 @@ export default function App() {
                       const squares = groups.flatMap((g, idx) => Array.from({ length: cells[idx] }, () => g));
                       const pct = (v: number) => `${Math.round((v / total) * 100)}%`;
                       return (
-                        <div className="space-y-5">
-                          <div className="grid grid-cols-10 gap-[3px] max-w-[260px] mx-auto" role="img" aria-label={groups.map(g => `${g.name} ${pct(g.value)}`).join(', ')}>
+                        <div className="flex items-center gap-4">
+                          <div className="grid grid-cols-10 gap-[2px] w-[112px] shrink-0" role="img" aria-label={groups.map(g => `${g.name} ${pct(g.value)}`).join(', ')}>
                             {squares.map((g, idx) => (
                               <span
                                 key={idx}
                                 title={`${g.name}: ${pct(g.value)} · R$ ${g.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                                className="aspect-square rounded-[4px]"
+                                className="aspect-square rounded-[2px]"
                                 style={{ backgroundColor: g.color }}
                               />
                             ))}
                           </div>
-                          <div className="space-y-2.5">
+                          <div className="flex-1 min-w-0 space-y-1.5">
                             {groups.map(g => (
-                              <div key={g.name} className="flex items-center gap-3">
+                              <div key={g.name} className="flex items-center gap-2">
                                 <span className="w-2.5 h-2.5 rounded-[3px] shrink-0" style={{ backgroundColor: g.color }} />
                                 <span className="text-xs font-normal text-slate-600 dark:text-[#C5C1E5] flex-1 truncate">{g.name}</span>
                                 <span className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] tabular-nums shrink-0">{pct(g.value)}</span>
-                                <span className="text-xs font-medium text-slate-800 dark:text-[#EDE9E3] tabular-nums shrink-0 w-24 text-right">R$ {g.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                <span className="text-xs font-medium text-slate-800 dark:text-[#EDE9E3] tabular-nums shrink-0 text-right">R$ {g.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               </div>
                             ))}
                           </div>
