@@ -1,5 +1,5 @@
-const CACHE_NAME = 'financeiro-shell-v1';
-const SHELL_URLS = ['/', '/manifest.json', '/icon.svg'];
+const CACHE_NAME = 'financeiro-shell-v2';
+const SHELL_URLS = ['/', '/manifest.json', '/icon.svg', '/icon-192.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

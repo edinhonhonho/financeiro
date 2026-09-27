@@ -102,7 +102,7 @@ import {
   XAxis,
   YAxis
 } from 'recharts';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth, getDaysInMonth } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth, getDaysInMonth, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Papa from 'papaparse';
 
@@ -1359,6 +1359,8 @@ export default function App() {
   const [isRecurrent, setIsRecurrent] = useState(false);
   const [recurrenceDateMode, setRecurrenceDateMode] = useState<'fixed' | 'businessDay'>('fixed');
   const [recurrenceBusinessDay, setRecurrenceBusinessDay] = useState(5);
+  // Parcelado: o valor digitado é o de cada parcela ou o total da compra.
+  const [installmentValueMode, setInstallmentValueMode] = useState<'parcel' | 'total'>('parcel');
   const [newPersonName, setNewPersonName] = useState('');
   const [newPersonColor, setNewPersonColor] = useState('');
   // Ao adicionar: pergunta se a pessoa já usa o app (busca por usuário) ou é um cadastro manual.
@@ -1395,6 +1397,20 @@ export default function App() {
     const card = cards[clamped];
     if (card && card.id !== selectedCard) setSelectedCard(card.id);
   };
+
+  // Ao abrir a aba Cartões (ex: pela miniatura na página inicial), leva o
+  // carrossel direto ao cartão selecionado.
+  useEffect(() => {
+    if (activeTab !== 'cartoes') return;
+    const timer = setTimeout(() => {
+      const el = cardsCarouselRef.current;
+      const index = cards.findIndex(c => c.id === selectedCard);
+      const child = index >= 0 ? el?.children[index] as HTMLElement | undefined : undefined;
+      if (el && child) el.scrollTo({ left: child.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft - (el.clientWidth - child.offsetWidth) / 2, behavior: 'auto' });
+    }, 50);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // Gráfico de evolução da fatura (aba Cartões, mobile) — 6 meses do cartão
   // ativo; clicar numa barra seleciona o mês e mostra os itens logo abaixo.
@@ -1797,7 +1813,11 @@ export default function App() {
   const handleAddTransaction = async (overrideUpdateMode?: 'single' | 'future') => {
     if (!user || isSubmitting) return;
     const userId = user.id;
-    const amount = parseCurrency(amountInput);
+    const enteredAmount = parseCurrency(amountInput);
+    // "Total da compra" no parcelado: cada parcela é o total dividido; os
+    // centavos que sobram vão para a primeira parcela.
+    const splitTotal = !editingTransaction && isInstallment && installmentValueMode === 'total' && installmentCount > 1;
+    const amount = splitTotal ? Math.floor((enteredAmount * 100) / installmentCount) / 100 : enteredAmount;
     if (!newTransaction.description) {
       showAlert("Descrição necessária", "Por favor, informe a descrição do lançamento.");
       return;
@@ -2240,6 +2260,12 @@ export default function App() {
           else if (r.status === 'actual' && !r.actualDate) r.actualDate = r.date;
         });
 
+        if (splitTotal) {
+          const leftover = Math.round((enteredAmount - amount * installmentCount) * 100) / 100;
+          const firstParcel = rows.find(r => !r.linkedToCard && r.installments?.current === 1);
+          if (firstParcel && leftover > 0) firstParcel.amount = Math.round((firstParcel.amount + leftover) * 100) / 100;
+        }
+
         await api.insertTransactions(rows);
       }
 
@@ -2375,6 +2401,7 @@ export default function App() {
     setEditingShareId(null);
     setAssignmentMode('single');
     setGlobalSplitType('parts');
+    setInstallmentValueMode('parcel');
     if (t.recurrence !== 'none' && t.recurrenceEndDate && t.date) {
       setRecurrenceCount(Math.max(2, differenceInMonths(parseISO(`${t.recurrenceEndDate}-01`), startOfMonth(parseISO(t.date))) + 1));
     } else {
@@ -2443,6 +2470,8 @@ export default function App() {
     setShareWithMe(true);
     setEditingShareId(null);
     setRecurrenceCount(12);
+    setInstallmentValueMode('parcel');
+    setRecurrenceDateMode('fixed');
     setQuickAssignQuery('');
     setGlobalSplitType('parts');
     setForcedSeriesMode(null);
@@ -2482,12 +2511,20 @@ export default function App() {
         image: newPersonImage || `https://picsum.photos/seed/${newPersonName}/100/100`,
         linkedUserId: personLinkSelected?.id || null
       };
-      if (editingPerson) {
-        await api.updatePerson(editingPerson.id, personData);
-        setEditingPerson(null);
-      } else {
-        await api.createPerson(user.id, { ...personData, visible: true });
+      const save = async (data: typeof personData) => {
+        if (editingPerson) await api.updatePerson(editingPerson.id, data);
+        else await api.createPerson(user.id, { ...data, visible: true });
+      };
+      try {
+        await save(personData);
+      } catch (err) {
+        // Banco sem a coluna "color" (SQL ainda não rodado): salva o resto e avisa.
+        if (!/color/i.test(extractErrorMessage(err))) throw err;
+        const { color: _ignored, ...withoutColor } = personData as typeof personData & { color?: string };
+        await save(withoutColor as typeof personData);
+        showAlert('Cor não salva', 'Para guardar a cor do card, rode no SQL Editor do Supabase: alter table public.people add column if not exists color text;');
       }
+      if (editingPerson) setEditingPerson(null);
       await loadPeople();
       setNewPersonName('');
       setNewPersonColor('');
@@ -2498,7 +2535,7 @@ export default function App() {
       setPersonLinkResults([]);
       setPersonLinkSelected(null);
     } catch (err) {
-      handleSupabaseError(err, OperationType.WRITE, 'people');
+      showAlert('Não foi possível salvar a pessoa', extractErrorMessage(err));
     }
   };
 
@@ -3288,26 +3325,71 @@ export default function App() {
           </button>
         ))}
       </div>
-      {repeatKind > 0 && (
-        <div className="flex items-center justify-between gap-3 bg-slate-50 dark:bg-[#16133F] rounded-2xl pl-5 pr-2 py-2">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{repeatCount} {repeatKind === 2 ? 'parcelas' : 'meses'}</p>
-            <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">
-              {repeatKind === 2
-                ? `${repeatCount}x de ${brlFmt(parseCurrency(amountInput))} · total ${brlFmt(parseCurrency(amountInput) * repeatCount)}`
-                : `${brlFmt(parseCurrency(amountInput))} por mês, até ${format(addMonths(parseISO(newTransaction.date || format(new Date(), 'yyyy-MM-dd')), repeatCount - 1), 'MMM/yyyy', { locale: ptBR })}`}
-            </p>
+      {repeatKind > 0 && (() => {
+        const entered = parseCurrency(amountInput);
+        const perParcel = installmentValueMode === 'total' && !editingTransaction ? entered / repeatCount : entered;
+        const startDate = newTransaction.date || format(new Date(), 'yyyy-MM-dd');
+        const pill = (active: boolean) => cn("flex-1 h-9 rounded-lg text-xs font-medium transition-all", active ? "bg-primary text-white shadow-sm" : "text-slate-500 dark:text-[#C5C1E5]");
+        return (
+          <div className="bg-slate-50 dark:bg-[#16133F] rounded-2xl p-2 space-y-2">
+            <div className="flex items-center justify-between gap-3 pl-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{repeatCount} {repeatKind === 2 ? 'parcelas' : 'meses'}</p>
+                <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">
+                  {repeatKind === 2
+                    ? `${repeatCount}x de ${brlFmt(perParcel)} · total ${brlFmt(perParcel * repeatCount)}`
+                    : `${brlFmt(entered)} por mês, até ${format(addMonths(parseISO(startDate), repeatCount - 1), 'MMM/yyyy', { locale: ptBR })}`}
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button type="button" onClick={() => changeRepeatCount(-1)} aria-label="Menos" className="w-10 h-10 rounded-full bg-white dark:bg-[#100E3D] text-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform">
+                  <Minus size={16} />
+                </button>
+                <button type="button" onClick={() => changeRepeatCount(1)} aria-label="Mais" className="w-10 h-10 rounded-full bg-white dark:bg-[#100E3D] text-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform">
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+
+            {repeatKind === 1 && (
+              <div className="bg-white dark:bg-[#100E3D] rounded-xl p-2 space-y-2">
+                <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Em que dia lançar todo mês?</p>
+                <div className="flex gap-1">
+                  <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={pill(recurrenceDateMode === 'fixed')}>
+                    Todo dia {parseISO(startDate).getDate()}
+                  </button>
+                  <button type="button" onClick={() => setRecurrenceDateMode('businessDay')} className={pill(recurrenceDateMode === 'businessDay')}>
+                    Dia útil
+                  </button>
+                </div>
+                {recurrenceDateMode === 'businessDay' && (
+                  <div className="flex items-center justify-between gap-2 pl-1">
+                    <span className="text-xs font-normal text-slate-500 dark:text-[#C5C1E5]">{recurrenceBusinessDay}º dia útil do mês</span>
+                    <div className="flex gap-1.5">
+                      <button type="button" onClick={() => setRecurrenceBusinessDay(d => Math.max(1, d - 1))} aria-label="Dia útil anterior" className="w-8 h-8 rounded-full bg-slate-50 dark:bg-[#16133F] text-primary flex items-center justify-center"><Minus size={14} /></button>
+                      <button type="button" onClick={() => setRecurrenceBusinessDay(d => Math.min(23, d + 1))} aria-label="Próximo dia útil" className="w-8 h-8 rounded-full bg-slate-50 dark:bg-[#16133F] text-primary flex items-center justify-center"><Plus size={14} /></button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {repeatKind === 2 && !editingTransaction && (
+              <div className="bg-white dark:bg-[#100E3D] rounded-xl p-2 space-y-2">
+                <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{brlFmt(entered)} é o valor</p>
+                <div className="flex gap-1">
+                  <button type="button" onClick={() => setInstallmentValueMode('parcel')} className={pill(installmentValueMode === 'parcel')}>
+                    De cada parcela
+                  </button>
+                  <button type="button" onClick={() => setInstallmentValueMode('total')} className={pill(installmentValueMode === 'total')}>
+                    Total da compra
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex gap-2 shrink-0">
-            <button type="button" onClick={() => changeRepeatCount(-1)} aria-label="Menos" className="w-10 h-10 rounded-full bg-white dark:bg-[#100E3D] text-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform">
-              <Minus size={16} />
-            </button>
-            <button type="button" onClick={() => changeRepeatCount(1)} aria-label="Mais" className="w-10 h-10 rounded-full bg-white dark:bg-[#100E3D] text-primary flex items-center justify-center shadow-sm active:scale-90 transition-transform">
-              <Plus size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 
@@ -3862,7 +3944,7 @@ export default function App() {
               <div className="space-y-6 pt-4">
               {peopleSection}
 
-                {newTransaction.type !== 'card_purchase' && (
+                {newTransaction.type !== 'card_purchase' && !newTransaction.cardId && (
                   <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#201C56]">
                     <Label htmlFor="status-m" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
@@ -4198,7 +4280,7 @@ export default function App() {
 
                 {peopleSection}
 
-                {newTransaction.type !== 'card_purchase' && (
+                {newTransaction.type !== 'card_purchase' && !newTransaction.cardId && (
                   <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#201C56]">
                     <Label htmlFor="status-d" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
@@ -4710,21 +4792,6 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleOpenRegistrar('income')}
-                    className="flex-1 h-12 rounded-full bg-primary text-white font-medium text-sm flex items-center justify-center gap-1.5 shadow-bubbly active:scale-95 transition-transform"
-                  >
-                    <ArrowUpCircle size={16} strokeWidth={2.5} /> Receita
-                  </button>
-                  <button
-                    onClick={() => handleOpenRegistrar('expense')}
-                    className="flex-1 h-12 rounded-full bg-secondary text-secondary-foreground font-medium text-sm flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
-                  >
-                    <ArrowDownCircle size={16} strokeWidth={2.5} /> Despesa
-                  </button>
-                </div>
-
                 {people.filter(p => p.visible !== false).length > 0 && (
                   <div>
                     <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight mb-3">Pessoas</p>
@@ -4747,6 +4814,40 @@ export default function App() {
                     </div>
                   </div>
                 )}
+
+                <div>
+                  <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight mb-3">Cartões</p>
+                  <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide pb-1">
+                    <button
+                      onClick={() => {
+                        setEditingCard(null);
+                        setNewCardName('');
+                        setLimitInput('0,00');
+                        setNewCardClosingDay('');
+                        setNewCardDueDay('');
+                        setNewCardColor('#8A7FF5');
+                        setShowCardForm(true);
+                        setActiveTab('cartoes');
+                      }}
+                      className="w-12 h-12 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
+                      aria-label="Adicionar cartão"
+                    >
+                      <Plus size={18} strokeWidth={2.5} />
+                    </button>
+                    {cards.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => { setSelectedCard(c.id); setShowCardForm(false); setActiveTab('cartoes'); }}
+                        className="h-12 w-[76px] rounded-xl shrink-0 shadow-soft relative overflow-hidden px-2 py-1.5 flex flex-col justify-between text-left"
+                        style={{ backgroundColor: c.color }}
+                        aria-label={`Abrir cartão ${c.name}`}
+                      >
+                        <span className="w-4 h-3 rounded-[3px] bg-white/40" />
+                        <span className="text-[10px] font-medium text-white truncate drop-shadow-sm">{c.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   {(() => {
@@ -5204,57 +5305,98 @@ export default function App() {
                 )}
 
                 {(movTab === 'apagar' || movTab === 'areceber') && (() => {
-                  const list = (movTab === 'apagar' ? movimentacoesLists.aPagar : movimentacoesLists.aReceber)
-                    .filter(t => t.description.toLowerCase().includes(movSearchQuery.trim().toLowerCase()));
+                  const isPay = movTab === 'apagar';
+                  const list = (isPay ? movimentacoesLists.aPagar : movimentacoesLists.aReceber)
+                    .filter(t => t.description.toLowerCase().includes(movSearchQuery.trim().toLowerCase()))
+                    .slice()
+                    .sort((a, b) => a.date.localeCompare(b.date));
+                  const today = startOfDay(new Date());
+                  const total = list.reduce((acc, t) => acc + t.amount, 0);
+                  const overdue = list.filter(t => differenceInCalendarDays(parseISO(t.date), today) < 0);
+                  const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  const dueInfo = (t: Transaction) => {
+                    const d = differenceInCalendarDays(parseISO(t.date), today);
+                    if (d < 0) return { label: `Atrasado há ${-d} ${-d === 1 ? 'dia' : 'dias'}`, cls: "bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400" };
+                    if (d === 0) return { label: isPay ? 'Vence hoje' : 'Hoje', cls: "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+                    if (d === 1) return { label: isPay ? 'Vence amanhã' : 'Amanhã', cls: "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400" };
+                    return { label: `${format(parseISO(t.date), "dd 'de' MMM", { locale: ptBR })} · em ${d} dias`, cls: "bg-slate-100 dark:bg-[#1C1852] text-slate-500 dark:text-[#A8A4CC]" };
+                  };
                   return (
                     <div className="space-y-3">
+                      {list.length > 0 && (
+                        <div className="flex items-end justify-between px-2 pb-1">
+                          <div>
+                            <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">{isPay ? 'Total a pagar' : 'Total a receber'} · {list.length} {list.length === 1 ? 'item' : 'itens'}</p>
+                            <p className={cn("text-2xl font-heading font-medium tracking-tighter", isPay ? "text-rose-400" : "text-emerald-500")}>{brl(total)}</p>
+                          </div>
+                          {overdue.length > 0 && (
+                            <span className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400">
+                              {overdue.length} {overdue.length === 1 ? 'atrasado' : 'atrasados'}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {list.length === 0 ? (
-                        <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">
-                          {movTab === 'apagar' ? 'Nada pendente para pagar neste mês.' : 'Nada pendente para receber neste mês.'}
-                        </p>
+                        <div className="bg-card rounded-[1.75rem] shadow-soft p-10 text-center space-y-2">
+                          <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                            <Check size={22} strokeWidth={2.5} />
+                          </div>
+                          <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">
+                            {isPay ? 'Nada pendente para pagar neste mês.' : 'Nada pendente para receber neste mês.'}
+                          </p>
+                        </div>
                       ) : (
                         list.map(t => {
                           const category = categories.find(c => c.name === t.category);
-                          const recurrenceLabel = t.installments
-                            ? `${t.installments.current}/${t.installments.total}`
-                            : t.recurrence === 'monthly' ? 'Mensal'
-                            : t.recurrence === 'weekly' ? 'Semanal'
-                            : t.recurrence === 'yearly' ? 'Anual'
-                            : 'Único';
+                          const card = t.id.startsWith('bill-') ? cards.find(c => c.id === t.cardId) : undefined;
+                          const billPerson = t.id.startsWith('person-bill-') ? people.find(pp => pp.id === t.id.replace('person-bill-', '')) : undefined;
+                          const meta = [
+                            card ? 'Fatura do cartão' : billPerson ? 'Reembolsos' : (t.category || 'Sem categoria'),
+                            t.installments ? `Parcela ${t.installments.current}/${t.installments.total}` : t.recurrence === 'monthly' ? 'Mensal' : null
+                          ].filter(Boolean).join(' · ');
+                          const due = dueInfo(t);
                           return (
-                            <div key={t.id} className="bg-card rounded-[1.75rem] shadow-soft p-4 space-y-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <div
-                                    className="w-11 h-11 rounded-2xl flex items-center justify-center text-lg shrink-0"
-                                    style={{ backgroundColor: category?.color || '#9C93BE' }}
-                                  >
+                            <div
+                              key={t.id}
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => handleTransactionClick(t)}
+                              className="bg-card rounded-[1.5rem] shadow-soft p-4 space-y-3 cursor-pointer active:scale-[0.99] transition-transform"
+                            >
+                              <div className="flex items-center gap-3">
+                                {billPerson ? (
+                                  <img src={billPerson.image || `https://picsum.photos/seed/${billPerson.name}/100/100`} alt="" className="w-11 h-11 rounded-2xl object-cover shrink-0" />
+                                ) : card ? (
+                                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white shrink-0" style={{ backgroundColor: card.color }}>
+                                    <CreditCard size={18} />
+                                  </div>
+                                ) : (
+                                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-lg shrink-0" style={{ backgroundColor: category?.color || '#9C93BE' }}>
                                     {category?.icon || DEFAULT_CATEGORY_ICON}
                                   </div>
-                                  <p className="text-base font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate">{t.description}</p>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[15px] font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate">{t.description}</p>
+                                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] truncate">{meta}</p>
                                 </div>
-                                <p className={cn(
-                                  "font-heading font-medium tracking-tighter whitespace-nowrap text-base shrink-0",
-                                  movTab === 'apagar' ? "text-rose-400" : "text-emerald-500"
-                                )}>
-                                  R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <p className={cn("font-heading font-medium tracking-tighter whitespace-nowrap text-base shrink-0", isPay ? "text-rose-400" : "text-emerald-500")}>
+                                  {brl(t.amount)}
                                 </p>
                               </div>
-                              <div className="flex items-center justify-between text-xs font-normal text-slate-400 dark:text-[#8D89AC] pl-1">
-                                <span>{format(parseISO(t.date), 'dd/MM/yyyy')}</span>
-                                <span>{recurrenceLabel}</span>
-                                <span className="truncate max-w-[35%]">{t.category || 'Sem categoria'}</span>
+                              <div className="flex items-center justify-between gap-3">
+                                <span className={cn("text-[11px] font-medium px-2.5 py-1 rounded-full truncate", due.cls)}>{due.label}</span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleQuickConfirm(t); }}
+                                  className={cn(
+                                    "h-9 px-4 rounded-full font-medium text-xs flex items-center gap-1.5 shrink-0 active:scale-95 transition-all",
+                                    isPay ? "bg-primary text-white" : "bg-emerald-500 text-white"
+                                  )}
+                                >
+                                  <Check size={14} strokeWidth={2.5} />
+                                  {isPay ? 'Marcar pago' : 'Marcar recebido'}
+                                </button>
                               </div>
-                              <button
-                                type="button"
-                                onClick={() => handleQuickConfirm(t)}
-                                className={cn(
-                                  "w-full h-12 rounded-full font-medium text-sm active:scale-95 transition-all",
-                                  movTab === 'apagar' ? "bg-primary/15 text-primary" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                                )}
-                              >
-                                {movTab === 'apagar' ? 'Pagar agora' : 'Receber agora'}
-                              </button>
                             </div>
                           );
                         })
@@ -5962,16 +6104,6 @@ export default function App() {
                                 >
                                   <Pencil size={14} strokeWidth={2.5} />
                                 </button>
-                                {monthCharges.balance > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); shareChargeOnWhatsApp(person, monthCharges); }}
-                                    className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0"
-                                    aria-label="Enviar cobrança"
-                                  >
-                                    <MessageCircle size={14} strokeWidth={2.5} />
-                                  </button>
-                                )}
                               </div>
                               <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 min-h-0">
                                 <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-white font-medium text-2xl shrink-0 overflow-hidden">
