@@ -112,14 +112,26 @@ import * as api from './api';
 import type { User } from '@supabase/supabase-js';
 
 // Currency Helpers
-// Formata como (XX) XXXXX-XXXX (ou (XX) XXXX-XXXX enquanto tem só 10 dígitos).
+// Telefone brasileiro com código do país: +55 (XX) XXXXX-XXXX. O +55 é
+// fixo; o usuário digita só DDD + número. Aceita valores antigos (só dígitos,
+// com ou sem o 55 na frente).
 const maskPhone = (value: string) => {
-  const d = value.replace(/\D/g, '').slice(0, 11);
+  let d = value.replace(/\D/g, '');
+  if (value.trim().startsWith('+')) d = d.slice(2);
+  else if (d.length > 11 && d.startsWith('55')) d = d.slice(2);
+  d = d.slice(0, 11);
   if (d.length === 0) return '';
-  if (d.length <= 2) return `(${d}`;
-  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+  if (d.length <= 2) return `+55 (${d}`;
+  if (d.length <= 6) return `+55 (${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `+55 (${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `+55 (${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+};
+
+/** Só dígitos, sempre com o código do país (para o link do WhatsApp). */
+const phoneToWhatsapp = (phone?: string) => {
+  const d = (phone || '').replace(/\D/g, '');
+  if (!d) return '';
+  return d.startsWith('55') && d.length >= 12 ? d : `55${d}`;
 };
 
 const maskCurrency = (value: string) => {
@@ -497,7 +509,7 @@ export default function App() {
     setAuthError('');
     setAuthInfo('');
     try {
-      const { error } = authMode === 'signin'
+      const { data: authData, error } = authMode === 'signin'
         ? await signInWithPassword(authEmail.trim(), authPassword)
         : await signUpWithPassword(authEmail.trim(), authPassword, {
             firstName: authFirstName.trim(),
@@ -507,7 +519,7 @@ export default function App() {
       if (error) {
         setAuthError(translateAuthError(error.message));
       } else if (authMode === 'signup') {
-        setAuthInfo('Conta criada com sucesso! Se a confirmação por e-mail estiver ativada, clique no link que enviamos para o seu e-mail antes de entrar. Caso contrário, é só entrar com sua senha agora.');
+        if (!authData?.session) setAuthInfo('Conta criada com sucesso! Já pode entrar com seu e-mail e senha.');
       }
     } catch (err) {
       setAuthError(translateAuthError(err instanceof Error ? err.message : String(err)));
@@ -564,27 +576,36 @@ export default function App() {
   const generateChargeMessage = (person: Person, charges: ReturnType<typeof getPersonMonthlyCharges>, month: Date) => {
     const monthName = format(month, 'MMMM/yyyy', { locale: ptBR });
     const firstName = person.name.split(' ')[0];
+    const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-    if (charges.items.length === 0) {
+    if (charges.items.length === 0 && charges.payableItems.length === 0) {
       return `Oi ${firstName}! Fechando as contas de ${monthName}, não ficou nada pendente por aqui. 🙌`;
     }
 
-    let message = `Oi ${firstName}! 👋\n`;
-    message += `Fechando as contas de *${monthName}*, aqui está o que ficou por sua conta:\n\n`;
+    const line = (t: { description: string; type: string; amount: number; status: string }) =>
+      `• ${t.description}${t.type === 'card_purchase' ? ' (cartão)' : ''} — ${brl(t.amount)}${t.status === 'actual' ? ' ✅' : ''}\n`;
 
-    charges.items.forEach(t => {
-      const isCard = t.type === 'card_purchase';
-      message += `• ${t.description}${isCard ? ' (cartão)' : ''} — R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${t.status === 'planned' ? ' _(pendente)_' : ''}\n`;
-    });
+    let message = `Oi ${firstName}! 👋\nFechando as contas de *${monthName}*:\n\n`;
+    if (charges.items.length > 0) {
+      message += `*Você me deve*\n`;
+      charges.items.forEach(t => { message += line(t); });
+      message += '\n';
+    }
+    if (charges.payableItems.length > 0) {
+      message += `*Eu te devo*\n`;
+      charges.payableItems.forEach(t => { message += line(t); });
+      message += '\n';
+    }
 
-    message += `\n💰 *Total: R$ ${charges.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n\n`;
-    message += `Pode me mandar quando puder, valeu! 🙏`;
+    if (charges.balance > 0) message += `💰 *Saldo: você me deve ${brl(charges.balance)}*\n\nPode me mandar quando puder, valeu! 🙏`;
+    else if (charges.balance < 0) message += `💰 *Saldo: eu te devo ${brl(-charges.balance)}*\n\nVou te passar assim que possível! 🙏`;
+    else message += `✅ *Estamos quites!*`;
     return message;
   };
 
   const shareChargeOnWhatsApp = (person: Person, charges: ReturnType<typeof getPersonMonthlyCharges>) => {
     const text = generateChargeMessage(person, charges, currentDate);
-    const phone = person.phone ? person.phone.replace(/\D/g, '') : '';
+    const phone = phoneToWhatsapp(person.phone);
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
   };
   // Marca como pagas todas as pendências do mês com a pessoa (o que ela me deve
@@ -3189,7 +3210,7 @@ export default function App() {
             )}
 
             {registrarStep === 1 && (
-              <div className="space-y-8 pt-4">
+              <div className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Descrição</Label>
                   <Input
@@ -6065,7 +6086,7 @@ export default function App() {
                       <div className="space-y-1">
                         <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Telefone</Label>
                         <Input
-                          placeholder="(00) 00000-0000"
+                          placeholder="+55 (00) 00000-0000"
                           className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs px-4 shadow-sm"
                           value={newPersonPhone || ''}
                           onChange={(e) => setNewPersonPhone(maskPhone(e.target.value))}
@@ -6173,7 +6194,7 @@ export default function App() {
                                 >
                                   <Pencil size={14} strokeWidth={2.5} />
                                 </button>
-                                {monthCharges.pendingTotal > 0 && (
+                                {monthCharges.balance > 0 && (
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); shareChargeOnWhatsApp(person, monthCharges); }}
@@ -6271,84 +6292,14 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between ml-2 gap-3">
-                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest shrink-0">
-                                Pendências de {format(selectedChargeDate, "MMMM", { locale: ptBR })}
-                              </p>
-                              <button
-                                type="button"
-                                disabled={charges.items.length === 0}
-                                onClick={() => shareChargeOnWhatsApp(activePerson, charges)}
-                                className={cn(
-                                  "flex items-center gap-1.5 text-[11px] font-medium pl-2.5 pr-3 py-1.5 rounded-full shrink-0 transition-all",
-                                  charges.balance === 0
-                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                    : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 active:scale-95"
-                                )}
-                              >
-                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", charges.balance === 0 ? "bg-emerald-500" : "bg-amber-500")} />
-                                {charges.balance === 0 ? 'Em dia' : 'Pendente'}
-                              </button>
-                            </div>
-                            <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] ml-2">
-                              R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                            {charges.payablePendingTotal > 0 && (
-                              <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] ml-2">
-                                Você deve R$ {charges.payablePendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · Saldo{' '}
-                                <span className={charges.balance >= 0 ? "text-emerald-500" : "text-rose-400"}>
-                                  {charges.balance >= 0 ? 'a receber' : 'a pagar'} R$ {Math.abs(charges.balance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </span>
-                              </p>
-                            )}
-                            {charges.items.length === 0 ? (
-                              <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
-                                <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nenhuma despesa neste mês.</p>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="space-y-2">
-                                  {charges.items.map(t => (
-                                    <div key={t.id}>
-                                      <TransactionItem
-                                        transaction={t}
-                                        onClick={() => handleTransactionClick(t)}
-                                        hideStatus
-                                        categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                                <button
-                                  onClick={() => shareChargeOnWhatsApp(activePerson, charges)}
-                                  disabled={charges.items.length === 0}
-                                  className="w-full h-12 rounded-full bg-primary text-white font-medium text-sm active:scale-95 transition-all disabled:opacity-40"
-                                >
-                                  Cobrar no WhatsApp
-                                </button>
-                                {(charges.pending.length > 0 || charges.payablePending.length > 0) && (
-                                  <button
-                                    onClick={() => settlePersonMonth(charges)}
-                                    className="w-full h-12 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium text-sm active:scale-95 transition-all"
-                                  >
-                                    Quitar mês
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
-
-                          {charges.payableItems.length > 0 && (
-                            <div className="space-y-3">
-                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest ml-2">
-                                Você paga para {activePerson.name.split(' ')[0]}
-                              </p>
-                              <p className="text-2xl font-heading font-medium tracking-tighter text-rose-400 ml-2">
-                                R$ {charges.payablePendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </p>
+                          {(() => {
+                            const firstName = activePerson.name.split(' ')[0];
+                            const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                            const hasAny = charges.items.length > 0 || charges.payableItems.length > 0;
+                            const hasPending = charges.pending.length > 0 || charges.payablePending.length > 0;
+                            const renderList = (list: typeof charges.items) => (
                               <div className="space-y-2">
-                                {charges.payableItems.map(t => (
+                                {list.map(t => (
                                   <div key={t.id}>
                                     <TransactionItem
                                       transaction={t}
@@ -6359,8 +6310,89 @@ export default function App() {
                                   </div>
                                 ))}
                               </div>
-                            </div>
-                          )}
+                            );
+                            return (
+                              <div className="space-y-5">
+                                <div className="bg-card rounded-[1.75rem] shadow-soft p-5 space-y-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest">
+                                      Saldo de {format(selectedChargeDate, "MMMM", { locale: ptBR })}
+                                    </p>
+                                    <span className={cn(
+                                      "flex items-center gap-1.5 text-[11px] font-medium pl-2.5 pr-3 py-1.5 rounded-full shrink-0",
+                                      charges.balance === 0
+                                        ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                        : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                    )}>
+                                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", charges.balance === 0 ? "bg-emerald-500" : "bg-amber-500")} />
+                                      {charges.balance === 0 ? (hasAny ? 'Quites' : 'Sem lançamentos') : 'Em aberto'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <p className={cn(
+                                      "text-3xl font-heading font-medium tracking-tighter",
+                                      charges.balance > 0 ? "text-emerald-500" : charges.balance < 0 ? "text-rose-400" : "text-slate-800 dark:text-[#EDE9E3]"
+                                    )}>
+                                      {brl(Math.abs(charges.balance))}
+                                    </p>
+                                    <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">
+                                      {charges.balance > 0 ? `${firstName} te deve` : charges.balance < 0 ? `Você deve a ${firstName}` : `Você e ${firstName} estão quites`}
+                                    </p>
+                                  </div>
+                                  {(charges.pendingTotal > 0 || charges.payablePendingTotal > 0) && (
+                                    <div className="grid grid-cols-2 gap-2 pt-1">
+                                      <div className="rounded-2xl bg-emerald-50/70 dark:bg-emerald-500/10 px-3 py-2">
+                                        <p className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70">{firstName} te deve</p>
+                                        <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{brl(charges.pendingTotal)}</p>
+                                      </div>
+                                      <div className="rounded-2xl bg-rose-50/70 dark:bg-rose-500/10 px-3 py-2">
+                                        <p className="text-[10px] text-rose-500/70 dark:text-rose-400/70">Você deve</p>
+                                        <p className="text-sm font-medium text-rose-500 dark:text-rose-400">{brl(charges.payablePendingTotal)}</p>
+                                      </div>
+                                    </div>
+                                  )}
+                                  {hasAny && (
+                                    <div className="flex gap-2 pt-1">
+                                      <button
+                                        onClick={() => shareChargeOnWhatsApp(activePerson, charges)}
+                                        className="flex-1 h-11 rounded-full bg-primary text-white font-medium text-sm active:scale-95 transition-all"
+                                      >
+                                        {charges.balance > 0 ? 'Cobrar no WhatsApp' : 'Enviar resumo'}
+                                      </button>
+                                      {hasPending && (
+                                        <button
+                                          onClick={() => settlePersonMonth(charges)}
+                                          className="flex-1 h-11 rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium text-sm active:scale-95 transition-all"
+                                        >
+                                          Quitar mês
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {!hasAny && (
+                                  <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
+                                    <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nada com {firstName} neste mês.</p>
+                                  </div>
+                                )}
+
+                                {charges.items.length > 0 && (
+                                  <div className="space-y-3">
+                                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest ml-2">{firstName} te deve</p>
+                                    {renderList(charges.items)}
+                                  </div>
+                                )}
+
+                                {charges.payableItems.length > 0 && (
+                                  <div className="space-y-3">
+                                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest ml-2">Você deve a {firstName}</p>
+                                    {renderList(charges.payableItems)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </>
                       );
                     })()}
@@ -6440,7 +6472,7 @@ export default function App() {
                     <div className="space-y-2">
                       <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Telefone</Label>
                       <Input 
-                        placeholder="(00) 00000-0000" 
+                        placeholder="+55 (00) 00000-0000" 
                         className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-5 shadow-sm"
                         value={newPersonPhone || ''}
                         onChange={(e) => setNewPersonPhone(maskPhone(e.target.value))}
