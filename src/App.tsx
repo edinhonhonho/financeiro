@@ -450,7 +450,9 @@ export default function App() {
   const [forgotSubmitting, setForgotSubmitting] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotError, setForgotError] = useState('');
-  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  // Lê o hash já na criação: o evento PASSWORD_RECOVERY do Supabase pode disparar
+  // antes do listener existir, e aí a tela de nova senha nunca abriria.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(() => /[#&]type=recovery/.test(window.location.hash));
   const [recoveryPassword, setRecoveryPassword] = useState('');
   const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
   const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
