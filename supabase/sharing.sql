@@ -14,6 +14,8 @@
 -- ============================================================================
 
 alter table public.transactions add column if not exists "owedByPerson" boolean;
+-- Cor personalizada do card de cada pessoa (opcional)
+alter table public.people add column if not exists color text;
 
 -- ----------------------------------------------------------------------------
 -- Permissões

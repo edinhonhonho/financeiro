@@ -47,6 +47,7 @@ export interface Person {
   image?: string;
   visible?: boolean;
   linkedUserId?: string | null;
+  color?: string | null;
 }
 
 export interface UserProfile {
@@ -65,6 +66,7 @@ export interface PublicProfile {
   firstName: string | null;
   lastName: string | null;
   username: string | null;
+  photoURL?: string | null;
 }
 
 export interface Card {

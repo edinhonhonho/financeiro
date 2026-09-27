@@ -267,8 +267,10 @@ const CARD_COLOR_PRESETS = [
   '#F797C0', '#FF9D91', '#8D89AC', '#4B4570',
 ];
 
-/** Cor determinística por pessoa (não editável — Person não tem campo `color`). */
-function getPersonColor(personId: string): string {
+/** Cor do card da pessoa: a escolhida por ela ou, se não houver, uma derivada do id. */
+function getPersonColor(person: Person): string {
+  if (person.color) return person.color;
+  const personId = person.id;
   let hash = 0;
   for (let i = 0; i < personId.length; i++) hash = (hash * 31 + personId.charCodeAt(i)) >>> 0;
   return CARD_COLOR_PRESETS[hash % CARD_COLOR_PRESETS.length];
@@ -850,6 +852,21 @@ export default function App() {
     try {
       await api.respondConsent(n.consentId, status);
       await api.markNotificationsRead([n.id]);
+      // Quem me associou passa a ter um card em Pessoas, se ainda não tiver.
+      if (status === 'accepted' && n.fromUserId && user && !people.some(p => p.linkedUserId === n.fromUserId)) {
+        const owner = await api.fetchPublicProfile(n.fromUserId);
+        if (owner) {
+          const fullName = [owner.firstName, owner.lastName].filter(Boolean).join(' ');
+          const name = fullName || owner.nickname || owner.username || 'Contato';
+          await api.createPerson(user.id, {
+            name,
+            image: owner.photoURL || `https://picsum.photos/seed/${name}/100/100`,
+            visible: true,
+            linkedUserId: owner.id
+          });
+          await loadPeople();
+        }
+      }
       await Promise.all([loadNotifications(), loadTransactions()]);
     } catch (err) {
       showAlert('Não foi possível responder', extractErrorMessage(err));
@@ -1319,7 +1336,7 @@ export default function App() {
   const [newTransaction, setNewTransaction] = useState<Partial<Transaction>>({
     type: 'expense',
     date: format(new Date(), 'yyyy-MM-dd'),
-    status: 'planned',
+    status: 'actual',
     recurrence: 'none',
     category: '',
     payerPayee: 'geral',
@@ -1332,7 +1349,9 @@ export default function App() {
   const [recurrenceDateMode, setRecurrenceDateMode] = useState<'fixed' | 'businessDay'>('fixed');
   const [recurrenceBusinessDay, setRecurrenceBusinessDay] = useState(5);
   const [newPersonName, setNewPersonName] = useState('');
-  const [newPersonEmail, setNewPersonEmail] = useState('');
+  const [newPersonColor, setNewPersonColor] = useState('');
+  // Ao adicionar: pergunta se a pessoa já usa o app (busca por usuário) ou é um cadastro manual.
+  const [personMode, setPersonMode] = useState<'ask' | 'app' | 'manual'>('ask');
   const [newPersonPhone, setNewPersonPhone] = useState('');
   const [newPersonImage, setNewPersonImage] = useState('');
   const [personLinkQuery, setPersonLinkQuery] = useState('');
@@ -2204,6 +2223,16 @@ export default function App() {
           } as Transaction & { userId: string });
         }
 
+        // Só a primeira ocorrência de uma série nasce paga; as seguintes (e as
+        // compras no cartão, quitadas pela fatura) ficam planejadas.
+        const mainRows = rows.filter(r => !r.linkedToCard);
+        const firstDate = mainRows.reduce((min, r) => (r.date < min ? r.date : min), mainRows[0]?.date ?? '');
+        rows.forEach(r => {
+          if (r.linkedToCard) return;
+          if (r.type === 'card_purchase' || (r.seriesId && r.date !== firstDate)) r.status = 'planned';
+          else if (r.status === 'actual' && !r.actualDate) r.actualDate = r.date;
+        });
+
         await api.insertTransactions(rows);
       }
 
@@ -2212,7 +2241,7 @@ export default function App() {
       setNewTransaction({
         type: 'expense',
         date: format(new Date(), 'yyyy-MM-dd'),
-        status: 'planned',
+        status: 'actual',
         recurrence: 'none',
         category: '',
         payerPayee: 'geral'
@@ -2417,7 +2446,7 @@ export default function App() {
     setNewTransaction({
       type: initialType,
       date: format(new Date(), 'yyyy-MM-dd'),
-      status: 'planned',
+      status: 'actual',
       recurrence: 'none',
       recurrenceEndDate: format(addMonths(new Date(), 12), 'yyyy-MM'),
       category: '',
@@ -2437,7 +2466,7 @@ export default function App() {
     try {
       const personData = {
         name: newPersonName.trim(),
-        email: newPersonEmail.trim() || undefined,
+        ...(newPersonColor ? { color: newPersonColor } : {}),
         phone: newPersonPhone.trim() || undefined,
         image: newPersonImage || `https://picsum.photos/seed/${newPersonName}/100/100`,
         linkedUserId: personLinkSelected?.id || null
@@ -2450,7 +2479,8 @@ export default function App() {
       }
       await loadPeople();
       setNewPersonName('');
-      setNewPersonEmail('');
+      setNewPersonColor('');
+      setPersonMode('ask');
       setNewPersonPhone('');
       setNewPersonImage('');
       setPersonLinkQuery('');
@@ -2464,7 +2494,8 @@ export default function App() {
   const handleEditPersonClick = (p: Person) => {
     setEditingPerson(p);
     setNewPersonName(p.name);
-    setNewPersonEmail(p.email || '');
+    setNewPersonColor(p.color || '');
+    setPersonMode('manual');
     setNewPersonPhone(maskPhone(p.phone || ''));
     setNewPersonImage(p.image || '');
     if (p.linkedUserId) {
@@ -2479,7 +2510,8 @@ export default function App() {
   const handleCancelEditPerson = () => {
     setEditingPerson(null);
     setNewPersonName('');
-    setNewPersonEmail('');
+    setNewPersonColor('');
+    setPersonMode('ask');
     setNewPersonPhone('');
     setNewPersonImage('');
     setPersonLinkQuery('');
@@ -3022,6 +3054,170 @@ export default function App() {
       </div>
     );
   }
+
+  const selectLinkedProfile = (profile: PublicProfile) => {
+    setPersonLinkSelected(profile);
+    setPersonLinkQuery('');
+    const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ');
+    setNewPersonName(fullName || profile.nickname || profile.username || '');
+    if (profile.photoURL) setNewPersonImage(profile.photoURL);
+  };
+
+  const personColorPicker = (
+    <div className="space-y-2">
+      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Cor do card</Label>
+      <div className="flex flex-wrap gap-2.5">
+        {CARD_COLOR_PRESETS.map(color => {
+          const current = newPersonColor || (editingPerson ? getPersonColor(editingPerson) : '');
+          return (
+            <button
+              key={color}
+              type="button"
+              onClick={() => setNewPersonColor(color)}
+              aria-label={`Cor ${color}`}
+              className={cn("w-8 h-8 rounded-full transition-all", current === color ? "ring-2 ring-primary ring-offset-2 dark:ring-offset-[#16133F] scale-110" : "opacity-60")}
+              style={{ backgroundColor: color }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const linkSearchBlock = (
+    <div className="space-y-2 relative">
+      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Usuário no Financeiro</Label>
+      {personLinkSelected ? (
+        <div className="rounded-2xl bg-white dark:bg-[#100E3D] shadow-sm flex items-center gap-3 p-3">
+          <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium overflow-hidden shrink-0">
+            {personLinkSelected.photoURL
+              ? <img src={personLinkSelected.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              : (personLinkSelected.firstName || personLinkSelected.username || '?').charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{newPersonName || personLinkSelected.nickname}</p>
+            <p className="text-xs font-normal text-primary flex items-center gap-1 truncate"><UserCheck size={12} />@{personLinkSelected.username}</p>
+          </div>
+          <button type="button" onClick={() => { setPersonLinkSelected(null); setPersonLinkQuery(''); }} className="text-slate-300 dark:text-[#6B679C] hover:text-rose-400 p-2" aria-label="Trocar usuário">
+            <X size={16} />
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] font-medium text-sm pointer-events-none">@</span>
+          <Input
+            placeholder="usuario"
+            className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm pl-8 pr-4 shadow-sm"
+            value={personLinkQuery}
+            onChange={(e) => setPersonLinkQuery(e.target.value.replace(/^@+/, ''))}
+            autoFocus={personMode === 'app'}
+          />
+        </div>
+      )}
+      {!personLinkSelected && personLinkQuery.trim() && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#100E3D] rounded-2xl shadow-deep border border-slate-50 dark:border-[#1C1852] z-20 overflow-hidden max-h-48 overflow-y-auto">
+          {personLinkSearching && <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Buscando...</p>}
+          {!personLinkSearching && personLinkResults.length === 0 && (
+            <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Nenhum usuário encontrado.</p>
+          )}
+          {personLinkResults.map(pr => (
+            <button
+              key={pr.id}
+              type="button"
+              onClick={() => selectLinkedProfile(pr)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#16133F] text-left"
+            >
+              <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-xs shrink-0 overflow-hidden">
+                {pr.photoURL
+                  ? <img src={pr.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  : (pr.firstName || pr.username || '?').charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{[pr.firstName, pr.lastName].filter(Boolean).join(' ') || pr.nickname}</p>
+                <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">@{pr.username}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const personFormFields = (!editingPerson && personMode === 'ask') ? (
+    <div className="space-y-3">
+      <p className="text-base font-medium text-slate-700 dark:text-[#EDEAF9] ml-1">Essa pessoa já usa o Financeiro?</p>
+      <button
+        type="button"
+        onClick={() => setPersonMode('app')}
+        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-[#100E3D] shadow-sm text-left active:scale-[0.99] transition-transform"
+      >
+        <span className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><UserCheck size={20} /></span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Sim, buscar pelo usuário</span>
+          <span className="block text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Nome e foto vêm automaticamente</span>
+        </span>
+        <ChevronRight size={16} className="text-slate-300 dark:text-[#6B679C] shrink-0" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setPersonMode('manual')}
+        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-[#100E3D] shadow-sm text-left active:scale-[0.99] transition-transform"
+      >
+        <span className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-[#1C1852] text-slate-400 dark:text-[#8D89AC] flex items-center justify-center shrink-0"><Users size={20} /></span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Não, cadastrar manualmente</span>
+          <span className="block text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Nome, foto e telefone</span>
+        </span>
+        <ChevronRight size={16} className="text-slate-300 dark:text-[#6B679C] shrink-0" />
+      </button>
+    </div>
+  ) : personMode === 'app' && !editingPerson ? (
+    <div className="space-y-4">
+      {linkSearchBlock}
+      {personLinkSelected && personColorPicker}
+      <button type="button" onClick={() => { setPersonMode('ask'); setPersonLinkSelected(null); setPersonLinkQuery(''); setNewPersonName(''); setNewPersonImage(''); }} className="text-xs font-medium text-primary ml-1">
+        Voltar
+      </button>
+    </div>
+  ) : (
+    <div className="space-y-4">
+      <div className="flex gap-4 items-center">
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-20 h-20 rounded-3xl bg-white dark:bg-[#100E3D] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex items-center justify-center overflow-hidden hover:border-primary transition-all group shrink-0 shadow-sm"
+        >
+          {newPersonImage ? (
+            <img src={newPersonImage} alt="Preview" className="w-full h-full object-cover" />
+          ) : (
+            <Users size={28} className="text-slate-300 dark:text-[#6B679C] group-hover:text-primary" />
+          )}
+        </button>
+        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+        <div className="flex-1 space-y-1">
+          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome</Label>
+          <Input
+            placeholder="Ex: Edson"
+            className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5 shadow-sm"
+            value={newPersonName || ''}
+            onChange={(e) => setNewPersonName(e.target.value)}
+          />
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Telefone</Label>
+        <Input
+          placeholder="+55 (00) 00000-0000"
+          className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5 shadow-sm"
+          value={newPersonPhone || ''}
+          onChange={(e) => setNewPersonPhone(maskPhone(e.target.value))}
+        />
+      </div>
+      {personColorPicker}
+      {editingPerson && linkSearchBlock}
+    </div>
+  );
+
 
   // Cabeçalho mobile compartilhado (foto + "Oi, Nome!" + calendário + notificações),
   // igual em toda página — dispensa qualquer controle de mês flutuante à parte.
@@ -6220,102 +6416,10 @@ export default function App() {
                         {editingPerson ? 'Editar pessoa' : 'Nova pessoa'}
                       </h1>
                     </div>
-                    <div className="flex gap-4 items-center">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-20 h-20 rounded-3xl bg-slate-50 dark:bg-[#16133F] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex items-center justify-center overflow-hidden hover:border-primary transition-all group shrink-0"
-                      >
-                        {newPersonImage ? (
-                          <img src={newPersonImage} alt="Preview" className="w-full h-full object-cover" />
-                        ) : (
-                          <Users size={28} className="text-slate-300 dark:text-[#6B679C] group-hover:text-primary" />
-                        )}
-                      </button>
-                      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome</Label>
-                        <Input
-                          placeholder="Ex: Edson"
-                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
-                          value={newPersonName || ''}
-                          onChange={(e) => setNewPersonName(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">E-mail</Label>
-                        <Input
-                          placeholder="contato@edson.com"
-                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs px-4 shadow-sm"
-                          value={newPersonEmail || ''}
-                          onChange={(e) => setNewPersonEmail(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Telefone</Label>
-                        <Input
-                          placeholder="+55 (00) 00000-0000"
-                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-xs px-4 shadow-sm"
-                          value={newPersonPhone || ''}
-                          onChange={(e) => setNewPersonPhone(maskPhone(e.target.value))}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2 relative">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Vincular a um usuário do app (opcional)</Label>
-                      {personLinkSelected ? (
-                        <div className="h-11 rounded-xl bg-slate-50 dark:bg-[#16133F] shadow-sm flex items-center justify-between px-4">
-                          <span className="flex items-center gap-2 font-normal text-sm text-primary">
-                            <UserCheck size={16} />
-                            @{personLinkSelected.username}
-                          </span>
-                          <button type="button" onClick={() => { setPersonLinkSelected(null); setPersonLinkQuery(''); }} className="text-slate-300 dark:text-[#6B679C] hover:text-rose-400">
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] font-medium text-sm pointer-events-none">@</span>
-                          <Input
-                            placeholder="usuario"
-                            className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-8 pr-4 shadow-sm"
-                            value={personLinkQuery}
-                            onChange={(e) => setPersonLinkQuery(e.target.value.replace(/^@+/, ''))}
-                          />
-                        </div>
-                      )}
-                      {!personLinkSelected && personLinkQuery.trim() && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#100E3D] rounded-2xl shadow-deep border border-slate-50 dark:border-[#1C1852] z-20 overflow-hidden max-h-48 overflow-y-auto">
-                          {personLinkSearching && (
-                            <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Buscando...</p>
-                          )}
-                          {!personLinkSearching && personLinkResults.length === 0 && (
-                            <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Nenhum usuário encontrado.</p>
-                          )}
-                          {personLinkResults.map(p => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => { setPersonLinkSelected(p); setPersonLinkQuery(''); }}
-                              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#16133F] text-left"
-                            >
-                              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-xs shrink-0">
-                                {(p.firstName || p.username || '?').charAt(0).toUpperCase()}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{[p.firstName, p.lastName].filter(Boolean).join(' ') || p.nickname}</p>
-                                <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">@{p.username}</p>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <button
+{personFormFields}
+                                        <button
                       onClick={async () => { await handleAddPerson(); setShowPersonForm(false); }}
-                      className="w-full h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all"
+                      className={cn("w-full h-12 rounded-full font-medium bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all", !editingPerson && personMode === 'ask' && "hidden")}
                     >
                       {editingPerson ? 'Salvar alterações' : 'Adicionar pessoa'}
                     </button>
@@ -6342,7 +6446,7 @@ export default function App() {
                         const monthCharges = getPersonMonthlyCharges(person.id, currentDate);
                         const identityLine = personLinkSelected && editingPerson?.id === person.id
                           ? `@${personLinkSelected.username}`
-                          : person.linkedUserId ? '@vinculado' : (person.email || person.phone || '');
+                          : person.linkedUserId ? '@vinculado' : (person.phone || '');
                         return (
                           <div key={person.id} className="w-[210px] shrink-0 snap-center">
                             <div
@@ -6350,7 +6454,7 @@ export default function App() {
                               role="button"
                               tabIndex={0}
                               className="rounded-[1.5rem] h-[230px] p-4 relative overflow-hidden flex flex-col shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
-                              style={{ backgroundColor: getPersonColor(person.id) }}
+                              style={{ backgroundColor: getPersonColor(person) }}
                             >
                               <svg className="absolute -right-4 -bottom-6 w-32 h-16 opacity-20" viewBox="0 0 160 60" fill="none">
                                 <path d="M0 30 Q 20 10 40 30 T 80 30 T 120 30 T 160 30" stroke="white" strokeWidth="6" strokeLinecap="round" />
@@ -6438,7 +6542,7 @@ export default function App() {
                       const activePerson = people.find(p => p.id === selectedPersonId) || people[0];
                       const selectedMonthKey = format(selectedChargeDate, 'yyyy-MM');
                       const charges = getPersonMonthlyCharges(activePerson.id, selectedChargeDate);
-                      const personColor = getPersonColor(activePerson.id);
+                      const personColor = getPersonColor(activePerson);
                       return (
                         <>
                           <div className="space-y-3">
@@ -6600,108 +6704,8 @@ export default function App() {
                       </button>
                     </div>
                   )}
-                  <div className="flex gap-6 items-center">
-                    <button 
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-20 h-20 rounded-3xl bg-white dark:bg-[#100E3D] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex items-center justify-center overflow-hidden hover:border-primary transition-all group shrink-0 shadow-sm"
-                    >
-                      {newPersonImage ? (
-                        <img src={newPersonImage} alt="Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <Users size={32} className="text-slate-300 dark:text-[#6B679C] group-hover:text-primary" />
-                      )}
-                    </button>
-                    <input 
-                      type="file" 
-                      ref={fileInputRef} 
-                      className="hidden" 
-                      accept="image/*" 
-                      onChange={handleImageChange} 
-                    />
-                    <div className="flex-1 space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome</Label>
-                      <Input 
-                        placeholder="Ex: Edson" 
-                        className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5"
-                        value={newPersonName || ''}
-                        onChange={(e) => setNewPersonName(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">E-mail</Label>
-                      <Input 
-                        placeholder="contato@edson.com" 
-                        className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-5 shadow-sm"
-                        value={newPersonEmail || ''}
-                        onChange={(e) => setNewPersonEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Telefone</Label>
-                      <Input 
-                        placeholder="+55 (00) 00000-0000" 
-                        className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-medium text-xs px-5 shadow-sm"
-                        value={newPersonPhone || ''}
-                        onChange={(e) => setNewPersonPhone(maskPhone(e.target.value))}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 relative">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Vincular a um usuário do app (opcional)</Label>
-                    {personLinkSelected ? (
-                      <div className="h-12 rounded-2xl bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-between px-5">
-                        <span className="flex items-center gap-2 font-normal text-sm text-primary">
-                          <UserCheck size={16} />
-                          @{personLinkSelected.username}
-                        </span>
-                        <button type="button" onClick={() => { setPersonLinkSelected(null); setPersonLinkQuery(''); }} className="text-slate-300 dark:text-[#6B679C] hover:text-rose-400">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] font-medium text-sm pointer-events-none">@</span>
-                        <Input
-                          placeholder="usuario"
-                          className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm pl-9 pr-5 shadow-sm"
-                          value={personLinkQuery}
-                          onChange={(e) => setPersonLinkQuery(e.target.value.replace(/^@+/, ''))}
-                        />
-                      </div>
-                    )}
-                    {!personLinkSelected && personLinkQuery.trim() && (
-                      <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#100E3D] rounded-2xl shadow-deep border border-slate-50 dark:border-[#1C1852] z-20 overflow-hidden max-h-48 overflow-y-auto">
-                        {personLinkSearching && (
-                          <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Buscando...</p>
-                        )}
-                        {!personLinkSearching && personLinkResults.length === 0 && (
-                          <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Nenhum usuário encontrado.</p>
-                        )}
-                        {personLinkResults.map(p => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => { setPersonLinkSelected(p); setPersonLinkQuery(''); }}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#16133F] text-left"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-xs shrink-0">
-                              {(p.firstName || p.username || '?').charAt(0).toUpperCase()}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{[p.firstName, p.lastName].filter(Boolean).join(' ') || p.nickname}</p>
-                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">@{p.username}</p>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <Button onClick={handleAddPerson} className="w-full h-14 rounded-full font-medium text-base bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all">
+{personFormFields}
+                                      <Button onClick={handleAddPerson} className={cn("w-full h-14 rounded-full font-medium text-base bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all", !editingPerson && personMode === 'ask' && "hidden")}>
                     {editingPerson ? <Settings size={20} className="mr-2" strokeWidth={3} /> : <Plus size={20} className="mr-2" strokeWidth={4} />}
                     {editingPerson ? 'Salvar alterações' : 'Adicionar Pessoa'}
                   </Button>
@@ -6718,7 +6722,7 @@ export default function App() {
                             {p.name}
                             {p.linkedUserId && <UserCheck size={12} className="text-primary shrink-0" />}
                           </p>
-                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] truncate tracking-tight">{p.email || 'Sem e-mail'}</p>
+                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] truncate tracking-tight">{p.phone || (p.linkedUserId ? 'Usa o Financeiro' : '')}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           <button

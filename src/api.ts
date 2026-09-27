@@ -54,7 +54,7 @@ export async function searchProfilesByUsername(query: string, excludeUserId?: st
   if (!cleaned) return [];
   let request = supabase
     .from('profiles')
-    .select('id, nickname, firstName, lastName, username')
+    .select('id, nickname, firstName, lastName, username, "photoURL"')
     .ilike('username', `%${cleaned}%`)
     .limit(10);
   if (excludeUserId) request = request.neq('id', excludeUserId);
@@ -66,7 +66,7 @@ export async function searchProfilesByUsername(query: string, excludeUserId?: st
 export async function fetchPublicProfile(userId: string): Promise<PublicProfile | null> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, nickname, firstName, lastName, username')
+    .select('id, nickname, firstName, lastName, username, "photoURL"')
     .eq('id', userId)
     .maybeSingle();
   if (error) handleSupabaseError(error, OperationType.GET, 'profiles');
@@ -286,7 +286,7 @@ export async function fetchPublicProfiles(ids: string[]): Promise<PublicProfile[
   if (ids.length === 0) return [];
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, nickname, firstName, lastName, username')
+    .select('id, nickname, firstName, lastName, username, "photoURL"')
     .in('id', ids);
   if (error) handleSupabaseError(error, OperationType.LIST, 'profiles');
   return (data ?? []) as PublicProfile[];
