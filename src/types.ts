@@ -10,6 +10,8 @@ export type RecurrenceType = 'none' | 'monthly' | 'weekly' | 'yearly';
 export interface TransactionAssignment {
   personId: string;
   amount: number;
+  // true/ausente = a pessoa te deve essa parte; false = você deve a ela.
+  owedByPerson?: boolean | null;
 }
 
 export interface Transaction {
