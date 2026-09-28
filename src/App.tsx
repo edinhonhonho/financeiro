@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { createPortal } from 'react-dom';
 import { ImageCropper } from './ImageCropper';
 import { useDragScroll } from './useDragScroll';
 import { Badge } from '@/components/ui/badge';
@@ -3738,7 +3739,9 @@ export default function App() {
     </div>
   );
 
-  const floatingMonthPicker = (
+  // Vai direto para o <body>: dentro das abas (que animam com transform) um
+  // `position: fixed` passa a ser relativo à aba e muda de altura conforme a página.
+  const floatingMonthPicker = createPortal(
   <div className="md:hidden fixed bottom-24 right-6 z-30 flex items-center gap-0.5 bg-white dark:bg-[#100E3D] rounded-full p-1.5 shadow-bubbly">
     <button
       type="button"
@@ -3767,7 +3770,8 @@ export default function App() {
     >
       <ChevronRight size={16} strokeWidth={3} />
     </button>
-  </div>
+  </div>,
+    document.body
   );
 
   // Cabeçalho mobile compartilhado (foto + "Oi, Nome!" + calendário + notificações),
