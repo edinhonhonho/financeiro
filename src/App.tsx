@@ -1828,6 +1828,21 @@ export default function App() {
     };
   }, [transactions, cards, people, currentDate]);
 
+  // Balanço da página inicial: por padrão soma tudo do mês (pago ou não);
+  // "Só concluídos" considera apenas o que já foi pago/recebido.
+  const [onlyCompleted, setOnlyCompleted] = useState(() => {
+    try { return localStorage.getItem('balanceOnlyCompleted') === '1'; } catch { return false; }
+  });
+  const toggleOnlyCompleted = () => {
+    setOnlyCompleted(prev => {
+      try { localStorage.setItem('balanceOnlyCompleted', prev ? '0' : '1'); } catch { /* sem armazenamento */ }
+      return !prev;
+    });
+  };
+  const homeIncome = onlyCompleted ? stats.incomeActual : stats.incomeTotal;
+  const homeExpense = onlyCompleted ? stats.expensesActual : stats.expenseTotal;
+  const homeBalance = homeIncome - homeExpense;
+
   const chartData = useMemo(() => {
     const start = startOfMonth(currentDate);
     const end = endOfMonth(currentDate);
@@ -4612,7 +4627,7 @@ export default function App() {
                 </button>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-2.5 scrollbar-hide">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-6 space-y-2.5 scrollbar-hide">
               {notifications.length === 0 ? (
                 <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-10">Você não tem notificações.</p>
               ) : notifications.map(n => {
@@ -5162,26 +5177,46 @@ export default function App() {
                   <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">Balanço do mês</h1>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     {(() => {
-                      const [intPart, decPart] = Math.abs(stats.balance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                      const [intPart, decPart] = Math.abs(homeBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                       return (
                         <p className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
-                          {stats.balance < 0 && '-'}R$ {intPart}<span className="text-slate-300 dark:text-[#5C5686]">,{decPart}</span>
+                          {homeBalance < 0 && '-'}R$ {intPart}<span className="text-slate-300 dark:text-[#5C5686]">,{decPart}</span>
                         </p>
                       );
                     })()}
                     <span className={cn(
                       "text-[11px] font-medium px-2.5 py-1 rounded-full",
-                      stats.balance >= 0 ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400"
+                      homeBalance >= 0 ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400"
                     )}>
-                      {stats.balance >= 0 ? '↑ Positivo' : '↓ Negativo'}
+                      {homeBalance >= 0 ? '↑ Positivo' : '↓ Negativo'}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={onlyCompleted}
+                    onClick={toggleOnlyCompleted}
+                    className={cn(
+                      "mt-2 inline-flex items-center gap-1.5 rounded-full border-[1.5px] pl-1.5 pr-3 py-1 text-[11px] font-medium transition-colors",
+                      onlyCompleted
+                        ? "border-primary text-primary bg-white dark:bg-[#100E3D]"
+                        : "border-slate-200 dark:border-[#2A2566] text-slate-400 dark:text-[#8D89AC] bg-white dark:bg-[#100E3D]"
+                    )}
+                  >
+                    <span className={cn(
+                      "w-4 h-4 rounded-[5px] border-[1.5px] flex items-center justify-center",
+                      onlyCompleted ? "bg-primary border-primary text-white" : "border-slate-300 dark:border-[#3A3470] text-transparent"
+                    )}>
+                      <Check size={10} strokeWidth={3.5} />
+                    </span>
+                    Só concluídos
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   {(() => {
-                    const [ii, id] = stats.incomeActual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
-                    const [ei, ed] = stats.expensesActual.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                    const [ii, id] = homeIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                    const [ei, ed] = homeExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                     return (
                       <>
                         <div className="bg-secondary shadow-soft rounded-xl p-4">
@@ -5290,7 +5325,7 @@ export default function App() {
                   icon={<ArrowDownCircle />}
                   subValue={stats.expensesPlanned > 0 ? `+ R$ ${stats.expensesPlanned.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} previstas` : undefined}
                 />
-                <StatCard title="Saldo do mês" value={stats.balance} icon={<Wallet />} />
+                <StatCard title="Saldo do mês" value={homeBalance} icon={<Wallet />} subValue={onlyCompleted ? 'Só concluídos' : 'Previsto, pago ou não'} />
                 <StatCard
                   title="Faturas em aberto"
                   value={stats.cardTotals.reduce((acc, c) => acc + c.total, 0)}
