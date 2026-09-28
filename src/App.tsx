@@ -174,6 +174,31 @@ const monthLabel = (date: Date) => {
   return label.charAt(0).toUpperCase() + label.slice(1);
 };
 
+/**
+ * Centraliza o item `index` de um carrossel horizontal. A aba nova ainda está
+ * montando (animação de troca de aba) quando isso é chamado, então tenta de
+ * novo até o carrossel existir, e repete depois da animação para garantir.
+ */
+function scrollCarouselToIndex(getEl: () => HTMLDivElement | null, index: number) {
+  if (index < 0) return () => {};
+  let tries = 0;
+  let timer: ReturnType<typeof setTimeout>;
+  const center = () => {
+    const el = getEl();
+    const child = el?.children[index] as HTMLElement | undefined;
+    if (!el || !child || el.clientWidth === 0) return false;
+    const left = child.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft - (el.clientWidth - child.offsetWidth) / 2;
+    el.scrollTo({ left, behavior: 'auto' });
+    return true;
+  };
+  const tick = () => {
+    if (center()) { timer = setTimeout(center, 350); return; }
+    if (tries++ < 40) timer = setTimeout(tick, 50);
+  };
+  timer = setTimeout(tick, 30);
+  return () => clearTimeout(timer);
+}
+
 // Currency Helpers
 // Telefone brasileiro com código do país: +55 (XX) XXXXX-XXXX. O +55 é
 // fixo; o usuário digita só DDD + número. Aceita valores antigos (só dígitos,
@@ -1447,13 +1472,7 @@ export default function App() {
   // carrossel direto ao cartão selecionado.
   useEffect(() => {
     if (activeTab !== 'cartoes') return;
-    const timer = setTimeout(() => {
-      const el = cardsCarouselRef.current;
-      const index = cards.findIndex(c => c.id === selectedCard);
-      const child = index >= 0 ? el?.children[index] as HTMLElement | undefined : undefined;
-      if (el && child) el.scrollTo({ left: child.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft - (el.clientWidth - child.offsetWidth) / 2, behavior: 'auto' });
-    }, 50);
-    return () => clearTimeout(timer);
+    return scrollCarouselToIndex(() => cardsCarouselRef.current, cards.findIndex(c => c.id === selectedCard));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -1562,13 +1581,7 @@ export default function App() {
   // carrossel direto ao card da pessoa selecionada.
   useEffect(() => {
     if (activeTab !== 'pessoas') return;
-    const timer = setTimeout(() => {
-      const el = peopleCarouselRef.current;
-      const index = people.findIndex(p => p.id === selectedPersonId);
-      const child = index >= 0 ? el?.children[index] as HTMLElement | undefined : undefined;
-      if (el && child) el.scrollTo({ left: child.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft - (el.clientWidth - child.offsetWidth) / 2, behavior: 'auto' });
-    }, 50);
-    return () => clearTimeout(timer);
+    return scrollCarouselToIndex(() => peopleCarouselRef.current, people.findIndex(p => p.id === selectedPersonId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -2705,6 +2718,28 @@ export default function App() {
   const [newCategoryColor, setNewCategoryColor] = useState('#8A7FF5');
   const [newCategoryIcon, setNewCategoryIcon] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  // Criar categoria direto do lançamento (atalho no seletor de categoria).
+  const [quickCategoryOpen, setQuickCategoryOpen] = useState(false);
+  const [quickCategoryName, setQuickCategoryName] = useState('');
+  const [quickCategoryIcon, setQuickCategoryIcon] = useState('🏷️');
+  const [quickCategoryColor, setQuickCategoryColor] = useState('#8A7FF5');
+  const handleQuickCreateCategory = async () => {
+    const name = quickCategoryName.trim();
+    if (!name || !user) return;
+    try {
+      if (!categories.some(c => c.name.toLowerCase() === name.toLowerCase())) {
+        await api.createCategory(user.id, { name, icon: quickCategoryIcon, color: quickCategoryColor });
+        await loadCategories();
+      }
+      const existing = categories.find(c => c.name.toLowerCase() === name.toLowerCase());
+      setNewTransaction(prev => ({ ...prev, category: existing?.name || name }));
+      setQuickCategoryOpen(false);
+      setQuickCategoryName('');
+      setQuickCategoryIcon('🏷️');
+    } catch (err) {
+      showAlert('Não foi possível criar a categoria', extractErrorMessage(err));
+    }
+  };
   const categoriesScrollRef = React.useRef<HTMLDivElement>(null);
 
   const handleAddCategory = async () => {
@@ -2809,7 +2844,10 @@ export default function App() {
       await api.signalSharedPayment(t.id.replace('shared-', ''));
       await loadTransactions();
     } catch (err) {
-      showAlert('Não foi possível avisar o pagamento', extractErrorMessage(err));
+      const message = extractErrorMessage(err);
+      showAlert('Não foi possível avisar o pagamento', /signal_shared_payment|schema cache/i.test(message)
+        ? 'Falta configurar o banco: rode o arquivo supabase/shared_payments.sql no SQL Editor do Supabase.'
+        : message);
     }
   };
 
@@ -2905,6 +2943,81 @@ export default function App() {
   const [confirmingTransaction, setConfirmingTransaction] = useState<Transaction | null>(null);
   const [confirmAmount, setConfirmAmount] = useState<number>(0);
   const [confirmDate, setConfirmDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+
+  // ---------------------------------------------------------------------------
+  // Botão "voltar" do celular (app instalado): cada aba e cada tela aberta por
+  // cima vira uma entrada no histórico, então voltar fecha a tela aberta ou
+  // volta para a aba anterior, em vez de fechar o app.
+  // ---------------------------------------------------------------------------
+  const anyOverlayOpen = isRegistrarOpen || !!confirmingTransaction || isProfileOpen || isCategoriasOpen ||
+    isPessoasOpen || isNotificationsOpen || !!sharedTxDetail || showPersonForm || showCardForm ||
+    isMonthPickerOpen || isDeleteDialogOpen || isDataModalOpen || isPessoasSummaryOpen || isAccountEditOpen;
+  const navRef = useRef({ fromPop: false, ignorePops: 0, overlayPushed: false, closedByPop: false, mounted: false });
+  const backStateRef = useRef({ activeTab, registrarStep, isRegistrarOpen, anyOverlayOpen });
+  backStateRef.current = { activeTab, registrarStep, isRegistrarOpen, anyOverlayOpen };
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav.mounted) {
+      nav.mounted = true;
+      window.history.replaceState({ tab: activeTab }, '');
+      return;
+    }
+    if (nav.fromPop) { nav.fromPop = false; return; }
+    window.history.pushState({ tab: activeTab }, '');
+  }, [activeTab]);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (anyOverlayOpen && !nav.overlayPushed) {
+      window.history.pushState({ tab: backStateRef.current.activeTab, overlay: true }, '');
+      nav.overlayPushed = true;
+    } else if (!anyOverlayOpen && nav.overlayPushed) {
+      nav.overlayPushed = false;
+      // Fechou pela própria tela: tira a entrada que tinha sido empilhada.
+      if (!nav.closedByPop) { nav.ignorePops += 1; window.history.back(); }
+      nav.closedByPop = false;
+    }
+  }, [anyOverlayOpen]);
+
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const nav = navRef.current;
+      if (nav.ignorePops > 0) { nav.ignorePops -= 1; return; }
+      const st = backStateRef.current;
+      if (st.isRegistrarOpen && st.registrarStep > 0) {
+        setRegistrarStep(step => (step - 1) as 0 | 1 | 2);
+        window.history.pushState({ tab: st.activeTab, overlay: true }, '');
+        return;
+      }
+      if (st.anyOverlayOpen) {
+        nav.closedByPop = true;
+        setIsRegistrarOpen(false);
+        setRegistrarStep(0);
+        setConfirmingTransaction(null);
+        setIsProfileOpen(false);
+        setIsCategoriasOpen(false);
+        setIsPessoasOpen(false);
+        setIsNotificationsOpen(false);
+        setSharedTxDetail(null);
+        setShowPersonForm(false);
+        setShowCardForm(false);
+        setIsMonthPickerOpen(false);
+        setIsDeleteDialogOpen(false);
+        setIsDataModalOpen(false);
+        setIsPessoasSummaryOpen(false);
+        setIsAccountEditOpen(false);
+        return;
+      }
+      const tab = (e.state && e.state.tab) as string | undefined;
+      if (tab && tab !== st.activeTab) {
+        nav.fromPop = true;
+        setActiveTab(tab);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   if (!isAuthReady) {
     return (
@@ -3985,7 +4098,12 @@ export default function App() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
+                      <button type="button" onClick={() => setQuickCategoryOpen(true)} className="text-[11px] font-medium text-primary flex items-center gap-1 pr-1">
+                        <Plus size={12} strokeWidth={2.5} /> Nova categoria
+                      </button>
+                    </div>
                     <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
                       <SelectTrigger className="h-14 border-none bg-slate-50 dark:bg-[#16133F] rounded-2xl font-normal text-sm px-5">
                         <SelectValue placeholder="Selecione..." />
@@ -4313,7 +4431,12 @@ export default function App() {
 
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
+                        <button type="button" onClick={() => setQuickCategoryOpen(true)} className="text-[11px] font-medium text-primary flex items-center gap-1 pr-1">
+                          <Plus size={12} strokeWidth={2.5} /> Nova categoria
+                        </button>
+                      </div>
                       <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
                         <SelectTrigger className="h-14 border-none bg-slate-50 dark:bg-[#16133F] rounded-2xl font-normal text-base px-6">
                           <SelectValue placeholder="Selecione..." />
@@ -4580,6 +4703,62 @@ export default function App() {
                 </div>
               );
             })()}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={quickCategoryOpen} onOpenChange={setQuickCategoryOpen}>
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E] z-[80]">
+            <div className="p-6 space-y-4">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Nova categoria</DialogTitle>
+                <DialogDescription className="text-xs">Já fica selecionada neste lançamento.</DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0" style={{ backgroundColor: quickCategoryColor }}>{quickCategoryIcon}</div>
+                <Input
+                  placeholder="Ex: Pet"
+                  className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5 shadow-sm"
+                  value={quickCategoryName}
+                  onChange={(e) => setQuickCategoryName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleQuickCreateCategory()}
+                  autoFocus
+                />
+              </div>
+              <div className="bg-white dark:bg-[#100E3D] rounded-2xl p-2 max-h-40 overflow-y-auto scrollbar-hide">
+                <div className="grid grid-cols-8 gap-1">
+                  {CATEGORY_EMOJIS.map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setQuickCategoryIcon(emoji)}
+                      className={cn("h-9 rounded-xl text-lg flex items-center justify-center", quickCategoryIcon === emoji && "bg-primary/15")}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {CARD_COLOR_PRESETS.slice(0, 10).map(color => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setQuickCategoryColor(color)}
+                    aria-label={`Cor ${color}`}
+                    className={cn("w-7 h-7 rounded-full transition-all", quickCategoryColor === color ? "ring-2 ring-primary ring-offset-2 dark:ring-offset-[#0B0A2E]" : "opacity-60")}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handleQuickCreateCategory}
+                disabled={!quickCategoryName.trim()}
+                className="w-full h-12 rounded-full bg-primary text-white font-medium text-sm disabled:opacity-40 active:scale-95 transition-all"
+              >
+                Criar e usar
+              </button>
+            </div>
           </DialogContent>
         </Dialog>
 

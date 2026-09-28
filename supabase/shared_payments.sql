@@ -44,3 +44,6 @@ end;
 $$;
 
 grant execute on function public.signal_shared_payment(uuid) to authenticated;
+
+-- Faz a API do Supabase enxergar a função nova na hora.
+notify pgrst, 'reload schema';
