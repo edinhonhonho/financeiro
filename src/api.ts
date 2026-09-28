@@ -48,29 +48,37 @@ export async function saveProfile(userId: string, patch: Partial<UserProfile>) {
   if (error) handleSupabaseError(error, OperationType.WRITE, 'profiles');
 }
 
-/** Busca usuários já cadastrados no app pelo nome de usuário (para vincular a uma pessoa). */
-export async function searchProfilesByUsername(query: string, excludeUserId?: string): Promise<PublicProfile[]> {
-  const cleaned = query.trim().replace(/^@+/, '');
-  if (!cleaned) return [];
-  let request = supabase
-    .from('profiles')
-    .select('id, nickname, firstName, lastName, username, "photoURL"')
-    .ilike('username', `%${cleaned}%`)
-    .limit(10);
-  if (excludeUserId) request = request.neq('id', excludeUserId);
-  const { data, error } = await request;
+// Perfis de outras pessoas vêm da view public_profiles (sem e-mail, ver
+// supabase/profiles_privacy.sql). Enquanto o SQL não for rodado, cai na tabela.
+const PUBLIC_PROFILE_COLUMNS = 'id, nickname, firstName, lastName, username, "photoURL"';
+let publicProfilesSource: 'public_profiles' | 'profiles' = 'public_profiles';
+
+async function queryPublicProfiles(
+  build: (q: ReturnType<ReturnType<typeof supabase.from>['select']>) => PromiseLike<{ data: unknown; error: { message: string } | null }>
+): Promise<PublicProfile[]> {
+  let { data, error } = await build(supabase.from(publicProfilesSource).select(PUBLIC_PROFILE_COLUMNS));
+  if (error && publicProfilesSource === 'public_profiles' && /public_profiles|schema cache|does not exist/i.test(error.message)) {
+    publicProfilesSource = 'profiles';
+    ({ data, error } = await build(supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS)));
+  }
   if (error) handleSupabaseError(error, OperationType.LIST, 'profiles');
   return (data ?? []) as PublicProfile[];
 }
 
+/** Busca usuários já cadastrados no app pelo nome de usuário (para vincular a uma pessoa). */
+export async function searchProfilesByUsername(query: string, excludeUserId?: string): Promise<PublicProfile[]> {
+  const cleaned = query.trim().replace(/^@+/, '');
+  if (!cleaned) return [];
+  return queryPublicProfiles(q => {
+    let request = q.ilike('username', `%${cleaned}%`).limit(10);
+    if (excludeUserId) request = request.neq('id', excludeUserId);
+    return request;
+  });
+}
+
 export async function fetchPublicProfile(userId: string): Promise<PublicProfile | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, nickname, firstName, lastName, username, "photoURL"')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error) handleSupabaseError(error, OperationType.GET, 'profiles');
-  return data as PublicProfile | null;
+  const rows = await queryPublicProfiles(q => q.eq('id', userId).limit(1));
+  return rows[0] ?? null;
 }
 
 // ----------------------------------------------------------------------------
@@ -284,12 +292,7 @@ export async function fetchMySharedPeople(): Promise<Array<{ id: string; userId:
 
 export async function fetchPublicProfiles(ids: string[]): Promise<PublicProfile[]> {
   if (ids.length === 0) return [];
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('id, nickname, firstName, lastName, username, "photoURL"')
-    .in('id', ids);
-  if (error) handleSupabaseError(error, OperationType.LIST, 'profiles');
-  return (data ?? []) as PublicProfile[];
+  return queryPublicProfiles(q => q.in('id', ids));
 }
 
 export async function fetchNotifications(userId: string): Promise<AppNotification[]> {

@@ -143,17 +143,17 @@ alter table public.people enable row level security;
 alter table public.cards enable row level security;
 alter table public.transactions enable row level security;
 
--- Leitura liberada para qualquer usuário autenticado (funciona como um
--- diretório simples, usado para vincular uma pessoa a um usuário existente
--- por nome de usuário). Escrita continua restrita ao próprio perfil.
 drop policy if exists "profiles_owner" on public.profiles;
 drop policy if exists "profiles_read_all" on public.profiles;
 drop policy if exists "profiles_insert_own" on public.profiles;
 drop policy if exists "profiles_update_own" on public.profiles;
 drop policy if exists "profiles_delete_own" on public.profiles;
 
-create policy "profiles_read_all" on public.profiles
-  for select using (auth.role() = 'authenticated');
+-- Cada um lê só o próprio perfil; o diretório sem e-mail fica na view
+-- public_profiles (supabase/profiles_privacy.sql).
+drop policy if exists "profiles_read_own" on public.profiles;
+create policy "profiles_read_own" on public.profiles
+  for select using (id = auth.uid());
 create policy "profiles_insert_own" on public.profiles
   for insert with check (id = auth.uid());
 create policy "profiles_update_own" on public.profiles
