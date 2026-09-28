@@ -2998,12 +2998,37 @@ export default function App() {
   }, [anyOverlayOpen]);
 
   // Com uma tela aberta por cima, o arrasto não pode rolar a página de trás.
+  // Os diálogos já travam a rolagem da página sozinhos. Aqui só garantimos que,
+  // quando nada está aberto, nenhuma trava fique esquecida (acontecia no
+  // celular depois de abrir as notificações).
   const modalOpen = anyOverlayOpen && !showPersonForm && !showCardForm;
   useEffect(() => {
-    if (!modalOpen) return;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = ''; };
+    if (modalOpen) return;
+    const timer = setTimeout(() => {
+      for (const el of [document.documentElement, document.body]) {
+        el.style.overflow = '';
+        el.style.removeProperty('padding-right');
+      }
+    }, 350);
+    return () => clearTimeout(timer);
   }, [modalOpen]);
+
+  // Cada aba guarda a própria posição de rolagem.
+  const tabScrollRef = useRef<Record<string, number>>({});
+  const currentTabRef = useRef(activeTab);
+  useEffect(() => {
+    const onScroll = () => { tabScrollRef.current[currentTabRef.current] = window.scrollY; };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  useEffect(() => {
+    currentTabRef.current = activeTab;
+    const target = tabScrollRef.current[activeTab] ?? 0;
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    // A aba nova só aparece depois da animação de saída da anterior.
+    const timer = setTimeout(() => window.scrollTo({ top: target, behavior: 'auto' }), 260);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
