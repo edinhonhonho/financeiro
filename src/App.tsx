@@ -3732,7 +3732,7 @@ export default function App() {
   // Vai direto para o <body>: dentro das abas (que animam com transform) um
   // `position: fixed` passa a ser relativo à aba e muda de altura conforme a página.
   const floatingMonthPicker = createPortal(
-  <div className="fixed bottom-24 right-6 md:bottom-12 md:right-32 z-30 flex items-center gap-0.5 bg-white dark:bg-[#211E4A] rounded-full p-1.5 shadow-bubbly">
+  <div className="fixed bottom-24 right-6 md:bottom-12 md:right-32 z-30 flex items-center gap-0.5 bg-white dark:bg-[#211E4A] rounded-full p-1.5 border border-slate-200/70 dark:border-white/10 shadow-[0_1px_2px_rgba(60,50,120,0.08),0_4px_12px_-4px_rgba(60,50,120,0.18)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.25),0_4px_12px_-4px_rgba(0,0,0,0.4)]">
     <button
       type="button"
       onClick={prevMonth}
