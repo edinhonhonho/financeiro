@@ -1443,10 +1443,10 @@ export default function App() {
 
   // Gráfico de evolução da fatura (aba Cartões, mobile) — 6 meses do cartão
   // ativo; clicar numa barra seleciona o mês e mostra os itens logo abaixo.
-  const [selectedBillDate, setSelectedBillDate] = useState<Date>(new Date());
+  const [selectedBillDate, setSelectedBillDate] = useState<Date>(currentDate);
   useEffect(() => {
-    if (activeTab === 'cartoes') setSelectedBillDate(new Date());
-  }, [selectedCard, activeTab]);
+    if (activeTab === 'cartoes') setSelectedBillDate(currentDate);
+  }, [selectedCard, activeTab, currentDate]);
 
   const CHART_MONTHS_HISTORY = 24;
   const CHART_BAR_WIDTH = 48;
@@ -1550,10 +1550,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  const [selectedChargeDate, setSelectedChargeDate] = useState<Date>(new Date());
+  // Mês mostrado em Pessoas: acompanha o mês selecionado no app (não o de hoje)
+  // e vale para todos os cards; trocar de pessoa mantém o mês.
+  const [selectedChargeDate, setSelectedChargeDate] = useState<Date>(currentDate);
   useEffect(() => {
-    if (activeTab === 'pessoas') setSelectedChargeDate(new Date());
-  }, [selectedPersonId, activeTab]);
+    if (activeTab === 'pessoas') setSelectedChargeDate(currentDate);
+  }, [activeTab, currentDate]);
 
   const personChargeHistory = useMemo(() => {
     const activePerson = people.find(p => p.id === selectedPersonId) || people[0];
@@ -6683,7 +6685,7 @@ export default function App() {
                       className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pt-1 pb-10 -mb-8 cursor-grab lg:grid lg:grid-cols-2 lg:gap-3 lg:overflow-visible lg:snap-none lg:mx-0 lg:px-0 lg:pt-0 lg:pb-0 lg:mb-0 lg:cursor-default"
                     >
                       {people.map(person => {
-                        const monthCharges = getPersonMonthlyCharges(person.id, currentDate);
+                        const monthCharges = getPersonMonthlyCharges(person.id, selectedChargeDate);
                         const identityLine = personLinkSelected && editingPerson?.id === person.id
                           ? `@${personLinkSelected.username}`
                           : person.linkedUserId ? '@vinculado' : (person.phone || '');
@@ -6721,19 +6723,24 @@ export default function App() {
                                 {identityLine && <p className="text-white/80 text-[11px] truncate max-w-full">{identityLine}</p>}
                               </div>
                               <div className="relative z-10 space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-white/70 text-[10px] tracking-wider">Pendente</span>
-                                  <span className="text-white text-xs font-medium">R$ {monthCharges.pendingTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                  <span className="text-white/70 text-[10px] tracking-wider">Pago</span>
-                                  <span className="text-white text-xs font-medium">R$ {monthCharges.paidTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                                </div>
-                                {monthCharges.payableTotal > 0 && (
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-white/70 text-[10px] tracking-wider">Você paga</span>
-                                    <span className="text-white text-xs font-medium">R$ {monthCharges.payableTotal.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                                  </div>
+                                <p className="text-white/70 text-[10px] tracking-wider capitalize">Em aberto · {format(selectedChargeDate, 'MMM yyyy', { locale: ptBR })}</p>
+                                {monthCharges.pendingTotal === 0 && monthCharges.payablePendingTotal === 0 ? (
+                                  <p className="text-white text-xs font-medium">Nada pendente</p>
+                                ) : (
+                                  <>
+                                    {monthCharges.pendingTotal > 0 && (
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-white/70 text-[10px] tracking-wider">Te deve</span>
+                                        <span className="text-white text-xs font-medium">R$ {monthCharges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                      </div>
+                                    )}
+                                    {monthCharges.payablePendingTotal > 0 && (
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-white/70 text-[10px] tracking-wider">Você deve</span>
+                                        <span className="text-white text-xs font-medium">R$ {monthCharges.payablePendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>
