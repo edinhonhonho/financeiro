@@ -196,7 +196,11 @@ begin
         'Aceitando, você passa a ver as despesas e receitas em que ' || owner_name || ' marcar você. Você pode mudar de ideia depois.',
         consent_row.id, 'consent:' || consent_row.id::text
       );
-    elsif consent_row.status = 'accepted' then
+    end if;
+
+    -- Toda movimentação vinculada avisa a pessoa (inclusive enquanto o pedido
+    -- de compartilhamento está pendente). Só quem recusou não recebe.
+    if consent_row.status <> 'declined' then
       -- Uma série (parcelas / recorrência) gera um único aviso.
       if tg_op = 'INSERT' and exists (
         select 1 from public.notifications n
@@ -222,7 +226,8 @@ begin
       values (
         person."linkedUserId", new."userId", 'assigned',
         owner_name || ' associou uma movimentação a você',
-        new.description || ' — R$ ' || to_char(coalesce(person_amount, new.amount), 'FM999G999G990D00'),
+        new.description || ' — R$ ' || to_char(coalesce(person_amount, new.amount), 'FM999G999G990D00')
+          || case when consent_row.status = 'accepted' then '' else ' · Aceite o pedido de compartilhamento para ver no app.' end,
         new.id, group_key
       );
     end if;
@@ -288,3 +293,6 @@ begin
   end loop;
 end;
 $$;
+
+-- Faz a API do Supabase enxergar as mudanças na hora.
+notify pgrst, 'reload schema';
