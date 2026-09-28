@@ -334,3 +334,9 @@ export async function rejectSharedPayment(transactionId: string, payerUserId: st
   const { error } = await supabase.rpc('reject_shared_payment', { tx: transactionId, payer: payerUserId });
   if (error) handleSupabaseError(error, OperationType.UPDATE, 'transactions');
 }
+
+export async function deleteNotifications(ids: string[]) {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from('notifications').delete().in('id', ids);
+  if (error) handleSupabaseError(error, OperationType.DELETE, 'notifications');
+}

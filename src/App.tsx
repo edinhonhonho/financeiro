@@ -889,6 +889,27 @@ export default function App() {
     }
   };
 
+  /** Notificação que ainda espera uma resposta minha (aceitar/recusar ou confirmar/recusar pagamento). */
+  const notificationNeedsAction = (n: AppNotification) => {
+    if (n.type === 'consent_request') return !n.read;
+    if (n.type === 'payment_signal') {
+      const tx = transactions.find(x => x.id === n.transactionId);
+      return !!tx && tx.status !== 'actual' && !!tx.sharedPaidAt;
+    }
+    return false;
+  };
+  const clearableNotifications = notifications.filter(n => !notificationNeedsAction(n));
+  const clearNotifications = async () => {
+    const ids = clearableNotifications.map(n => n.id);
+    if (ids.length === 0) return;
+    try {
+      await api.deleteNotifications(ids);
+      await loadNotifications();
+    } catch (err) {
+      showAlert('Não foi possível limpar', extractErrorMessage(err));
+    }
+  };
+
   const markAllNotificationsRead = async () => {
     const ids = notifications.filter(n => !n.read).map(n => n.id);
     if (ids.length === 0) return;
@@ -3958,11 +3979,18 @@ export default function App() {
                 <p className="text-lg font-heading font-medium tracking-tight text-slate-800 dark:text-[#EDE9E3]">Notificações</p>
                 <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">Avisos de quem associa movimentações a você</p>
               </div>
-              {notifications.some(n => !n.read) && (
-                <button type="button" onClick={markAllNotificationsRead} className="text-xs font-medium text-primary shrink-0 mt-1">
-                  Marcar todas como lidas
-                </button>
-              )}
+              <div className="flex flex-col items-end gap-1 shrink-0 mt-1">
+                {notifications.some(n => !n.read) && (
+                  <button type="button" onClick={markAllNotificationsRead} className="text-xs font-medium text-primary">
+                    Marcar todas como lidas
+                  </button>
+                )}
+                {clearableNotifications.length > 0 && (
+                  <button type="button" onClick={clearNotifications} className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] hover:text-rose-500 flex items-center gap-1">
+                    <Trash2 size={12} /> Limpar
+                  </button>
+                )}
+              </div>
             </div>
             {notificationsListBody}
           </PopoverContent>
@@ -4739,11 +4767,18 @@ export default function App() {
                 <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Notificações</DialogTitle>
                 <DialogDescription className="text-xs">Avisos de quem associa movimentações a você</DialogDescription>
               </DialogHeader>
-              {notifications.some(n => !n.read) && (
-                <button type="button" onClick={markAllNotificationsRead} className="mt-3 text-xs font-medium text-primary">
-                  Marcar todas como lidas
-                </button>
-              )}
+              <div className="mt-3 flex items-center gap-4">
+                {notifications.some(n => !n.read) && (
+                  <button type="button" onClick={markAllNotificationsRead} className="text-xs font-medium text-primary">
+                    Marcar todas como lidas
+                  </button>
+                )}
+                {clearableNotifications.length > 0 && (
+                  <button type="button" onClick={clearNotifications} className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] flex items-center gap-1">
+                    <Trash2 size={12} /> Limpar
+                  </button>
+                )}
+              </div>
             </div>
             {notificationsListBody}
           </DialogContent>
