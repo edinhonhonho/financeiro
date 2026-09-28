@@ -3001,9 +3001,8 @@ export default function App() {
   const modalOpen = anyOverlayOpen && !showPersonForm && !showCardForm;
   useEffect(() => {
     if (!modalOpen) return;
-    const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previous; };
+    return () => { document.body.style.overflow = ''; };
   }, [modalOpen]);
 
   useEffect(() => {
@@ -4909,18 +4908,18 @@ export default function App() {
         <ImageCropper src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />
 
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-          <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:w-screen sm:max-w-none sm:translate-x-0 sm:rounded-none">
-            <div className="px-6 pt-6 pb-2 shrink-0">
+          <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-[min(920px,92vw)] md:max-w-none md:h-[min(640px,88vh)] md:rounded-[1.75rem] md:shadow-deep md:flex-row">
+            <div className="px-6 pt-6 pb-2 shrink-0 md:w-72 md:p-8 md:border-r md:border-slate-200/70 dark:md:border-white/10 md:flex md:flex-col">
               <DialogHeader className="sr-only">
                 <DialogTitle>Minha conta</DialogTitle>
                 <DialogDescription>{userProfile?.username ? `@${userProfile.username} · ` : ''}{user?.email}</DialogDescription>
               </DialogHeader>
-              <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mb-6">Minha conta</h1>
-              <div className="flex items-center gap-4">
+              <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mb-6 md:text-3xl md:mb-8">Minha conta</h1>
+              <div className="flex items-center gap-4 md:flex-col md:items-start md:gap-3">
                 <button
                   type="button"
                   onClick={() => profileImageInputRef.current?.click()}
-                  className="relative w-14 h-14 rounded-full bg-primary flex items-center justify-center text-white font-medium text-xl shrink-0 overflow-visible"
+                  className="relative w-14 h-14 md:w-24 md:h-24 rounded-full bg-primary flex items-center justify-center text-white font-medium text-xl md:text-3xl shrink-0 overflow-visible"
                   aria-label="Alterar foto de perfil"
                 >
                   <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
@@ -4941,8 +4940,8 @@ export default function App() {
                   accept="image/*"
                   onChange={handleProfileImageChange}
                 />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-800 dark:text-[#EDE9E3] truncate">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
+                <div className="flex-1 min-w-0 md:flex-none md:w-full">
+                  <p className="font-medium text-slate-800 dark:text-[#EDE9E3] truncate md:text-lg">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
                   <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] truncate">
                     {userProfile?.username ? `@${userProfile.username} · ` : ''}{user?.email}
                   </p>
@@ -4957,8 +4956,8 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 md:p-10">
-              <div className="max-w-2xl mx-auto w-full space-y-8">
+            <div className="flex-1 min-h-0 overflow-y-auto p-6 md:p-8">
+              <div className="max-w-2xl mx-auto w-full space-y-8 md:space-y-6">
 
                 <AccountSection label="Gerenciamento">
                   <AccountRow
@@ -5788,7 +5787,7 @@ export default function App() {
               <div className="space-y-6 lg:col-span-8">
                 {movTab === 'movimentacoes' && (
                   <>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-3 lg:hidden">
                       <div className="bg-secondary dark:bg-[#211E4A] shadow-soft rounded-xl p-4">
                         <p className="text-sm font-normal text-emerald-600/70 dark:text-emerald-400/70 truncate">Receita</p>
                         {(() => {
@@ -7541,10 +7540,14 @@ function TransactionItem({
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
   const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-') && !transaction.id.startsWith('person-bill-') && !(transaction.id.startsWith('shared-') && transaction.type === 'income');
+  // No computador não há arrastar: um "check" à direita pede confirmação.
+  const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px) and (pointer: fine)').matches;
+  const [asking, setAsking] = useState(false);
+  const doneLabel = transaction.type === 'income' ? 'recebido' : 'pago';
 
   return (
     <SwipeToConfirm
-      enabled={canConfirm}
+      enabled={canConfirm && !isDesktop}
       actionLabel={transaction.type === 'income' ? 'Recebido' : 'Pago'}
       colorClass={transaction.type === 'income' ? 'bg-emerald-400' : 'bg-primary'}
       onConfirm={() => onQuickConfirm?.()}
@@ -7562,7 +7565,7 @@ function TransactionItem({
             canConfirm ? (
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onQuickConfirm?.(); }}
+                onClick={(e) => { e.stopPropagation(); if (isDesktop) setAsking(true); else onQuickConfirm?.(); }}
                 title={transaction.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
                 className={cn(
                   "w-6 h-6 flex items-center justify-center shrink-0 rounded-full active:scale-90 transition-transform",
@@ -7609,13 +7612,47 @@ function TransactionItem({
             <p className="text-base font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{transaction.description}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
           <p className={cn(
             "font-heading font-medium tracking-tighter whitespace-nowrap text-base",
             transaction.type === 'income' ? "text-emerald-500" : "text-rose-400"
           )}>
             R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
+          {isDesktop && canConfirm && (asking ? (
+            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => { setAsking(false); onQuickConfirm?.(); }}
+                className={cn("h-8 px-3 rounded-full text-xs font-medium text-white flex items-center gap-1", transaction.type === 'income' ? "bg-emerald-500" : "bg-primary")}
+              >
+                <Check size={13} strokeWidth={3} /> Marcar como {doneLabel}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAsking(false)}
+                className="w-8 h-8 rounded-full text-slate-400 dark:text-[#9D99BC] hover:bg-slate-100 dark:hover:bg-[#2A2755] flex items-center justify-center"
+                aria-label="Cancelar"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setAsking(true); }}
+              title={`Marcar como ${doneLabel}`}
+              aria-label={`Marcar como ${doneLabel}`}
+              className="w-6 h-6 rounded-[7px] border-2 border-slate-300 dark:border-[#4B4683] hover:border-primary hover:bg-primary/10 transition-colors flex items-center justify-center text-transparent hover:text-primary"
+            >
+              <Check size={13} strokeWidth={3} />
+            </button>
+          ))}
+          {isDesktop && transaction.status === 'actual' && !!onQuickConfirm && (
+            <span className="w-6 h-6 rounded-[7px] bg-emerald-500 text-white flex items-center justify-center" title={`Já ${doneLabel}`}>
+              <Check size={13} strokeWidth={3} />
+            </span>
+          )}
         </div>
       </div>
     </SwipeToConfirm>
