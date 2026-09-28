@@ -1659,47 +1659,31 @@ export default function App() {
     }
   };
 
+  // Divide em centavos exatos: valores digitados e % entram como estão; o que
+  // sobra é repartido igualmente entre as "partes", sempre truncando para
+  // centavos, e os centavos que sobram vão para a primeira parte da lista.
   const getAssignmentsFromSplits = (total: number, splits: { personId: string; type: 'value' | 'parts' | 'percentage'; value: string }[]) => {
-    const fixedSplits = splits.filter(s => s.type === 'value');
-    const percentSplits = splits.filter(s => s.type === 'percentage');
-    const partSplits = splits.filter(s => s.type === 'parts');
-    
-    const fixedTotal = fixedSplits.reduce((acc, s) => acc + parseCurrency(s.value), 0);
-    const percentTotal = percentSplits.reduce((acc, s) => acc + (total * (Number(s.value.replace(',', '.')) || 0) / 100), 0);
-    
-    const remaining = total - fixedTotal - percentTotal;
-    const totalParts = partSplits.reduce((acc, s) => acc + (Number(s.value) || 0), 0);
-    
-    const partValue = totalParts > 0 ? Math.max(0, remaining / totalParts) : 0;
-
-    const rounded = splits.map(s => {
-      let amount = 0;
-      if (s.type === 'value') {
-        amount = parseCurrency(s.value);
-      } else if (s.type === 'percentage') {
-        amount = total * (Number(s.value.replace(',', '.')) || 0) / 100;
-      } else {
-        amount = (Number(s.value) || 0) * partValue;
-      }
-      return { personId: s.personId, cents: Math.round(amount * 100) };
+    const totalCents = Math.round(total * 100);
+    const cents = splits.map(s => {
+      if (s.type === 'value') return Math.round(parseCurrency(s.value) * 100);
+      if (s.type === 'percentage') return Math.round(totalCents * (Number(s.value.replace(',', '.')) || 0) / 100);
+      return 0;
     });
-
-    // Adjust the last split so the sum matches the total exactly (avoids rounding
-    // drift) — only when there's more than one split. With a single split the
-    // person may deliberately owe less than the full amount (ex: cobrar só 50%,
-    // o resto é por conta de quem lançou); forcing it up to `total` here was the
-    // bug that made a partial single-person split always charge the full value.
-    // O ajuste só cai numa parte "igual" (nunca num valor digitado à mão).
-    const lastPartIndex = splits.map(s => s.type).lastIndexOf('parts');
-    if (rounded.length > 1 && lastPartIndex >= 0) {
-      const totalCents = Math.round(total * 100);
-      const sumCents = rounded.reduce((acc, r) => acc + r.cents, 0);
-      if (sumCents !== totalCents) {
-        rounded[lastPartIndex].cents += totalCents - sumCents;
-      }
+    const fixedCents = cents.reduce((acc, c) => acc + c, 0);
+    const remainingCents = Math.max(0, totalCents - fixedCents);
+    const partWeights = splits.map(s => (s.type === 'parts' ? Math.max(0, Number(s.value) || 0) : 0));
+    const totalParts = partWeights.reduce((acc, w) => acc + w, 0);
+    if (totalParts > 0) {
+      let given = 0;
+      partWeights.forEach((w, idx) => {
+        if (w <= 0) return;
+        cents[idx] = Math.floor((remainingCents * w) / totalParts);
+        given += cents[idx];
+      });
+      const firstPart = partWeights.findIndex(w => w > 0);
+      cents[firstPart] += remainingCents - given;
     }
-
-    return rounded.map(r => ({ personId: r.personId, amount: r.cents / 100 }));
+    return splits.map((s, idx) => ({ personId: s.personId, amount: cents[idx] / 100 }));
   };
 
   // Foto escolhida aguardando enquadramento (pessoa ou perfil).
@@ -1833,7 +1817,7 @@ export default function App() {
     // "Total da compra" no parcelado: cada parcela é o total dividido; os
     // centavos que sobram vão para a primeira parcela.
     const splitTotal = !editingTransaction && isInstallment && installmentValueMode === 'total' && installmentCount > 1;
-    const amount = splitTotal ? Math.floor((enteredAmount * 100) / installmentCount) / 100 : enteredAmount;
+    const amount = splitTotal ? Math.floor(Math.round(enteredAmount * 100) / installmentCount) / 100 : enteredAmount;
     if (!newTransaction.description) {
       showAlert("Descrição necessária", "Por favor, informe a descrição do lançamento.");
       return;
@@ -2277,9 +2261,22 @@ export default function App() {
         });
 
         if (splitTotal) {
-          const leftover = Math.round((enteredAmount - amount * installmentCount) * 100) / 100;
+          const leftoverCents = Math.round(enteredAmount * 100) - Math.round(amount * 100) * installmentCount;
           const firstParcel = rows.find(r => !r.linkedToCard && r.installments?.current === 1);
-          if (firstParcel && leftover > 0) firstParcel.amount = Math.round((firstParcel.amount + leftover) * 100) / 100;
+          if (firstParcel && leftoverCents > 0) {
+            firstParcel.amount = (Math.round(firstParcel.amount * 100) + leftoverCents) / 100;
+            // A divisão com pessoas da 1ª parcela acompanha o valor maior.
+            if (firstParcel.assignments && firstParcel.assignments.length > 0) {
+              const firstShares = computeShareAssignments(firstParcel.amount);
+              firstParcel.assignments = firstShares;
+              rows.forEach(r => {
+                if (r.linkedToCard && r.linkedTransactionId === firstParcel.id) {
+                  const share = firstShares.find(a => a.personId === r.payerPayee);
+                  if (share) r.amount = share.amount;
+                }
+              });
+            }
+          }
         }
 
         await api.insertTransactions(rows);
@@ -3475,7 +3472,9 @@ export default function App() {
 
   const repeatSection = (() => {
     const entered = parseCurrency(amountInput);
-    const perParcel = installmentValueMode === 'total' && !editingTransaction ? entered / repeatCount : entered;
+    const totalMode = installmentValueMode === 'total' && !editingTransaction;
+    const perParcel = totalMode ? Math.floor(Math.round(entered * 100) / repeatCount) / 100 : entered;
+    const firstParcelExtra = totalMode ? (Math.round(entered * 100) - Math.round(perParcel * 100) * repeatCount) / 100 : 0;
     const startDate = newTransaction.date || format(new Date(), 'yyyy-MM-dd');
     const chip = (active: boolean) => cn(
       "h-8 px-3 rounded-full text-xs font-medium transition-all whitespace-nowrap",
@@ -3516,7 +3515,9 @@ export default function App() {
                   <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{repeatKind === 2 ? 'Parcelas' : 'Meses'}</p>
                   <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">
                     {repeatKind === 2
-                      ? `${repeatCount}x de ${brlFmt(perParcel)} · total ${brlFmt(perParcel * repeatCount)}`
+                      ? (firstParcelExtra > 0
+                        ? `1ª de ${brlFmt(perParcel + firstParcelExtra)} + ${repeatCount - 1}x de ${brlFmt(perParcel)} · total ${brlFmt(entered)}`
+                        : `${repeatCount}x de ${brlFmt(perParcel)} · total ${brlFmt(perParcel * repeatCount)}`)
                       : `Até ${format(addMonths(parseISO(startDate), repeatCount - 1), "MMM 'de' yyyy", { locale: ptBR })}`}
                   </p>
                 </div>
