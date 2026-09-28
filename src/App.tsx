@@ -103,7 +103,7 @@ import {
   XAxis,
   YAxis
 } from 'recharts';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth, getDaysInMonth, startOfDay } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth, getDaysInMonth, startOfDay, formatDistanceToNowStrict } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Papa from 'papaparse';
 
@@ -4601,81 +4601,120 @@ export default function App() {
 
         <Dialog open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
           <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E] max-h-[85vh] flex flex-col">
-            <div className="p-6 pb-3 shrink-0 flex items-start justify-between gap-3">
+            <div className="p-6 pb-3 pr-14 shrink-0">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Notificações</DialogTitle>
                 <DialogDescription className="text-xs">Avisos de quem associa movimentações a você</DialogDescription>
               </DialogHeader>
               {notifications.some(n => !n.read) && (
-                <button type="button" onClick={markAllNotificationsRead} className="text-xs font-medium text-primary shrink-0 mt-1">
-                  Marcar como lidas
+                <button type="button" onClick={markAllNotificationsRead} className="mt-3 text-xs font-medium text-primary">
+                  Marcar todas como lidas
                 </button>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-2 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-2.5 scrollbar-hide">
               {notifications.length === 0 ? (
                 <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-10">Você não tem notificações.</p>
-              ) : notifications.map(n => (
-                <div key={n.id} className={cn("rounded-2xl p-4 space-y-2 bg-card shadow-soft", !n.read && "ring-1 ring-primary/30")}>
-                  <div className="flex items-start gap-3">
-                    <span className={cn("mt-1.5 w-2 h-2 rounded-full shrink-0", n.read ? "bg-transparent" : "bg-primary")} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{n.title}</p>
-                      {n.body && <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">{n.body}</p>}
-                      <p className="text-[10px] font-normal text-slate-300 dark:text-[#6B679C] mt-1">
-                        {format(parseISO(n.createdAt), "dd/MM 'às' HH:mm", { locale: ptBR })}
+              ) : notifications.map(n => {
+                const sender = people.find(pp => pp.linkedUserId && pp.linkedUserId === n.fromUserId);
+                const action = n.type === 'payment_signal' ? 'avisou que já pagou'
+                  : n.type === 'assigned' ? 'associou uma movimentação a você'
+                  : n.type === 'consent_request' ? 'quer associar movimentações a você'
+                  : n.title.includes(' aceitou') ? 'aceitou o compartilhamento' : 'recusou o compartilhamento';
+                const senderName = sender?.name
+                  || n.title.replace(/ (disse que já pagou|associou .*|quer associar .*|aceitou .*|recusou .*)$/, '')
+                  || 'Alguém';
+                // Movimentação da notificação: a minha (quando me avisaram que pagaram)
+                // ou a espelhada (quando alguém me associou a uma dela).
+                const tx = n.transactionId
+                  ? transactions.find(x => x.id === n.transactionId) || transactions.find(x => x.id === `shared-${n.transactionId}`)
+                  : undefined;
+                const TypeIcon = n.type === 'payment_signal' ? CheckCircle2 : n.type === 'assigned' ? ArrowLeftRight : n.type === 'consent_request' ? Users : UserCheck;
+                return (
+                  <div key={n.id} className={cn("rounded-[1.5rem] p-4 space-y-3 bg-card shadow-soft", !n.read && "ring-1 ring-primary/30")}>
+                    <div className="flex items-center gap-3">
+                      <div className="relative shrink-0">
+                        {sender?.image ? (
+                          <img src={sender.image} alt="" className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-sm">{senderName.charAt(0).toUpperCase()}</div>
+                        )}
+                        <span className={cn(
+                          "absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white dark:border-[#100E3D] flex items-center justify-center text-white",
+                          n.type === 'payment_signal' ? "bg-emerald-500" : "bg-primary"
+                        )}>
+                          <TypeIcon size={10} strokeWidth={3} />
+                        </span>
+                      </div>
+                      <p className="flex-1 min-w-0 text-sm leading-snug text-slate-500 dark:text-[#A8A4CC]">
+                        <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{senderName}</span> {action}
                       </p>
+                      <div className="flex items-center gap-1.5 shrink-0 self-start mt-0.5">
+                        <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] whitespace-nowrap">
+                          {formatDistanceToNowStrict(parseISO(n.createdAt), { locale: ptBR, addSuffix: true })}
+                        </span>
+                        {!n.read && <span className="w-2 h-2 rounded-full bg-primary" aria-label="Não lida" />}
+                      </div>
                     </div>
-                  </div>
-                  {n.type === 'payment_signal' && (() => {
-                    const tx = transactions.find(x => x.id === n.transactionId);
-                    if (!tx) return null;
-                    const reference = (
-                      <p className="text-[11px] font-medium text-slate-500 dark:text-[#A8A4CC] pl-5">
-                        Referente a {monthLabel(getTransactionEffectiveMonth(tx)).toLowerCase()}
-                        {tx.installments ? ` · parcela ${tx.installments.current}/${tx.installments.total}` : tx.recurrence !== 'none' || tx.seriesId ? ' · recorrente' : ''}
+
+                    {tx ? (
+                      <div className="rounded-2xl bg-slate-50 dark:bg-[#16133F] px-4 py-3 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{tx.description.split(' · ')[0]}</p>
+                          <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">
+                            {monthLabel(getTransactionEffectiveMonth(tx))}
+                            {tx.installments ? ` · parcela ${tx.installments.current}/${tx.installments.total}` : (tx.recurrence !== 'none' || tx.seriesId) ? ' · recorrente' : ''}
+                          </p>
+                        </div>
+                        <p className="font-heading font-medium text-base tracking-tight text-slate-800 dark:text-[#EDE9E3] whitespace-nowrap shrink-0">
+                          R$ {tx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    ) : n.body ? (
+                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">{n.body}</p>
+                    ) : null}
+
+                    {n.type === 'payment_signal' && tx && (tx.status === 'actual' ? (
+                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                        <Check size={14} strokeWidth={2.5} /> Recebimento confirmado
                       </p>
-                    );
-                    if (tx.status === 'actual') return <>{reference}<p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 pl-5">Recebimento confirmado</p></>;
-                    return (
-                      <div className="pl-5 space-y-2">
-                        <div className="-ml-5">{reference}</div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handleConfirmTransaction(tx.id, tx.amount, format(new Date(), 'yyyy-MM-dd'), tx.date);
+                          await api.markNotificationsRead([n.id]);
+                          await loadNotifications();
+                        }}
+                        className="w-full h-10 rounded-full bg-emerald-500 text-white text-xs font-medium active:scale-95 transition-all"
+                      >
+                        Confirmar recebimento
+                      </button>
+                    ))}
+
+                    {n.type === 'consent_request' && !n.read && (
+                      <div className="flex gap-2">
                         <button
                           type="button"
-                          onClick={async () => {
-                            await handleConfirmTransaction(tx.id, tx.amount, format(new Date(), 'yyyy-MM-dd'), tx.date);
-                            await api.markNotificationsRead([n.id]);
-                            await loadNotifications();
-                          }}
-                          className="w-full h-10 rounded-full bg-emerald-500 text-white text-xs font-medium"
+                          disabled={respondingConsentId === n.consentId}
+                          onClick={() => handleConsentResponse(n, 'accepted')}
+                          className="flex-1 h-10 rounded-full bg-primary text-white text-xs font-medium disabled:opacity-50"
                         >
-                          Confirmar recebimento
+                          Aceitar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={respondingConsentId === n.consentId}
+                          onClick={() => handleConsentResponse(n, 'declined')}
+                          className="flex-1 h-10 rounded-full bg-secondary text-secondary-foreground text-xs font-medium disabled:opacity-50"
+                        >
+                          Recusar
                         </button>
                       </div>
-                    );
-                  })()}
-                  {n.type === 'consent_request' && !n.read && (
-                    <div className="flex gap-2 pl-5">
-                      <button
-                        type="button"
-                        disabled={respondingConsentId === n.consentId}
-                        onClick={() => handleConsentResponse(n, 'accepted')}
-                        className="flex-1 h-10 rounded-full bg-primary text-white text-xs font-medium disabled:opacity-50"
-                      >
-                        Aceitar
-                      </button>
-                      <button
-                        type="button"
-                        disabled={respondingConsentId === n.consentId}
-                        onClick={() => handleConsentResponse(n, 'declined')}
-                        className="flex-1 h-10 rounded-full bg-secondary text-secondary-foreground text-xs font-medium disabled:opacity-50"
-                      >
-                        Recusar
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </DialogContent>
         </Dialog>
