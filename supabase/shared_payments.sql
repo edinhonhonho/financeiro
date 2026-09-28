@@ -52,3 +52,54 @@ grant execute on function public.signal_shared_payment(uuid) to authenticated;
 
 -- Faz a API do Supabase enxergar a função nova na hora.
 notify pgrst, 'reload schema';
+
+-- ----------------------------------------------------------------------------
+-- "Não reconheço este pagamento": quem criou recusa o aviso de pagamento.
+-- Limpa o "já paguei" e avisa quem tinha informado o pagamento.
+-- ----------------------------------------------------------------------------
+
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in ('consent_request', 'assigned', 'consent_response', 'payment_signal', 'payment_rejected'));
+
+create or replace function public.reject_shared_payment(tx uuid, payer uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  t public.transactions;
+  owner_name text;
+begin
+  select * into t from public.transactions where id = tx;
+  if t.id is null or t."userId" <> auth.uid() then
+    raise exception 'Movimentação não encontrada';
+  end if;
+  if not exists (
+    select 1 from public.notifications n
+    where n."userId" = auth.uid() and n."fromUserId" = payer and n."transactionId" = tx and n.type = 'payment_signal'
+  ) then
+    raise exception 'Nenhum aviso de pagamento dessa pessoa para esta movimentação';
+  end if;
+
+  update public.transactions set "sharedPaidAt" = null where id = tx;
+  update public.notifications set read = true
+    where "userId" = auth.uid() and "transactionId" = tx and type = 'payment_signal';
+
+  select coalesce(nullif(pr.nickname, ''), pr."firstName", 'Alguém') into owner_name
+  from public.profiles pr where pr.id = auth.uid();
+
+  insert into public.notifications ("userId", "fromUserId", type, title, body, "transactionId", "groupKey")
+  values (
+    payer, auth.uid(), 'payment_rejected',
+    coalesce(owner_name, 'Alguém') || ' não reconheceu seu pagamento',
+    t.description || ' — R$ ' || to_char(t.amount, 'FM999G999G990D00') || ' · continua em aberto',
+    t.id, 'rejected:' || t.id::text || ':' || extract(epoch from now())::bigint
+  );
+end;
+$$;
+
+grant execute on function public.reject_shared_payment(uuid, uuid) to authenticated;
+
+notify pgrst, 'reload schema';

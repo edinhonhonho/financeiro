@@ -3831,18 +3831,19 @@ export default function App() {
       ) : notifications.map(n => {
         const sender = people.find(pp => pp.linkedUserId && pp.linkedUserId === n.fromUserId);
         const action = n.type === 'payment_signal' ? 'avisou que já pagou'
+          : n.type === 'payment_rejected' ? 'não reconheceu seu pagamento'
           : n.type === 'assigned' ? 'associou uma movimentação a você'
           : n.type === 'consent_request' ? 'quer associar movimentações a você'
           : n.title.includes(' aceitou') ? 'aceitou o compartilhamento' : 'recusou o compartilhamento';
         const senderName = sender?.name
-          || n.title.replace(/ (disse que já pagou|associou .*|quer associar .*|aceitou .*|recusou .*)$/, '')
+          || n.title.replace(/ (disse que já pagou|não reconheceu .*|associou .*|quer associar .*|aceitou .*|recusou .*)$/, '')
           || 'Alguém';
         // Movimentação da notificação: a minha (quando me avisaram que pagaram)
         // ou a espelhada (quando alguém me associou a uma dela).
         const tx = n.transactionId
           ? transactions.find(x => x.id === n.transactionId) || transactions.find(x => x.id === `shared-${n.transactionId}`)
           : undefined;
-        const TypeIcon = n.type === 'payment_signal' ? CheckCircle2 : n.type === 'assigned' ? ArrowLeftRight : n.type === 'consent_request' ? Users : UserCheck;
+        const TypeIcon = n.type === 'payment_signal' ? CheckCircle2 : n.type === 'payment_rejected' ? X : n.type === 'assigned' ? ArrowLeftRight : n.type === 'consent_request' ? Users : UserCheck;
         return (
           <div key={n.id} className={cn("rounded-[1.5rem] p-4 space-y-3 bg-card shadow-soft", !n.read && "ring-1 ring-primary/30")}>
             <div className="flex items-center gap-3">
@@ -3854,7 +3855,7 @@ export default function App() {
                 )}
                 <span className={cn(
                   "absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white dark:border-[#211E4A] flex items-center justify-center text-white",
-                  n.type === 'payment_signal' ? "bg-emerald-500" : "bg-primary"
+                  n.type === 'payment_signal' ? "bg-emerald-500" : n.type === 'payment_rejected' ? "bg-rose-500" : "bg-primary"
                 )}>
                   <TypeIcon size={10} strokeWidth={3} />
                 </span>
@@ -3891,19 +3892,49 @@ export default function App() {
               <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                 <Check size={14} strokeWidth={2.5} /> Recebimento confirmado
               </p>
+            ) : !tx.sharedPaidAt && n.read ? (
+              <p className="text-xs font-medium text-rose-500 dark:text-rose-400 flex items-center gap-1.5">
+                <X size={14} strokeWidth={2.5} /> Pagamento não reconhecido · {senderName.split(' ')[0]} foi avisado(a)
+              </p>
             ) : (
-              <button
-                type="button"
-                onClick={async () => {
-                  await handleConfirmTransaction(tx.id, tx.amount, format(new Date(), 'yyyy-MM-dd'), tx.date);
-                  await api.markNotificationsRead([n.id]);
-                  await loadNotifications();
-                }}
-                className="w-full h-10 rounded-full bg-emerald-500 text-white text-xs font-medium active:scale-95 transition-all"
-              >
-                Confirmar recebimento
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!n.fromUserId) return;
+                    try {
+                      await api.rejectSharedPayment(tx.id, n.fromUserId);
+                      await Promise.all([loadNotifications(), loadTransactions()]);
+                    } catch (err) {
+                      const message = extractErrorMessage(err);
+                      showAlert('Não foi possível recusar', /reject_shared_payment|schema cache/i.test(message)
+                        ? 'Falta configurar o banco: rode de novo o arquivo supabase/shared_payments.sql no SQL Editor do Supabase.'
+                        : message);
+                    }
+                  }}
+                  className="flex-1 h-10 rounded-full bg-rose-500/10 text-rose-500 dark:text-rose-400 text-xs font-medium active:scale-95 transition-all"
+                >
+                  Não reconheço
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleConfirmTransaction(tx.id, tx.amount, format(new Date(), 'yyyy-MM-dd'), tx.date);
+                    await api.markNotificationsRead([n.id]);
+                    await loadNotifications();
+                  }}
+                  className="flex-1 h-10 rounded-full bg-emerald-500 text-white text-xs font-medium active:scale-95 transition-all"
+                >
+                  Confirmar recebimento
+                </button>
+              </div>
             ))}
+
+            {n.type === 'payment_rejected' && (
+              <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">
+                A movimentação voltou a ficar em aberto. Se você já pagou, fale com {senderName.split(' ')[0]} e avise de novo quando estiver resolvido.
+              </p>
+            )}
 
             {n.type === 'consent_request' && !n.read && (
               <div className="flex gap-2">
@@ -6775,20 +6806,38 @@ export default function App() {
                             const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                             const hasAny = charges.items.length > 0 || charges.payableItems.length > 0;
                             const hasPending = charges.pending.length > 0 || charges.payablePending.length > 0;
-                            const renderList = (list: typeof charges.items) => (
-                              <div className="space-y-2">
-                                {list.map(t => (
-                                  <div key={t.id}>
-                                    <TransactionItem
-                                      transaction={t}
-                                      onClick={() => handleTransactionClick(t)}
-                                      hideStatus
-                                      categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
-                                    />
-                                  </div>
-                                ))}
-                              </div>
-                            );
+                            // Pendentes primeiro (são o que forma o saldo); os já quitados
+                            // ficam embaixo, marcados e esmaecidos.
+                            const renderList = (list: typeof charges.items, owedToMe: boolean) => {
+                              const pendingList = list.filter(t => t.status !== 'actual');
+                              const doneList = list.filter(t => t.status === 'actual');
+                              const row = (t: typeof list[number]) => (
+                                <div key={t.id} className={cn("relative", t.status === 'actual' && "opacity-60")}>
+                                  <TransactionItem
+                                    transaction={t}
+                                    onClick={() => handleTransactionClick(t)}
+                                    hideStatus
+                                    categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
+                                    statusBadge={t.status === 'actual'
+                                      ? { label: owedToMe ? 'Recebido' : 'Pago', tone: 'done' }
+                                      : t.sharedPaidAt
+                                        ? { label: 'Aguardando confirmação', tone: 'waiting' }
+                                        : { label: 'Em aberto', tone: 'open' }}
+                                  />
+                                </div>
+                              );
+                              return (
+                                <div className="space-y-2">
+                                  {pendingList.map(row)}
+                                  {doneList.length > 0 && (
+                                    <p className="text-[11px] font-medium text-slate-400 dark:text-[#9D99BC] ml-2 pt-2">
+                                      Já {owedToMe ? 'recebido' : 'pago'} · {doneList.length} {doneList.length === 1 ? 'item' : 'itens'} (fora do saldo)
+                                    </p>
+                                  )}
+                                  {doneList.map(row)}
+                                </div>
+                              );
+                            };
                             return (
                               <div className="space-y-5">
                                 <div className="bg-card rounded-[1.75rem] shadow-soft p-5 space-y-3">
@@ -6858,14 +6907,14 @@ export default function App() {
                                 {charges.items.length > 0 && (
                                   <div className="space-y-3">
                                     <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest ml-2">{firstName} te deve</p>
-                                    {renderList(charges.items)}
+                                    {renderList(charges.items, true)}
                                   </div>
                                 )}
 
                                 {charges.payableItems.length > 0 && (
                                   <div className="space-y-3">
                                     <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest ml-2">Você deve a {firstName}</p>
-                                    {renderList(charges.payableItems)}
+                                    {renderList(charges.payableItems, false)}
                                   </div>
                                 )}
                               </div>
@@ -7551,7 +7600,8 @@ function TransactionItem({
   onQuickConfirm,
   hideDate = false,
   hideStatus = false,
-  categoryIcon
+  categoryIcon,
+  statusBadge
 }: {
   transaction: Transaction,
   personName?: string,
@@ -7560,7 +7610,8 @@ function TransactionItem({
   onQuickConfirm?: () => void,
   hideDate?: boolean,
   hideStatus?: boolean,
-  categoryIcon?: string
+  categoryIcon?: string,
+  statusBadge?: { label: string; tone: 'done' | 'open' | 'waiting' }
 }) {
   const formattedDate = format(parseISO(transaction.date), 'dd/MM/yyyy', { locale: ptBR });
   const canConfirm = !!onQuickConfirm && transaction.status !== 'actual' && !transaction.id.startsWith('bill-') && !transaction.id.startsWith('person-bill-') && !(transaction.id.startsWith('shared-') && transaction.type === 'income');
@@ -7631,6 +7682,17 @@ function TransactionItem({
               )}
               {transaction.linkedToCard && (
                 <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 shrink-0">· vinculado</span>
+              )}
+              {statusBadge && (
+                <span className={cn(
+                  "text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 flex items-center gap-0.5",
+                  statusBadge.tone === 'done' && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+                  statusBadge.tone === 'open' && "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+                  statusBadge.tone === 'waiting' && "bg-primary/15 text-primary"
+                )}>
+                  {statusBadge.tone === 'done' && <Check size={10} strokeWidth={3} />}
+                  {statusBadge.label}
+                </span>
               )}
             </div>
             <p className="text-base font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{transaction.description}</p>

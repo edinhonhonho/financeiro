@@ -328,3 +328,9 @@ export async function signalSharedPayment(transactionId: string) {
   const { error } = await supabase.rpc('signal_shared_payment', { tx: transactionId });
   if (error) handleSupabaseError(error, OperationType.UPDATE, 'transactions');
 }
+
+/** Quem criou a movimentação não reconhece o "já paguei": volta a ficar em aberto e a pessoa é avisada. */
+export async function rejectSharedPayment(transactionId: string, payerUserId: string) {
+  const { error } = await supabase.rpc('reject_shared_payment', { tx: transactionId, payer: payerUserId });
+  if (error) handleSupabaseError(error, OperationType.UPDATE, 'transactions');
+}

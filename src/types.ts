@@ -100,7 +100,7 @@ export interface AppNotification {
   id: string;
   userId: string;
   fromUserId?: string | null;
-  type: 'consent_request' | 'assigned' | 'consent_response' | 'payment_signal';
+  type: 'consent_request' | 'assigned' | 'consent_response' | 'payment_signal' | 'payment_rejected';
   title: string;
   body?: string | null;
   transactionId?: string | null;
