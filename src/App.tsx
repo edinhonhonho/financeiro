@@ -3799,6 +3799,114 @@ export default function App() {
     document.body
   );
 
+  const isDesktopView = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+  const notificationsListBody = (
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-6 pb-6 space-y-2.5" style={{ WebkitOverflowScrolling: 'touch' }}>
+      {notifications.length === 0 ? (
+        <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA] text-center py-10">Você não tem notificações.</p>
+      ) : notifications.map(n => {
+        const sender = people.find(pp => pp.linkedUserId && pp.linkedUserId === n.fromUserId);
+        const action = n.type === 'payment_signal' ? 'avisou que já pagou'
+          : n.type === 'assigned' ? 'associou uma movimentação a você'
+          : n.type === 'consent_request' ? 'quer associar movimentações a você'
+          : n.title.includes(' aceitou') ? 'aceitou o compartilhamento' : 'recusou o compartilhamento';
+        const senderName = sender?.name
+          || n.title.replace(/ (disse que já pagou|associou .*|quer associar .*|aceitou .*|recusou .*)$/, '')
+          || 'Alguém';
+        // Movimentação da notificação: a minha (quando me avisaram que pagaram)
+        // ou a espelhada (quando alguém me associou a uma dela).
+        const tx = n.transactionId
+          ? transactions.find(x => x.id === n.transactionId) || transactions.find(x => x.id === `shared-${n.transactionId}`)
+          : undefined;
+        const TypeIcon = n.type === 'payment_signal' ? CheckCircle2 : n.type === 'assigned' ? ArrowLeftRight : n.type === 'consent_request' ? Users : UserCheck;
+        return (
+          <div key={n.id} className={cn("rounded-[1.5rem] p-4 space-y-3 bg-card shadow-soft", !n.read && "ring-1 ring-primary/30")}>
+            <div className="flex items-center gap-3">
+              <div className="relative shrink-0">
+                {sender?.image ? (
+                  <img src={sender.image} alt="" className="w-10 h-10 rounded-full object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-sm">{senderName.charAt(0).toUpperCase()}</div>
+                )}
+                <span className={cn(
+                  "absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white dark:border-[#211E4A] flex items-center justify-center text-white",
+                  n.type === 'payment_signal' ? "bg-emerald-500" : "bg-primary"
+                )}>
+                  <TypeIcon size={10} strokeWidth={3} />
+                </span>
+              </div>
+              <p className="flex-1 min-w-0 text-sm leading-snug text-slate-500 dark:text-[#A8A4CC]">
+                <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{senderName}</span> {action}
+              </p>
+              <div className="flex items-center gap-1.5 shrink-0 self-start mt-0.5">
+                <span className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC] whitespace-nowrap">
+                  {formatDistanceToNowStrict(parseISO(n.createdAt), { locale: ptBR, addSuffix: true })}
+                </span>
+                {!n.read && <span className="w-2 h-2 rounded-full bg-primary" aria-label="Não lida" />}
+              </div>
+            </div>
+
+            {tx ? (
+              <div className="rounded-2xl bg-slate-50 dark:bg-[#2A2755] px-4 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{tx.description.split(' · ')[0]}</p>
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">
+                    {monthLabel(getTransactionEffectiveMonth(tx))}
+                    {tx.installments ? ` · parcela ${tx.installments.current}/${tx.installments.total}` : (tx.recurrence !== 'none' || tx.seriesId) ? ' · recorrente' : ''}
+                  </p>
+                </div>
+                <p className="font-heading font-medium text-base tracking-tight text-slate-800 dark:text-[#EDE9E3] whitespace-nowrap shrink-0">
+                  R$ {tx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            ) : n.body ? (
+              <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">{n.body}</p>
+            ) : null}
+
+            {n.type === 'payment_signal' && tx && (tx.status === 'actual' ? (
+              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                <Check size={14} strokeWidth={2.5} /> Recebimento confirmado
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={async () => {
+                  await handleConfirmTransaction(tx.id, tx.amount, format(new Date(), 'yyyy-MM-dd'), tx.date);
+                  await api.markNotificationsRead([n.id]);
+                  await loadNotifications();
+                }}
+                className="w-full h-10 rounded-full bg-emerald-500 text-white text-xs font-medium active:scale-95 transition-all"
+              >
+                Confirmar recebimento
+              </button>
+            ))}
+
+            {n.type === 'consent_request' && !n.read && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={respondingConsentId === n.consentId}
+                  onClick={() => handleConsentResponse(n, 'accepted')}
+                  className="flex-1 h-10 rounded-full bg-primary text-white text-xs font-medium disabled:opacity-50"
+                >
+                  Aceitar
+                </button>
+                <button
+                  type="button"
+                  disabled={respondingConsentId === n.consentId}
+                  onClick={() => handleConsentResponse(n, 'declined')}
+                  className="flex-1 h-10 rounded-full bg-secondary text-secondary-foreground text-xs font-medium disabled:opacity-50"
+                >
+                  Recusar
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
   // Cabeçalho mobile compartilhado (foto + "Oi, Nome!" + calendário + notificações),
   // igual em toda página — dispensa qualquer controle de mês flutuante à parte.
   const mobileTopHeader = (
@@ -3828,19 +3936,39 @@ export default function App() {
         >
           <CalendarIcon size={18} />
         </button>
-        <button
-          type="button"
-          onClick={() => setIsNotificationsOpen(true)}
-          className="relative w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
-          aria-label="Notificações"
-        >
-          <Bell size={18} />
-          {notifications.some(n => !n.read) && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-400 text-white text-[10px] font-medium flex items-center justify-center">
-              {notifications.filter(n => !n.read).length}
-            </span>
-          )}
-        </button>
+        <Popover open={isNotificationsOpen && isDesktopView} onOpenChange={setIsNotificationsOpen}>
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                onClick={() => { if (!isDesktopView) setIsNotificationsOpen(true); }}
+                className="relative w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
+                aria-label="Notificações"
+              >
+                <Bell size={18} />
+                {notifications.some(n => !n.read) && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-400 text-white text-[10px] font-medium flex items-center justify-center">
+                    {notifications.filter(n => !n.read).length}
+                  </span>
+                )}
+              </button>
+            }
+          />
+          <PopoverContent align="end" sideOffset={10} className="w-[420px] max-h-[min(640px,80vh)] p-0 gap-0 rounded-[1.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] ring-1 ring-slate-200/70 dark:ring-white/10 overflow-hidden flex flex-col">
+            <div className="px-6 pt-5 pb-3 shrink-0 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-lg font-heading font-medium tracking-tight text-slate-800 dark:text-[#EDE9E3]">Notificações</p>
+                <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">Avisos de quem associa movimentações a você</p>
+              </div>
+              {notifications.some(n => !n.read) && (
+                <button type="button" onClick={markAllNotificationsRead} className="text-xs font-medium text-primary shrink-0 mt-1">
+                  Marcar todas como lidas
+                </button>
+              )}
+            </div>
+            {notificationsListBody}
+          </PopoverContent>
+        </Popover>
       </div>
     </div>
   );
@@ -4608,7 +4736,7 @@ export default function App() {
           icon={<Users />}
         />
 
-        <Dialog open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+        <Dialog open={isNotificationsOpen && !isDesktopView} onOpenChange={setIsNotificationsOpen}>
           <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] h-[85dvh] sm:h-auto sm:max-h-[85vh] flex flex-col">
             <div className="p-6 pb-3 pr-14 shrink-0">
               <DialogHeader>
@@ -4621,110 +4749,7 @@ export default function App() {
                 </button>
               )}
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-6 pb-6 space-y-2.5" style={{ WebkitOverflowScrolling: 'touch' }}>
-              {notifications.length === 0 ? (
-                <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA] text-center py-10">Você não tem notificações.</p>
-              ) : notifications.map(n => {
-                const sender = people.find(pp => pp.linkedUserId && pp.linkedUserId === n.fromUserId);
-                const action = n.type === 'payment_signal' ? 'avisou que já pagou'
-                  : n.type === 'assigned' ? 'associou uma movimentação a você'
-                  : n.type === 'consent_request' ? 'quer associar movimentações a você'
-                  : n.title.includes(' aceitou') ? 'aceitou o compartilhamento' : 'recusou o compartilhamento';
-                const senderName = sender?.name
-                  || n.title.replace(/ (disse que já pagou|associou .*|quer associar .*|aceitou .*|recusou .*)$/, '')
-                  || 'Alguém';
-                // Movimentação da notificação: a minha (quando me avisaram que pagaram)
-                // ou a espelhada (quando alguém me associou a uma dela).
-                const tx = n.transactionId
-                  ? transactions.find(x => x.id === n.transactionId) || transactions.find(x => x.id === `shared-${n.transactionId}`)
-                  : undefined;
-                const TypeIcon = n.type === 'payment_signal' ? CheckCircle2 : n.type === 'assigned' ? ArrowLeftRight : n.type === 'consent_request' ? Users : UserCheck;
-                return (
-                  <div key={n.id} className={cn("rounded-[1.5rem] p-4 space-y-3 bg-card shadow-soft", !n.read && "ring-1 ring-primary/30")}>
-                    <div className="flex items-center gap-3">
-                      <div className="relative shrink-0">
-                        {sender?.image ? (
-                          <img src={sender.image} alt="" className="w-10 h-10 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-sm">{senderName.charAt(0).toUpperCase()}</div>
-                        )}
-                        <span className={cn(
-                          "absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white dark:border-[#211E4A] flex items-center justify-center text-white",
-                          n.type === 'payment_signal' ? "bg-emerald-500" : "bg-primary"
-                        )}>
-                          <TypeIcon size={10} strokeWidth={3} />
-                        </span>
-                      </div>
-                      <p className="flex-1 min-w-0 text-sm leading-snug text-slate-500 dark:text-[#A8A4CC]">
-                        <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{senderName}</span> {action}
-                      </p>
-                      <div className="flex items-center gap-1.5 shrink-0 self-start mt-0.5">
-                        <span className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC] whitespace-nowrap">
-                          {formatDistanceToNowStrict(parseISO(n.createdAt), { locale: ptBR, addSuffix: true })}
-                        </span>
-                        {!n.read && <span className="w-2 h-2 rounded-full bg-primary" aria-label="Não lida" />}
-                      </div>
-                    </div>
-
-                    {tx ? (
-                      <div className="rounded-2xl bg-slate-50 dark:bg-[#2A2755] px-4 py-3 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{tx.description.split(' · ')[0]}</p>
-                          <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">
-                            {monthLabel(getTransactionEffectiveMonth(tx))}
-                            {tx.installments ? ` · parcela ${tx.installments.current}/${tx.installments.total}` : (tx.recurrence !== 'none' || tx.seriesId) ? ' · recorrente' : ''}
-                          </p>
-                        </div>
-                        <p className="font-heading font-medium text-base tracking-tight text-slate-800 dark:text-[#EDE9E3] whitespace-nowrap shrink-0">
-                          R$ {tx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                      </div>
-                    ) : n.body ? (
-                      <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">{n.body}</p>
-                    ) : null}
-
-                    {n.type === 'payment_signal' && tx && (tx.status === 'actual' ? (
-                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                        <Check size={14} strokeWidth={2.5} /> Recebimento confirmado
-                      </p>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await handleConfirmTransaction(tx.id, tx.amount, format(new Date(), 'yyyy-MM-dd'), tx.date);
-                          await api.markNotificationsRead([n.id]);
-                          await loadNotifications();
-                        }}
-                        className="w-full h-10 rounded-full bg-emerald-500 text-white text-xs font-medium active:scale-95 transition-all"
-                      >
-                        Confirmar recebimento
-                      </button>
-                    ))}
-
-                    {n.type === 'consent_request' && !n.read && (
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          disabled={respondingConsentId === n.consentId}
-                          onClick={() => handleConsentResponse(n, 'accepted')}
-                          className="flex-1 h-10 rounded-full bg-primary text-white text-xs font-medium disabled:opacity-50"
-                        >
-                          Aceitar
-                        </button>
-                        <button
-                          type="button"
-                          disabled={respondingConsentId === n.consentId}
-                          onClick={() => handleConsentResponse(n, 'declined')}
-                          className="flex-1 h-10 rounded-full bg-secondary text-secondary-foreground text-xs font-medium disabled:opacity-50"
-                        >
-                          Recusar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            {notificationsListBody}
           </DialogContent>
         </Dialog>
 
@@ -5223,10 +5248,10 @@ export default function App() {
               </div>
 
               {/* Hero de saldo — no computador vira a faixa de cima do painel */}
-              <div className="space-y-5 lg:col-span-12 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-x-8 lg:gap-y-6 lg:items-end">
-                <div className="lg:col-span-12">{mobileTopHeader}</div>
+              <div className="space-y-5 lg:space-y-0 lg:contents">
+                <div className="lg:col-span-12 lg:order-1">{mobileTopHeader}</div>
 
-                <div className="lg:col-span-5">
+                <div className="lg:col-span-5 lg:order-2 lg:self-end">
                   <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight">{monthLabel(currentDate)}</p>
                   <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">Balanço do mês</h1>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -5259,7 +5284,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 lg:col-span-7 lg:gap-4">
+                <div className="grid grid-cols-2 gap-3 lg:col-span-7 lg:gap-4 lg:order-3 lg:self-end">
                   {(() => {
                     const [ii, id] = homeIncome.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                     const [ei, ed] = homeExpense.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
@@ -5295,7 +5320,7 @@ export default function App() {
                   const visiblePeople = people.filter(p => p.visible !== false);
                   return (
                     <>
-                      <div className="lg:col-span-6 lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
+                      <div className="lg:col-span-6 lg:order-6 lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
                         <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight mb-3">Pessoas</p>
                         <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1">
                           {visiblePeople.map(p => (
@@ -5315,7 +5340,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="lg:col-span-6 lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
+                      <div className="lg:col-span-6 lg:order-6 lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
                         <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight mb-3">Cartões</p>
                         <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1">
                           {cards.map(c => (
@@ -5380,7 +5405,7 @@ export default function App() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-6 lg:col-span-8 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 lg:col-span-8 lg:grid-cols-2 lg:order-4">
                 <ShadcnCard className="border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#211E4A] py-0 gap-0">
                   <CardContent className="px-5 py-4">
                     <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Receitas x despesas (últimos 6 meses)</h3>
@@ -5466,7 +5491,7 @@ export default function App() {
                 </ShadcnCard>
               </div>
 
-              <div className="lg:col-span-4 lg:row-span-2">
+              <div className="lg:col-span-4 lg:order-5">
                 <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4 ml-2">Devedores do mês</h3>
                 {(() => {
                   const debtors = people
@@ -5504,7 +5529,7 @@ export default function App() {
                 })()}
               </div>
 
-              <div className="lg:col-span-8">
+              <div className="lg:col-span-12 lg:order-7">
                 <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4 ml-2">Lançamentos recentes</h3>
                 <div className="space-y-2">
                     {((groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'] || []).map(t => {
@@ -5764,7 +5789,7 @@ export default function App() {
                 {movTab === 'movimentacoes' && (
                   <>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-secondary shadow-soft rounded-xl p-4">
+                      <div className="bg-secondary dark:bg-[#211E4A] shadow-soft rounded-xl p-4">
                         <p className="text-sm font-normal text-emerald-600/70 dark:text-emerald-400/70 truncate">Receita</p>
                         {(() => {
                           const [i, d] = stats.incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
@@ -5775,7 +5800,7 @@ export default function App() {
                           );
                         })()}
                       </div>
-                      <div className="bg-secondary shadow-soft rounded-xl p-4">
+                      <div className="bg-secondary dark:bg-[#211E4A] shadow-soft rounded-xl p-4">
                         <p className="text-sm font-normal text-rose-500/70 dark:text-rose-400/70 truncate">Despesa</p>
                         {(() => {
                           const [i, d] = stats.expenseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
@@ -6193,7 +6218,7 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-10 lg:items-start">
-                  <div className="space-y-6 lg:sticky lg:top-8 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:scrollbar-hide lg:p-1">
+                  <div className="space-y-6 lg:sticky lg:top-8 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:scrollbar-hide lg:p-2.5">
                     <div
                       ref={cardsCarouselRef}
                       onScroll={handleCardsCarouselScroll}
@@ -6599,7 +6624,7 @@ export default function App() {
                   </div>
                 ) : (
                   <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-10 lg:items-start">
-                  <div className="space-y-6 lg:sticky lg:top-8 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:scrollbar-hide lg:p-1">
+                  <div className="space-y-6 lg:sticky lg:top-8 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:scrollbar-hide lg:p-2.5">
                     <div
                       ref={peopleCarouselRef}
                       onScroll={handlePeopleCarouselScroll}
