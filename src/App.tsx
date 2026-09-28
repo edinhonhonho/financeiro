@@ -3930,12 +3930,11 @@ export default function App() {
             setPickerYear(format(currentDate, 'yyyy'));
             setIsMonthPickerOpen(true);
           }}
-          className="h-11 pl-3.5 pr-4 rounded-full bg-card shadow-soft flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-[#EDEAF9] whitespace-nowrap"
+          className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] md:w-auto md:h-11 md:pl-3.5 md:pr-4 md:gap-2 md:border-none md:bg-card md:shadow-soft md:text-sm md:font-medium md:text-slate-700 dark:md:text-[#EDEAF9] whitespace-nowrap"
           aria-label="Selecionar mês"
         >
-          <CalendarIcon size={16} className="text-primary" />
-          <span className="hidden sm:inline">{monthLabel(currentDate)}</span>
-          <span className="sm:hidden capitalize">{format(currentDate, 'MMM yyyy', { locale: ptBR })}</span>
+          <CalendarIcon size={18} className="md:w-4 md:h-4 md:text-primary" />
+          <span className="hidden md:inline">{monthLabel(currentDate)}</span>
         </button>
         <Popover open={isNotificationsOpen && isDesktopView} onOpenChange={setIsNotificationsOpen}>
           <PopoverTrigger
@@ -5251,6 +5250,7 @@ export default function App() {
                 <div className="lg:col-span-12 lg:order-1">{mobileTopHeader}</div>
 
                 <div className="lg:col-span-5 lg:order-2 lg:self-end">
+                  <p className="md:hidden text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight mb-1">{monthLabel(currentDate)}</p>
                   <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Balanço do mês</h1>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     {(() => {
