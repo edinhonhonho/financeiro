@@ -3930,10 +3930,12 @@ export default function App() {
             setPickerYear(format(currentDate, 'yyyy'));
             setIsMonthPickerOpen(true);
           }}
-          className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
+          className="h-11 pl-3.5 pr-4 rounded-full bg-card shadow-soft flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-[#EDEAF9] whitespace-nowrap"
           aria-label="Selecionar mês"
         >
-          <CalendarIcon size={18} />
+          <CalendarIcon size={16} className="text-primary" />
+          <span className="hidden sm:inline">{monthLabel(currentDate)}</span>
+          <span className="sm:hidden capitalize">{format(currentDate, 'MMM yyyy', { locale: ptBR })}</span>
         </button>
         <Popover open={isNotificationsOpen && isDesktopView} onOpenChange={setIsNotificationsOpen}>
           <PopoverTrigger
@@ -4645,17 +4647,6 @@ export default function App() {
 
                 {repeatSection}
 
-                {newTransaction.type !== 'card_purchase' && !newTransaction.cardId && (
-                  <div className="flex items-center justify-between rounded-[14px] bg-white dark:bg-[#211E4A] px-5 h-12 shadow-sm">
-                    <Label htmlFor="status-d" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
-                      {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
-                    </Label>
-                    <ToggleSwitch
-                      checked={newTransaction.status === 'actual'}
-                      onChange={(checked) => setNewTransaction({ ...newTransaction, status: checked ? 'actual' : 'planned' })}
-                    />
-                  </div>
-                )}
               </div>
 
               <div className="min-h-0 overflow-y-auto px-8 py-6 space-y-5">
@@ -4693,6 +4684,15 @@ export default function App() {
                 </button>
               ) : <span />}
               <div className="flex items-center gap-2">
+                {newTransaction.type !== 'card_purchase' && !newTransaction.cardId && (
+                  <label className="flex items-center gap-2.5 mr-3 text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
+                    {newTransaction.type === 'income' ? 'Já recebido' : 'Já pago'}
+                    <ToggleSwitch
+                      checked={newTransaction.status === 'actual'}
+                      onChange={(checked) => setNewTransaction({ ...newTransaction, status: checked ? 'actual' : 'planned' })}
+                    />
+                  </label>
+                )}
                 <button type="button" onClick={() => setIsRegistrarOpen(false)} className="h-11 px-5 rounded-full text-sm font-medium text-slate-500 dark:text-[#C5C1E5] hover:bg-slate-100 dark:hover:bg-[#2A2755] transition-colors">
                   Cancelar
                 </button>
@@ -5197,7 +5197,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 pt-4 md:p-10 md:pt-8 max-w-7xl mx-auto w-full pb-48 md:pb-32 text-slate-400 dark:text-[#9D99BC]">
+      <main className="flex-1 p-6 pt-4 md:p-10 md:pt-8 max-w-7xl mx-auto w-full pb-48 md:pb-32 lg:pb-8 text-slate-400 dark:text-[#9D99BC]">
         <AnimatePresence mode="wait">
           {activeTab === 'visao-geral' && (
             <motion.div
@@ -5251,8 +5251,7 @@ export default function App() {
                 <div className="lg:col-span-12 lg:order-1">{mobileTopHeader}</div>
 
                 <div className="lg:col-span-5 lg:order-2 lg:self-end">
-                  <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight">{monthLabel(currentDate)}</p>
-                  <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">Balanço do mês</h1>
+                  <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Balanço do mês</h1>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     {(() => {
                       const [intPart, decPart] = Math.abs(homeBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
@@ -5559,7 +5558,7 @@ export default function App() {
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
-              className="space-y-6 pb-32 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start"
+              className="space-y-6 pb-32 lg:pb-0 lg:space-y-0 lg:grid lg:grid-cols-12 lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-6 lg:h-[calc(100dvh-4rem)] lg:overflow-hidden"
             >
               <div className="space-y-5 lg:col-span-12">
                 {mobileTopHeader}
@@ -5784,7 +5783,7 @@ export default function App() {
               </div>
 
               {/* Movimentações (mobile) — cards no estilo Transactions.png / Upcoming Bills.png */}
-              <div className="space-y-6 lg:col-span-8">
+              <div className="space-y-6 lg:col-span-8 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-3 lg:pb-24">
                 {movTab === 'movimentacoes' && (
                   <>
                     <div className="grid grid-cols-2 gap-3 lg:hidden">
@@ -5945,7 +5944,7 @@ export default function App() {
 
 
               {/* Resumo lateral (só no computador) */}
-              <aside className="hidden lg:block lg:col-span-4 lg:sticky lg:top-8 space-y-3">
+              <aside className="hidden lg:block lg:col-span-4 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:pb-24 space-y-3">
                 {(() => {
                   const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                   const pay = movimentacoesLists.aPagar;
@@ -7624,7 +7623,7 @@ function TransactionItem({
               <button
                 type="button"
                 onClick={() => { setAsking(false); onQuickConfirm?.(); }}
-                className={cn("h-8 px-3 rounded-full text-xs font-medium text-white flex items-center gap-1", transaction.type === 'income' ? "bg-emerald-500" : "bg-primary")}
+                className={cn("h-8 px-3 rounded-full text-xs font-medium flex items-center gap-1", transaction.type === 'income' ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-rose-500/15 text-rose-500 dark:text-rose-400")}
               >
                 <Check size={13} strokeWidth={3} /> Marcar como {doneLabel}
               </button>
@@ -7643,16 +7642,16 @@ function TransactionItem({
               onClick={(e) => { e.stopPropagation(); setAsking(true); }}
               title={`Marcar como ${doneLabel}`}
               aria-label={`Marcar como ${doneLabel}`}
-              className="w-6 h-6 rounded-[7px] border-2 border-slate-300 dark:border-[#4B4683] hover:border-primary hover:bg-primary/10 transition-colors flex items-center justify-center text-transparent hover:text-primary"
+              className={cn(
+                "w-7 h-7 rounded-full border-[1.5px] border-dashed flex items-center justify-center transition-colors",
+                transaction.type === 'income'
+                  ? "border-emerald-400/70 text-emerald-400/0 hover:text-emerald-500 hover:bg-emerald-500/10"
+                  : "border-rose-400/70 text-rose-400/0 hover:text-rose-500 hover:bg-rose-500/10"
+              )}
             >
               <Check size={13} strokeWidth={3} />
             </button>
           ))}
-          {isDesktop && transaction.status === 'actual' && !!onQuickConfirm && (
-            <span className="w-6 h-6 rounded-[7px] bg-emerald-500 text-white flex items-center justify-center" title={`Já ${doneLabel}`}>
-              <Check size={13} strokeWidth={3} />
-            </span>
-          )}
         </div>
       </div>
     </SwipeToConfirm>
