@@ -167,7 +167,7 @@ body {
   background-attachment: fixed, fixed;
 }
 .dark body {
-  background-color: #0B0A2E;
+  background-color: #17153A;
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
   background-repeat: repeat;
@@ -211,24 +211,24 @@ body {
 .dark {
     /* Azul-marinho profundo, como em dark_tema.svg — quase sólido, sem o
        degrade lavanda do modo claro. */
-    --background: #0B0A2E;
+    --background: #17153A;
     --foreground: #F2F1FC;
-    --card: #100E3D;
+    --card: #211E4A;
     --card-foreground: #F2F1FC;
-    --popover: #14124A;
+    --popover: #26235A;
     --popover-foreground: #F2F1FC;
     --primary: #8A7FF5; /* Mesmo roxo do claro, pra manter a marca coesa */
     --primary-foreground: #FFFFFF;
     --secondary: #ECE9FB; /* A referência mantém essa pílula clara mesmo no escuro */
     --secondary-foreground: #322C5C;
-    --muted: #16133F;
-    --muted-foreground: #8D89AC;
-    --accent: #1C1852;
+    --muted: #2A2755;
+    --muted-foreground: #9D99BC;
+    --accent: #312D62;
     --accent-foreground: #C3BBFF;
     --destructive: #FF6F61;
-    --destructive-foreground: #0B0A2E;
-    --border: #201C56;
-    --input: #201C56;
+    --destructive-foreground: #17153A;
+    --border: #37336A;
+    --input: #37336A;
     --ring: #8A7FF5;
 }
 

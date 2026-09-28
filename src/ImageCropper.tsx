@@ -61,14 +61,14 @@ export function ImageCropper({ src, onCancel, onConfirm }: ImageCropperProps) {
 
   return (
     <Dialog open={!!src} onOpenChange={(open) => { if (!open) onCancel(); }}>
-      <DialogContent className="max-w-sm rounded-[2rem] border-none shadow-deep p-6 bg-[#F6F4FD] dark:bg-[#0B0A2E] z-[90]">
+      <DialogContent className="max-w-sm rounded-[2rem] border-none shadow-deep p-6 bg-[#F6F4FD] dark:bg-[#17153A] z-[90]">
         <DialogHeader>
           <DialogTitle className="font-heading font-normal tracking-tighter text-xl">Enquadrar foto</DialogTitle>
           <DialogDescription className="text-xs">Arraste para posicionar e use o controle para ampliar.</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center gap-5">
           <div
-            className="relative overflow-hidden rounded-3xl bg-slate-200 dark:bg-[#16133F] touch-none cursor-grab active:cursor-grabbing select-none"
+            className="relative overflow-hidden rounded-3xl bg-slate-200 dark:bg-[#2A2755] touch-none cursor-grab active:cursor-grabbing select-none"
             style={{ width: BOX, height: BOX }}
             onPointerDown={(e) => {
               (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);

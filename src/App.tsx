@@ -305,7 +305,7 @@ const CATEGORY_EMOJIS = [
 const CARD_COLOR_PRESETS = [
   '#8A7FF5', '#37D6A3', '#FDB8D7', '#FF6F61',
   '#FFC168', '#6FA8FF', '#B6ADFF', '#5FC9A8',
-  '#F797C0', '#FF9D91', '#8D89AC', '#4B4570',
+  '#F797C0', '#FF9D91', '#9D99BC', '#4B4570',
 ];
 
 /** Cor do card da pessoa: a escolhida por ela ou, se não houver, uma derivada do id. */
@@ -352,17 +352,17 @@ function DateField({
         <button
           type="button"
           className={cn(
-            "h-11 rounded-lg border-none bg-slate-50 dark:bg-[#16133F] focus:bg-white dark:focus:bg-[#100E3D] font-normal text-sm px-4 flex items-center gap-2 text-left w-full transition-all",
+            "h-11 rounded-lg border-none bg-slate-50 dark:bg-[#2A2755] focus:bg-white dark:focus:bg-[#211E4A] font-normal text-sm px-4 flex items-center gap-2 text-left w-full transition-all",
             className
           )}
         >
-          <CalendarIcon size={15} className="text-slate-400 dark:text-[#8D89AC] shrink-0" />
-          <span className={cn(!selected && "text-slate-400 dark:text-[#8D89AC] font-medium")}>
+          <CalendarIcon size={15} className="text-slate-400 dark:text-[#9D99BC] shrink-0" />
+          <span className={cn(!selected && "text-slate-400 dark:text-[#9D99BC] font-medium")}>
             {selected ? format(selected, 'dd/MM/yyyy') : placeholder}
           </span>
         </button>
       } />
-      <PopoverContent className="w-auto p-2 rounded-2xl border-none shadow-deep bg-white dark:bg-[#100E3D] z-[80]">
+      <PopoverContent className="w-auto p-2 rounded-2xl border-none shadow-deep bg-white dark:bg-[#211E4A] z-[80]">
         <Calendar
           mode="single"
           selected={selected}
@@ -386,7 +386,7 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (valu
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={cn("w-12 h-7 rounded-full transition-colors relative shrink-0", checked ? "bg-primary" : "bg-slate-200 dark:bg-[#2A2566]")}
+      className={cn("w-12 h-7 rounded-full transition-colors relative shrink-0", checked ? "bg-primary" : "bg-slate-200 dark:bg-[#423D78]")}
     >
       <span className={cn("absolute top-1 left-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform", checked && "translate-x-5")} />
     </button>
@@ -418,10 +418,10 @@ function AccountRow({
       <div className="flex-1 min-w-0">
         <p className={cn("font-medium text-sm", danger ? "text-rose-500" : "text-slate-800 dark:text-[#EDE9E3]")}>{title}</p>
         {description && (
-          <p className={cn("text-[11px] font-normal mt-0.5 leading-relaxed", danger ? "text-rose-400/70" : "text-slate-400 dark:text-[#8D89AC]")}>{description}</p>
+          <p className={cn("text-[11px] font-normal mt-0.5 leading-relaxed", danger ? "text-rose-400/70" : "text-slate-400 dark:text-[#9D99BC]")}>{description}</p>
         )}
       </div>
-      {right !== undefined ? right : (onClick && !disabled && <ChevronRight size={16} className="text-slate-300 dark:text-[#6B679C] shrink-0" />)}
+      {right !== undefined ? right : (onClick && !disabled && <ChevronRight size={16} className="text-slate-300 dark:text-[#7E7AAA] shrink-0" />)}
     </>
   );
 
@@ -443,7 +443,7 @@ function AccountRow({
       disabled={disabled}
       className={cn(
         "w-full flex items-center gap-4 p-5 text-left transition-colors",
-        disabled ? "opacity-50 cursor-default" : "hover:bg-slate-50 dark:hover:bg-[#16133F]"
+        disabled ? "opacity-50 cursor-default" : "hover:bg-slate-50 dark:hover:bg-[#2A2755]"
       )}
     >
       {content}
@@ -454,8 +454,8 @@ function AccountRow({
 function AccountSection({ label, children }: { label?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
-      {label && <p className="text-[10px] font-medium tracking-widest text-slate-400 dark:text-[#8D89AC] ml-1">{label}</p>}
-      <div className="bg-white dark:bg-[#100E3D] rounded-[2rem] shadow-soft divide-y divide-slate-100 dark:divide-[#201C56] overflow-hidden">
+      {label && <p className="text-[10px] font-medium tracking-widest text-slate-400 dark:text-[#9D99BC] ml-1">{label}</p>}
+      <div className="bg-white dark:bg-[#211E4A] rounded-[2rem] shadow-soft divide-y divide-slate-100 dark:divide-[#37336A] overflow-hidden">
         {children}
       </div>
     </div>
@@ -478,7 +478,7 @@ export default function App() {
     // Mantém a cor da barra de status do PWA/navegador igual ao fundo do app,
     // já que o modo escuro aqui é uma preferência manual (não só do SO).
     document.querySelectorAll('meta[name="theme-color"]').forEach(meta => {
-      meta.setAttribute('content', darkMode ? '#0B0A2E' : '#F6F4FD');
+      meta.setAttribute('content', darkMode ? '#17153A' : '#F6F4FD');
     });
   }, [darkMode]);
 
@@ -3060,7 +3060,7 @@ export default function App() {
             <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
               Defina sua nova senha
             </h1>
-            <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] mt-2">Escolha uma nova senha para entrar no Financeiro.</p>
+            <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC] mt-2">Escolha uma nova senha para entrar no Financeiro.</p>
           </div>
 
           <div className="space-y-4">
@@ -3077,7 +3077,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowRecoveryPassword(v => !v)}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] hover:text-primary transition-colors"
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9D99BC] hover:text-primary transition-colors"
                 >
                   {showRecoveryPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -3113,7 +3113,7 @@ export default function App() {
   }
 
   if (!user) {
-    const pillInput = "h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6 placeholder:text-slate-400 dark:placeholder:text-[#6B679C]";
+    const pillInput = "h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6 placeholder:text-slate-400 dark:placeholder:text-[#7E7AAA]";
     const fieldLabel = "text-[11px] font-medium text-slate-500 dark:text-[#A8A4CC] ml-1";
 
     return (
@@ -3188,14 +3188,14 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthInfo(''); }}
-                  className={cn("text-sm pb-3 -mb-px border-b-2 transition-colors", authMode === 'signin' ? "font-medium text-slate-800 dark:text-[#EDE9E3] border-primary" : "text-slate-400 dark:text-[#8D89AC] border-transparent")}
+                  className={cn("text-sm pb-3 -mb-px border-b-2 transition-colors", authMode === 'signin' ? "font-medium text-slate-800 dark:text-[#EDE9E3] border-primary" : "text-slate-400 dark:text-[#9D99BC] border-transparent")}
                 >
                   Entrar
                 </button>
                 <button
                   type="button"
                   onClick={() => { setAuthMode('signup'); setAuthError(''); setAuthInfo(''); }}
-                  className={cn("text-sm pb-3 -mb-px border-b-2 transition-colors", authMode === 'signup' ? "font-medium text-slate-800 dark:text-[#EDE9E3] border-primary" : "text-slate-400 dark:text-[#8D89AC] border-transparent")}
+                  className={cn("text-sm pb-3 -mb-px border-b-2 transition-colors", authMode === 'signup' ? "font-medium text-slate-800 dark:text-[#EDE9E3] border-primary" : "text-slate-400 dark:text-[#9D99BC] border-transparent")}
                 >
                   Criar conta
                 </button>
@@ -3244,7 +3244,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setShowAuthPassword(v => !v)}
-                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] hover:text-primary transition-colors"
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9D99BC] hover:text-primary transition-colors"
                       aria-label={showAuthPassword ? 'Ocultar senha' : 'Mostrar senha'}
                     >
                       {showAuthPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -3280,7 +3280,7 @@ export default function App() {
                   <span>{authMode === 'signin' ? 'Entrar' : 'Criar conta'}</span>
                 </Button>
 
-                <p className="text-[11px] font-normal text-slate-400 dark:text-[#6B679C] text-center leading-relaxed pt-2">
+                <p className="text-[11px] font-normal text-slate-400 dark:text-[#7E7AAA] text-center leading-relaxed pt-2">
                   Ao continuar, você concorda com os Termos de Uso e a Política de Privacidade.
                 </p>
               </div>
@@ -3301,7 +3301,7 @@ export default function App() {
 
   const personColorPicker = (
     <div className="space-y-2">
-      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Cor do card</Label>
+      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Cor do card</Label>
       <div className="flex flex-wrap gap-2.5">
         {CARD_COLOR_PRESETS.map(color => {
           const current = newPersonColor || (editingPerson ? getPersonColor(editingPerson) : '');
@@ -3311,7 +3311,7 @@ export default function App() {
               type="button"
               onClick={() => setNewPersonColor(color)}
               aria-label={`Cor ${color}`}
-              className={cn("w-8 h-8 rounded-full transition-all", current === color ? "ring-2 ring-primary ring-offset-2 dark:ring-offset-[#16133F] scale-110" : "opacity-60")}
+              className={cn("w-8 h-8 rounded-full transition-all", current === color ? "ring-2 ring-primary ring-offset-2 dark:ring-offset-[#2A2755] scale-110" : "opacity-60")}
               style={{ backgroundColor: color }}
             />
           );
@@ -3322,9 +3322,9 @@ export default function App() {
 
   const linkSearchBlock = (
     <div className="space-y-2 relative">
-      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Usuário no Financeiro</Label>
+      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Usuário no Financeiro</Label>
       {personLinkSelected ? (
-        <div className="rounded-2xl bg-white dark:bg-[#100E3D] shadow-sm flex items-center gap-3 p-3">
+        <div className="rounded-2xl bg-white dark:bg-[#211E4A] shadow-sm flex items-center gap-3 p-3">
           <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium overflow-hidden shrink-0">
             {personLinkSelected.photoURL
               ? <img src={personLinkSelected.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -3334,16 +3334,16 @@ export default function App() {
             <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{newPersonName || personLinkSelected.nickname}</p>
             <p className="text-xs font-normal text-primary flex items-center gap-1 truncate"><UserCheck size={12} />@{personLinkSelected.username}</p>
           </div>
-          <button type="button" onClick={() => { setPersonLinkSelected(null); setPersonLinkQuery(''); }} className="text-slate-300 dark:text-[#6B679C] hover:text-rose-400 p-2" aria-label="Trocar usuário">
+          <button type="button" onClick={() => { setPersonLinkSelected(null); setPersonLinkQuery(''); }} className="text-slate-300 dark:text-[#7E7AAA] hover:text-rose-400 p-2" aria-label="Trocar usuário">
             <X size={16} />
           </button>
         </div>
       ) : (
         <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] font-medium text-sm pointer-events-none">@</span>
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9D99BC] font-medium text-sm pointer-events-none">@</span>
           <Input
             placeholder="usuario"
-            className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm pl-8 pr-4 shadow-sm"
+            className="h-12 rounded-2xl border-none bg-white dark:bg-[#211E4A] font-normal text-sm pl-8 pr-4 shadow-sm"
             value={personLinkQuery}
             onChange={(e) => setPersonLinkQuery(e.target.value.replace(/^@+/, ''))}
             autoFocus={personMode === 'app'}
@@ -3351,17 +3351,17 @@ export default function App() {
         </div>
       )}
       {!personLinkSelected && personLinkQuery.trim() && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#100E3D] rounded-2xl shadow-deep border border-slate-50 dark:border-[#1C1852] z-20 overflow-hidden max-h-48 overflow-y-auto">
-          {personLinkSearching && <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Buscando...</p>}
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-[#211E4A] rounded-2xl shadow-deep border border-slate-50 dark:border-[#312D62] z-20 overflow-hidden max-h-48 overflow-y-auto">
+          {personLinkSearching && <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#7E7AAA] text-center">Buscando...</p>}
           {!personLinkSearching && personLinkResults.length === 0 && (
-            <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#6B679C] text-center">Nenhum usuário encontrado.</p>
+            <p className="p-4 text-xs font-normal text-slate-300 dark:text-[#7E7AAA] text-center">Nenhum usuário encontrado.</p>
           )}
           {personLinkResults.map(pr => (
             <button
               key={pr.id}
               type="button"
               onClick={() => selectLinkedProfile(pr)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#16133F] text-left"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-[#2A2755] text-left"
             >
               <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-xs shrink-0 overflow-hidden">
                 {pr.photoURL
@@ -3370,7 +3370,7 @@ export default function App() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{[pr.firstName, pr.lastName].filter(Boolean).join(' ') || pr.nickname}</p>
-                <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">@{pr.username}</p>
+                <p className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">@{pr.username}</p>
               </div>
             </button>
           ))}
@@ -3385,26 +3385,26 @@ export default function App() {
       <button
         type="button"
         onClick={() => setPersonMode('app')}
-        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-[#100E3D] shadow-sm text-left active:scale-[0.99] transition-transform"
+        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-[#211E4A] shadow-sm text-left active:scale-[0.99] transition-transform"
       >
         <span className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><UserCheck size={20} /></span>
         <span className="flex-1 min-w-0">
           <span className="block text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Sim, buscar pelo usuário</span>
-          <span className="block text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Nome e foto vêm automaticamente</span>
+          <span className="block text-xs font-normal text-slate-400 dark:text-[#9D99BC]">Nome e foto vêm automaticamente</span>
         </span>
-        <ChevronRight size={16} className="text-slate-300 dark:text-[#6B679C] shrink-0" />
+        <ChevronRight size={16} className="text-slate-300 dark:text-[#7E7AAA] shrink-0" />
       </button>
       <button
         type="button"
         onClick={() => setPersonMode('manual')}
-        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-[#100E3D] shadow-sm text-left active:scale-[0.99] transition-transform"
+        className="w-full flex items-center gap-4 p-4 rounded-2xl bg-white dark:bg-[#211E4A] shadow-sm text-left active:scale-[0.99] transition-transform"
       >
-        <span className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-[#1C1852] text-slate-400 dark:text-[#8D89AC] flex items-center justify-center shrink-0"><Users size={20} /></span>
+        <span className="w-11 h-11 rounded-2xl bg-slate-100 dark:bg-[#312D62] text-slate-400 dark:text-[#9D99BC] flex items-center justify-center shrink-0"><Users size={20} /></span>
         <span className="flex-1 min-w-0">
           <span className="block text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Não, cadastrar manualmente</span>
-          <span className="block text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Nome, foto e telefone</span>
+          <span className="block text-xs font-normal text-slate-400 dark:text-[#9D99BC]">Nome, foto e telefone</span>
         </span>
-        <ChevronRight size={16} className="text-slate-300 dark:text-[#6B679C] shrink-0" />
+        <ChevronRight size={16} className="text-slate-300 dark:text-[#7E7AAA] shrink-0" />
       </button>
     </div>
   ) : personMode === 'app' && !editingPerson ? (
@@ -3421,30 +3421,30 @@ export default function App() {
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="w-20 h-20 rounded-3xl bg-white dark:bg-[#100E3D] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex items-center justify-center overflow-hidden hover:border-primary transition-all group shrink-0 shadow-sm"
+          className="w-20 h-20 rounded-3xl bg-white dark:bg-[#211E4A] border-2 border-dashed border-slate-200 dark:border-[#423D78] flex items-center justify-center overflow-hidden hover:border-primary transition-all group shrink-0 shadow-sm"
         >
           {newPersonImage ? (
             <img src={newPersonImage} alt="Preview" className="w-full h-full object-cover" />
           ) : (
-            <Users size={28} className="text-slate-300 dark:text-[#6B679C] group-hover:text-primary" />
+            <Users size={28} className="text-slate-300 dark:text-[#7E7AAA] group-hover:text-primary" />
           )}
         </button>
         <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
         <div className="flex-1 space-y-1">
-          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome</Label>
+          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Nome</Label>
           <Input
             placeholder="Ex: Edson"
-            className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5 shadow-sm"
+            className="h-12 rounded-2xl border-none bg-white dark:bg-[#211E4A] font-normal text-sm px-5 shadow-sm"
             value={newPersonName || ''}
             onChange={(e) => setNewPersonName(e.target.value)}
           />
         </div>
       </div>
       <div className="space-y-1">
-        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Telefone</Label>
+        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Telefone</Label>
         <Input
           placeholder="+55 (00) 00000-0000"
-          className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5 shadow-sm"
+          className="h-12 rounded-2xl border-none bg-white dark:bg-[#211E4A] font-normal text-sm px-5 shadow-sm"
           value={newPersonPhone || ''}
           onChange={(e) => setNewPersonPhone(maskPhone(e.target.value))}
         />
@@ -3504,10 +3504,10 @@ export default function App() {
     const startDate = newTransaction.date || format(new Date(), 'yyyy-MM-dd');
     const chip = (active: boolean) => cn(
       "h-8 px-3 rounded-full text-xs font-medium transition-all whitespace-nowrap",
-      active ? "bg-primary text-white shadow-sm" : "bg-white dark:bg-[#100E3D] text-slate-500 dark:text-[#C5C1E5]"
+      active ? "bg-primary text-white shadow-sm" : "bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5]"
     );
     const stepper = (value: React.ReactNode, onMinus: () => void, onPlus: () => void, label: string) => (
-      <div className="flex items-center bg-white dark:bg-[#100E3D] rounded-full p-1 shadow-sm shrink-0">
+      <div className="flex items-center bg-white dark:bg-[#211E4A] rounded-full p-1 shadow-sm shrink-0">
         <button type="button" onClick={onMinus} aria-label={`Diminuir ${label}`} className="w-8 h-8 rounded-full text-primary flex items-center justify-center active:scale-90 transition-transform">
           <Minus size={15} />
         </button>
@@ -3519,15 +3519,15 @@ export default function App() {
     );
     return (
       <div className="space-y-2">
-        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Repete?</Label>
-        <div className="rounded-[18px] bg-slate-50 dark:bg-[#16133F] p-1">
+        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Repete?</Label>
+        <div className="rounded-[18px] bg-slate-50 dark:bg-[#2A2755] p-1">
           <div className="flex">
             {(['Não', 'Todo mês', 'Parcelado'] as const).map((label, k) => (
               <button
                 key={label}
                 type="button"
                 onClick={() => chooseRepeatKind(k as 0 | 1 | 2)}
-                className={cn("flex-1 h-11 rounded-[14px] text-sm font-medium transition-colors", repeatKind === k ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                className={cn("flex-1 h-11 rounded-[14px] text-sm font-medium transition-colors", repeatKind === k ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC]")}
               >
                 {label}
               </button>
@@ -3539,7 +3539,7 @@ export default function App() {
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{repeatKind === 2 ? 'Parcelas' : 'Meses'}</p>
-                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">
                     {repeatKind === 2
                       ? `${repeatCount}x de ${brlFmt(perParcel)} · total ${brlFmt(perParcel * repeatCount)}`
                       : `Até ${format(addMonths(parseISO(startDate), repeatCount - 1), "MMM 'de' yyyy", { locale: ptBR })}`}
@@ -3550,7 +3550,7 @@ export default function App() {
 
               {repeatKind === 1 && (
                 <div className="space-y-2">
-                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC]">Lançar em</p>
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">Lançar em</p>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex gap-1.5">
                       <button type="button" onClick={() => setRecurrenceDateMode('fixed')} className={chip(recurrenceDateMode === 'fixed')}>
@@ -3572,7 +3572,7 @@ export default function App() {
 
               {repeatKind === 2 && !editingTransaction && (
                 <div className="space-y-2">
-                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC]">Os {brlFmt(entered)} são</p>
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">Os {brlFmt(entered)} são</p>
                   <div className="flex gap-1.5">
                     <button type="button" onClick={() => setInstallmentValueMode('parcel')} className={chip(installmentValueMode === 'parcel')}>
                       O valor da parcela
@@ -3600,10 +3600,10 @@ export default function App() {
       <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Com quem?</Label>
 
       <div className="relative">
-        <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] pointer-events-none" />
+        <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9D99BC] pointer-events-none" />
         <Input
           placeholder="Buscar pessoa ou @usuário..."
-          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-10 pr-3"
+          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#2A2755] font-normal text-sm pl-10 pr-3"
           value={quickAssignQuery}
           onChange={(e) => setQuickAssignQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && personSearchResults.length === 0 && handleQuickAssignPerson()}
@@ -3622,8 +3622,8 @@ export default function App() {
                 className={cn(
                   "h-10 px-3 rounded-full font-normal text-sm transition-all flex items-center gap-2 border-2",
                   isSelected
-                    ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary"
-                    : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
+                    ? "bg-slate-50 dark:bg-[#2A2755] border-primary text-primary"
+                    : "bg-slate-50 dark:bg-[#2A2755] border-transparent text-slate-400 dark:text-[#9D99BC]"
                 )}
               >
                 <img src={p.image} alt="" className="w-5 h-5 rounded-full object-cover" />
@@ -3633,8 +3633,8 @@ export default function App() {
           })}
         </div>
       ) : quickAssignQuery.trim() ? (
-        <div className="bg-slate-50 dark:bg-[#16133F] rounded-[1.25rem] p-3 space-y-2">
-          <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
+        <div className="bg-slate-50 dark:bg-[#2A2755] rounded-[1.25rem] p-3 space-y-2">
+          <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">Ninguém encontrado com "{quickAssignQuery.trim()}".</p>
           <Button
             type="button"
             onClick={handleQuickAssignPerson}
@@ -3647,19 +3647,19 @@ export default function App() {
           </Button>
         </div>
       ) : (
-        <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Nenhuma pessoa cadastrada ainda. Digite um nome ou @usuário para adicionar.</p>
+        <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">Nenhuma pessoa cadastrada ainda. Digite um nome ou @usuário para adicionar.</p>
       )}
 
       {personSplits.length > 0 && (
         <div className="space-y-2 pt-1">
           {!isIncomeTx && (
-            <div className="flex bg-slate-50 dark:bg-[#16133F] rounded-xl p-1">
+            <div className="flex bg-slate-50 dark:bg-[#2A2755] rounded-xl p-1">
               {([true, false] as const).map(withMe => (
                 <button
                   key={String(withMe)}
                   type="button"
                   onClick={() => setShareWithMe(withMe)}
-                  className={cn("flex-1 h-9 rounded-lg text-xs font-medium transition-all", shareWithMe === withMe ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]")}
+                  className={cn("flex-1 h-9 rounded-lg text-xs font-medium transition-all", shareWithMe === withMe ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC]")}
                 >
                   {withMe ? 'Igual com você' : 'Só eles'}
                 </button>
@@ -3674,7 +3674,7 @@ export default function App() {
             const owes = isIncomeTx || split.owes !== false;
             const isEditing = editingShareId === split.personId;
             return (
-              <div key={split.personId} className="flex items-center gap-2.5 bg-slate-50 dark:bg-[#16133F] rounded-2xl pl-2.5 pr-2 py-2">
+              <div key={split.personId} className="flex items-center gap-2.5 bg-slate-50 dark:bg-[#2A2755] rounded-2xl pl-2.5 pr-2 py-2">
                 <img src={person?.image} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{person?.name}</p>
@@ -3684,7 +3684,7 @@ export default function App() {
                 </div>
                 {isEditing ? (
                   <input
-                    className="w-24 h-9 bg-white dark:bg-[#100E3D] border-0 rounded-lg font-medium text-sm px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/30 shrink-0"
+                    className="w-24 h-9 bg-white dark:bg-[#211E4A] border-0 rounded-lg font-medium text-sm px-2 text-right shadow-sm outline-none focus:ring-1 focus:ring-primary/30 shrink-0"
                     inputMode="numeric"
                     autoFocus
                     value={split.type === 'value' ? split.value : maskCurrency(String(Math.round(share * 100)))}
@@ -3703,7 +3703,7 @@ export default function App() {
                     aria-label={`Editar valor de ${firstName}`}
                   >
                     {brlFmt(share)}
-                    <Pencil size={12} className="text-slate-300 dark:text-[#6B679C]" />
+                    <Pencil size={12} className="text-slate-300 dark:text-[#7E7AAA]" />
                   </button>
                 )}
                 {split.type === 'value' && !isEditing && (
@@ -3719,7 +3719,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setPersonSplits(prev => prev.map(sp => sp.personId === split.personId ? { ...sp, owes: sp.owes === false } : sp))}
-                    className="w-9 h-9 rounded-full bg-white dark:bg-[#100E3D] text-primary flex items-center justify-center shadow-sm shrink-0 active:scale-90 transition-transform"
+                    className="w-9 h-9 rounded-full bg-white dark:bg-[#211E4A] text-primary flex items-center justify-center shadow-sm shrink-0 active:scale-90 transition-transform"
                     aria-label={`Trocar quem deve a quem com ${firstName}`}
                   >
                     <ArrowLeftRight size={15} />
@@ -3730,11 +3730,11 @@ export default function App() {
           })}
 
           {!isIncomeTx && shareTotal - sharedSum > 0.005 && (
-            <div className="flex items-center gap-2.5 border border-dashed border-slate-200 dark:border-[#2A2566] rounded-2xl pl-2.5 pr-4 py-2">
+            <div className="flex items-center gap-2.5 border border-dashed border-slate-200 dark:border-[#423D78] rounded-2xl pl-2.5 pr-4 py-2">
               <div className="w-9 h-9 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-medium shrink-0">Eu</div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Sua parte</p>
-                <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC]">fica com você</p>
+                <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">fica com você</p>
               </div>
               <span className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] tabular-nums">{brlFmt(shareTotal - sharedSum)}</span>
             </div>
@@ -3745,7 +3745,7 @@ export default function App() {
           )}
 
           {!isIncomeTx && personSplits.some(sp => sp.owes !== false) && (
-            <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] ml-1 leading-relaxed">
+            <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] ml-1 leading-relaxed">
               O que te devem vira uma receita a receber em Pessoas{newTransaction.type === 'card_purchase' && newTransaction.cardId ? ', no vencimento da fatura' : ''}. Toque em ⇄ quando for você que deve.
             </p>
           )}
@@ -3757,7 +3757,7 @@ export default function App() {
   // Vai direto para o <body>: dentro das abas (que animam com transform) um
   // `position: fixed` passa a ser relativo à aba e muda de altura conforme a página.
   const floatingMonthPicker = createPortal(
-  <div className="md:hidden fixed bottom-24 right-6 z-30 flex items-center gap-0.5 bg-white dark:bg-[#100E3D] rounded-full p-1.5 shadow-bubbly">
+  <div className="fixed bottom-24 right-6 md:bottom-12 md:right-32 z-30 flex items-center gap-0.5 bg-white dark:bg-[#211E4A] rounded-full p-1.5 shadow-bubbly">
     <button
       type="button"
       onClick={prevMonth}
@@ -3792,7 +3792,7 @@ export default function App() {
   // Cabeçalho mobile compartilhado (foto + "Oi, Nome!" + calendário + notificações),
   // igual em toda página — dispensa qualquer controle de mês flutuante à parte.
   const mobileTopHeader = (
-    <div className="md:hidden flex items-center justify-between">
+    <div className="flex items-center justify-between">
       <button onClick={() => setIsProfileOpen(true)} className="flex items-center gap-3 min-w-0">
         <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium shrink-0 overflow-hidden">
           {userProfile?.photoURL ? (
@@ -3839,7 +3839,7 @@ export default function App() {
     <div className="min-h-screen font-sans text-foreground selection:bg-primary/20 md:pl-80">
       {/* Onboarding / Nickname Modal */}
       <Dialog open={isNicknameModalOpen} onOpenChange={setIsNicknameModalOpen}>
-        <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#0B0A2E] flex flex-col">
+        <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] flex flex-col">
           <DialogHeader className="sr-only">
             <DialogTitle>Quase lá</DialogTitle>
             <DialogDescription>Escolha como quer ser chamado</DialogDescription>
@@ -3850,7 +3850,7 @@ export default function App() {
                 {(tempNickname || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Quase lá</h1>
-              <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">Como você quer ser chamado?</p>
+              <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC]">Como você quer ser chamado?</p>
             </div>
             <Input
               placeholder="Ex: Edson"
@@ -3870,7 +3870,7 @@ export default function App() {
       </Dialog>
 
       <Dialog open={!!confirmingTransaction} onOpenChange={(open) => !open && setConfirmingTransaction(null)}>
-        <DialogContent className="rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep max-w-sm max-h-[90vh] p-0 overflow-hidden bg-white dark:bg-[#100E3D] flex flex-col">
+        <DialogContent className="rounded-t-[2rem] rounded-b-none md:rounded-[2rem] border-none shadow-deep max-w-sm max-h-[90vh] p-0 overflow-hidden bg-white dark:bg-[#211E4A] flex flex-col">
           <div className="p-6 shrink-0">
             <DialogHeader>
               <DialogTitle className="text-xl font-heading font-medium text-slate-800 dark:text-[#EDE9E3] leading-tight">
@@ -3884,13 +3884,13 @@ export default function App() {
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
             <div className="space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">
                   {confirmingTransaction?.type === 'card_purchase' || confirmingTransaction?.id.startsWith('bill-') ? 'Valor a pagar' : 'Quanto recebeu?'}
                 </Label>
                 <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-slate-300 dark:text-[#6B679C] group-focus-within:text-primary transition-colors">R$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 font-medium text-slate-300 dark:text-[#7E7AAA] group-focus-within:text-primary transition-colors">R$</span>
                   <Input
-                    className="rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] h-12 pl-12 text-lg font-medium focus:bg-white dark:focus:bg-[#100E3D] focus:ring-2 focus:ring-primary/20 transition-all"
+                    className="rounded-2xl border-none bg-slate-50 dark:bg-[#2A2755] h-12 pl-12 text-lg font-medium focus:bg-white dark:focus:bg-[#211E4A] focus:ring-2 focus:ring-primary/20 transition-all"
                     inputMode="decimal"
                     value={confirmAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     onChange={(e) => setConfirmAmount(parseCurrency(maskCurrency(e.target.value)))}
@@ -3899,7 +3899,7 @@ export default function App() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Data que aconteceu</Label>
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Data que aconteceu</Label>
                 <DateField
                   className="rounded-2xl h-12"
                   value={confirmDate}
@@ -3918,7 +3918,7 @@ export default function App() {
                 {confirmingTransaction?.type === 'income' ? 'Confirmar recebimento' : (confirmingTransaction?.type === 'card_purchase' || confirmingTransaction?.id.startsWith('bill-') ? 'Confirmar pagamento' : 'Confirmar pagamento')}
               </Button>
               <div className="flex gap-2">
-                <Button variant="ghost" className="flex-1 h-12 rounded-2xl font-normal text-slate-500 dark:text-[#A8A4CC] hover:bg-slate-100 dark:hover:bg-[#1C1852]" onClick={() => {
+                <Button variant="ghost" className="flex-1 h-12 rounded-2xl font-normal text-slate-500 dark:text-[#A8A4CC] hover:bg-slate-100 dark:hover:bg-[#312D62]" onClick={() => {
                   if (confirmingTransaction) {
                     if (confirmingTransaction.id.startsWith('bill-')) {
                       setSelectedCard(confirmingTransaction.cardId || null);
@@ -3951,14 +3951,14 @@ export default function App() {
 
       {/* Month/Year Picker */}
       <Dialog open={isMonthPickerOpen} onOpenChange={setIsMonthPickerOpen}>
-        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
           <div className="p-7 space-y-5">
             <DialogHeader>
               <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Ir para o mês</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-3">
               <Select value={pickerMonth} onValueChange={setPickerMonth}>
-                <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-4 shadow-sm">
+                <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#2A2755] rounded-xl font-normal text-sm px-4 shadow-sm">
                   <SelectValue placeholder="Mês" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -3968,7 +3968,7 @@ export default function App() {
                 </SelectContent>
               </Select>
               <Select value={pickerYear} onValueChange={setPickerYear}>
-                <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#16133F] rounded-xl font-normal text-sm px-4 shadow-sm">
+                <SelectTrigger className="h-12 border-none bg-slate-50 dark:bg-[#2A2755] rounded-xl font-normal text-sm px-4 shadow-sm">
                   <SelectValue placeholder="Ano" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -3994,7 +3994,7 @@ export default function App() {
       {/* Novo lançamento (mobile) — tela cheia, em 3 etapas */}
       <div className="md:hidden">
         <Dialog open={isRegistrarOpen && window.innerWidth < 768} onOpenChange={(open) => { setIsRegistrarOpen(open); if (!open) setRegistrarStep(0); }}>
-          <DialogContent showCloseButton={false} className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none flex flex-col p-0 border-none shadow-none overflow-hidden bg-white dark:bg-[#100E3D]">
+          <DialogContent showCloseButton={false} className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none flex flex-col p-0 border-none shadow-none overflow-hidden bg-white dark:bg-[#211E4A]">
             <DialogHeader className="sr-only">
               <DialogTitle>{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
               <DialogDescription>Etapa {registrarStep + 1} de 3</DialogDescription>
@@ -4016,7 +4016,7 @@ export default function App() {
                     type="button"
                     onClick={() => setRegistrarStep(s)}
                     aria-label={`Ir para etapa ${s + 1}`}
-                    className={cn("h-1.5 rounded-full transition-all", registrarStep === s ? "w-5 bg-primary" : "w-1.5 bg-slate-200 dark:bg-[#2A2566]")}
+                    className={cn("h-1.5 rounded-full transition-all", registrarStep === s ? "w-5 bg-primary" : "w-1.5 bg-slate-200 dark:bg-[#423D78]")}
                   />
                 ))}
               </div>
@@ -4040,7 +4040,7 @@ export default function App() {
                     onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null, ...(editingTransaction ? {} : { status: 'planned' as const })})}
                     className={cn(
                       "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
-                      newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
+                      newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#2A2755] text-slate-400 dark:text-[#9D99BC] hover:bg-slate-100 dark:hover:bg-[#312D62]/80"
                     )}
                   >
                     <ArrowUpCircle size={18} strokeWidth={2.5} />
@@ -4050,7 +4050,7 @@ export default function App() {
                     onClick={() => setNewTransaction({...newTransaction, type: 'expense', ...(editingTransaction ? {} : { status: 'actual' as const })})}
                     className={cn(
                       "flex-1 h-12 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
-                      (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
+                      (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#2A2755] text-slate-400 dark:text-[#9D99BC] hover:bg-slate-100 dark:hover:bg-[#312D62]/80"
                     )}
                   >
                     <ArrowDownCircle size={18} strokeWidth={2.5} />
@@ -4060,9 +4060,9 @@ export default function App() {
 
                 <div className="flex-1 flex flex-col items-center justify-center gap-10">
                   <div className="text-center space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Valor</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Valor</Label>
                     <div className="flex items-center justify-center gap-1">
-                      <span className="text-3xl font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
+                      <span className="text-3xl font-medium text-slate-300 dark:text-[#7E7AAA]">R$</span>
                       <p className="font-heading font-medium text-5xl text-slate-800 dark:text-[#EDE9E3] tracking-tight">{amountInput}</p>
                     </div>
                   </div>
@@ -4073,7 +4073,7 @@ export default function App() {
                         key={d}
                         type="button"
                         onClick={() => pressAmountDigit(d)}
-                        className="h-16 rounded-2xl bg-slate-50 dark:bg-[#16133F] text-slate-700 dark:text-[#EDEAF9] text-xl font-medium active:scale-95 transition-all"
+                        className="h-16 rounded-2xl bg-slate-50 dark:bg-[#2A2755] text-slate-700 dark:text-[#EDEAF9] text-xl font-medium active:scale-95 transition-all"
                       >
                         {d}
                       </button>
@@ -4081,7 +4081,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={backspaceAmountDigit}
-                      className="h-16 rounded-2xl bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] flex items-center justify-center active:scale-95 transition-all"
+                      className="h-16 rounded-2xl bg-slate-50 dark:bg-[#2A2755] text-slate-400 dark:text-[#9D99BC] flex items-center justify-center active:scale-95 transition-all"
                       aria-label="Apagar dígito"
                     >
                       <Delete size={20} />
@@ -4094,10 +4094,10 @@ export default function App() {
             {registrarStep === 1 && (
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Descrição</Label>
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Descrição</Label>
                   <Input
                     placeholder="Ex: Aluguel"
-                    className="h-14 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-base px-5"
+                    className="h-14 rounded-2xl border-none bg-slate-50 dark:bg-[#2A2755] font-normal text-base px-5"
                     value={newTransaction.description || ''}
                     onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
                     autoFocus
@@ -4106,9 +4106,9 @@ export default function App() {
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
                     <DateField
-                      className="h-14 rounded-2xl text-sm bg-slate-50 dark:bg-[#16133F]"
+                      className="h-14 rounded-2xl text-sm bg-slate-50 dark:bg-[#2A2755]"
                       value={newTransaction.date || ''}
                       onChange={(v) => {
                         setTxDate(v);
@@ -4118,13 +4118,13 @@ export default function App() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Categoria</Label>
                       <button type="button" onClick={() => setQuickCategoryOpen(true)} className="text-[11px] font-medium text-primary flex items-center gap-1 pr-1">
                         <Plus size={12} strokeWidth={2.5} /> Nova categoria
                       </button>
                     </div>
                     <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
-                      <SelectTrigger className="h-14 border-none bg-slate-50 dark:bg-[#16133F] rounded-2xl font-normal text-sm px-5">
+                      <SelectTrigger className="h-14 border-none bg-slate-50 dark:bg-[#2A2755] rounded-2xl font-normal text-sm px-5">
                         <SelectValue placeholder="Selecione..." />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl border-none shadow-deep p-2">
@@ -4143,14 +4143,14 @@ export default function App() {
 
                 {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">É no cartão de crédito?</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">É no cartão de crédito?</Label>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
                         className={cn(
                           "h-10 px-4 rounded-full text-sm font-medium border-2 transition-all",
-                          !newTransaction.cardId ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
+                          !newTransaction.cardId ? "bg-slate-50 dark:bg-[#2A2755] border-primary text-primary" : "bg-slate-50 dark:bg-[#2A2755] border-transparent text-slate-400 dark:text-[#9D99BC]"
                         )}
                       >
                         Não
@@ -4162,7 +4162,7 @@ export default function App() {
                           onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
                           className={cn(
                             "h-10 px-4 rounded-full text-sm font-medium border-2 transition-all flex items-center gap-2",
-                            newTransaction.cardId === card.id ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
+                            newTransaction.cardId === card.id ? "bg-slate-50 dark:bg-[#2A2755] border-primary text-primary" : "bg-slate-50 dark:bg-[#2A2755] border-transparent text-slate-400 dark:text-[#9D99BC]"
                           )}
                         >
                           <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: card.color }} />
@@ -4182,7 +4182,7 @@ export default function App() {
               {peopleSection}
 
                 {newTransaction.type !== 'card_purchase' && !newTransaction.cardId && (
-                  <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                  <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#37336A]">
                     <Label htmlFor="status-m" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
@@ -4197,18 +4197,18 @@ export default function App() {
                   const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
                   if (!linked) return null;
                   return (
-                    <div className="pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                    <div className="pt-6 border-t border-slate-100 dark:border-[#37336A]">
                       <div
                         onClick={() => handleEditClick(linked)}
                         className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-[1.25rem] cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#211E4A] shadow-sm flex items-center justify-center text-indigo-500 shrink-0">
                             {linked.type === 'income' ? <ArrowUpCircle size={16} strokeWidth={3} /> : <CreditCard size={16} strokeWidth={3} />}
                           </div>
                           <div className="min-w-0">
                             <p className="text-xs font-normal text-slate-700 dark:text-[#EDEAF9] truncate">Vinculado a: {linked.description}</p>
-                            <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            <p className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                           </div>
                         </div>
                         <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
@@ -4241,7 +4241,7 @@ export default function App() {
 
         {/* Categories Management Modal */}
         <Dialog open={isCategoriasOpen} onOpenChange={setIsCategoriasOpen}>
-          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep flex flex-col overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep flex flex-col overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
             <div className="p-6 shrink-0">
               <DialogHeader>
                 <DialogTitle className="text-3xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter">Categorias</DialogTitle>
@@ -4249,7 +4249,7 @@ export default function App() {
               </DialogHeader>
             </div>
             <div ref={categoriesScrollRef} className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-              <div className="space-y-4 p-6 bg-slate-50 dark:bg-[#16133F] rounded-[2rem]">
+              <div className="space-y-4 p-6 bg-slate-50 dark:bg-[#2A2755] rounded-[2rem]">
                 {editingCategory && (
                   <div className="flex items-center justify-between bg-primary/10 text-primary text-xs font-medium rounded-xl px-4 py-2.5">
                     <span>Editando "{editingCategory.name}"</span>
@@ -4260,12 +4260,12 @@ export default function App() {
                 )}
                 <div className="flex gap-3">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Emoji</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Emoji</Label>
                     <button
                       type="button"
                       onClick={() => setShowEmojiPicker(v => !v)}
                       className={cn(
-                        "h-12 w-16 rounded-2xl bg-white dark:bg-[#100E3D] text-center text-2xl shadow-sm flex items-center justify-center transition-all",
+                        "h-12 w-16 rounded-2xl bg-white dark:bg-[#211E4A] text-center text-2xl shadow-sm flex items-center justify-center transition-all",
                         showEmojiPicker && "ring-2 ring-primary"
                       )}
                       aria-label="Escolher emoji"
@@ -4274,17 +4274,17 @@ export default function App() {
                     </button>
                   </div>
                   <div className="flex-1 space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome da categoria</Label>
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Nome da categoria</Label>
                     <Input
                       placeholder="Ex: Assinaturas"
-                      className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5 shadow-sm"
+                      className="h-12 rounded-2xl border-none bg-white dark:bg-[#211E4A] font-normal text-sm px-5 shadow-sm"
                       value={newCategoryName || ''}
                       onChange={(e) => setNewCategoryName(e.target.value)}
                     />
                   </div>
                 </div>
                 {showEmojiPicker && (
-                  <div className="bg-white dark:bg-[#100E3D] rounded-2xl shadow-sm p-3 max-h-52 overflow-y-auto scrollbar-hide">
+                  <div className="bg-white dark:bg-[#211E4A] rounded-2xl shadow-sm p-3 max-h-52 overflow-y-auto scrollbar-hide">
                     <div className="grid grid-cols-8 gap-1">
                       {CATEGORY_EMOJIS.map(emoji => (
                         <button
@@ -4292,7 +4292,7 @@ export default function App() {
                           type="button"
                           onClick={() => { setNewCategoryIcon(emoji); setShowEmojiPicker(false); }}
                           className={cn(
-                            "h-10 rounded-xl text-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-[#1C1852] transition-colors",
+                            "h-10 rounded-xl text-xl flex items-center justify-center hover:bg-slate-100 dark:hover:bg-[#312D62] transition-colors",
                             newCategoryIcon === emoji && "bg-primary/15"
                           )}
                         >
@@ -4303,8 +4303,8 @@ export default function App() {
                   </div>
                 )}
                 <div className="space-y-2">
-                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Cor</Label>
-                  <div className="grid grid-cols-5 gap-2 bg-white dark:bg-[#100E3D] p-3 rounded-2xl shadow-sm">
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Cor</Label>
+                  <div className="grid grid-cols-5 gap-2 bg-white dark:bg-[#211E4A] p-3 rounded-2xl shadow-sm">
                     {['#8A7FF5', '#37D6A3', '#FDB8D7', '#FF6F61', '#FFC168', '#6FA8FF', '#B6ADFF', '#5FC9A8', '#F797C0'].map(color => (
                       <button
                         key={color}
@@ -4320,7 +4320,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => colorInputRef.current?.click()}
-                      className="w-8 h-8 rounded-full bg-slate-100 dark:bg-[#1C1852] flex items-center justify-center text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5] transition-all border-2 border-dashed border-slate-300 dark:border-[#5a5a5a]"
+                      className="w-8 h-8 rounded-full bg-slate-100 dark:bg-[#312D62] flex items-center justify-center text-slate-400 dark:text-[#9D99BC] hover:text-slate-600 dark:hover:text-[#C5C1E5] transition-all border-2 border-dashed border-slate-300 dark:border-[#5a5a5a]"
                     >
                       <Plus size={16} />
                       <input 
@@ -4339,7 +4339,7 @@ export default function App() {
               </div>
 
               <div className="space-y-3">
-                <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Suas categorias ({categories.length})</p>
+                <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] ml-2 tracking-widest">Suas categorias ({categories.length})</p>
                 <div className="space-y-2">
                   {categories.map(cat => (
                     <div key={cat.id} className="flex items-center gap-3 pl-3 pr-2 py-2 bg-card rounded-full shadow-soft group">
@@ -4349,7 +4349,7 @@ export default function App() {
                       <span className="flex-1 font-medium text-slate-700 dark:text-[#EDEAF9] text-sm truncate tracking-tight">{cat.name}</span>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
-                          className="h-9 w-9 flex items-center justify-center text-slate-300 dark:text-[#6B679C] hover:text-primary rounded-full transition-all"
+                          className="h-9 w-9 flex items-center justify-center text-slate-300 dark:text-[#7E7AAA] hover:text-primary rounded-full transition-all"
                           onClick={() => {
                             setEditingCategory(cat);
                             setNewCategoryName(cat.name);
@@ -4363,7 +4363,7 @@ export default function App() {
                           <Pencil size={14} strokeWidth={2.5} />
                         </button>
                         <button
-                          className="h-9 w-9 flex items-center justify-center text-slate-300 dark:text-[#6B679C] hover:text-rose-400 rounded-full transition-all"
+                          className="h-9 w-9 flex items-center justify-center text-slate-300 dark:text-[#7E7AAA] hover:text-rose-400 rounded-full transition-all"
                           onClick={() => handleDeleteCategory(cat.id)}
                         >
                           <Trash2 size={14} strokeWidth={2.5} />
@@ -4384,146 +4384,132 @@ export default function App() {
           <DialogTrigger 
             render={
               <Button 
-                className="w-16 h-16 rounded-full bg-primary hover:active:scale-90 shadow-deep p-0 border-[6px] border-white dark:border-[#100E3D] transition-all duration-500 overflow-hidden group"
+                className="w-16 h-16 rounded-full bg-primary hover:active:scale-90 shadow-deep p-0 border-[6px] border-white dark:border-[#211E4A] transition-all duration-500 overflow-hidden group"
                 onClick={handleOpenRegistrar}
               >
                 <Plus size={32} className="text-white relative z-10 transition-transform duration-500 group-hover:rotate-90" strokeWidth={3} />
               </Button>
             }
           />
-          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none flex flex-col p-0 overflow-hidden border-none shadow-deep bg-white dark:bg-[#100E3D] sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full sm:max-w-xl sm:h-auto sm:max-h-[85vh] sm:rounded-[1.75rem]">
-            <div className="px-8 pt-8 pb-2 shrink-0">
-              <DialogHeader>
-                <DialogTitle className="text-4xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
-              </DialogHeader>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-8 pb-12 space-y-8 scrollbar-hide">
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null, ...(editingTransaction ? {} : { status: 'planned' as const })})}
-                  className={cn(
-                    "flex-1 h-14 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
-                    newTransaction.type === 'income' ? "bg-emerald-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
-                  )}
-                >
-                  <ArrowUpCircle size={20} strokeWidth={2.5} />
-                  Receita
-                </button>
-                <button
-                  onClick={() => setNewTransaction({...newTransaction, type: 'expense', ...(editingTransaction ? {} : { status: 'actual' as const })})}
-                  className={cn(
-                    "flex-1 h-14 rounded-2xl font-medium transition-all flex items-center justify-center gap-2 text-sm",
-                    (newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') ? "bg-rose-400 text-white shadow-soft" : "bg-slate-50 dark:bg-[#16133F] text-slate-400 dark:text-[#8D89AC] hover:bg-slate-100 dark:hover:bg-[#1C1852]/80"
-                  )}
-                >
-                  <ArrowDownCircle size={20} strokeWidth={2.5} />
-                  Despesa
-                </button>
+          <DialogContent className="max-w-none p-0 overflow-hidden border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] flex flex-col sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[min(1080px,94vw)] sm:max-w-none sm:h-[min(760px,92vh)] sm:rounded-[1.75rem]">
+            {/* Cabeçalho: título, tipo e valor numa linha só */}
+            <div className="shrink-0 px-8 pt-7 pb-5 flex items-end justify-between gap-8 border-b border-slate-200/70 dark:border-white/10">
+              <div className="min-w-0">
+                <DialogHeader>
+                  <DialogTitle className="text-3xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter">{editingTransaction ? 'Editar lançamento' : 'Novo lançamento'}</DialogTitle>
+                  <DialogDescription className="text-xs">Preencha o essencial à esquerda; repetição e pessoas ficam à direita.</DialogDescription>
+                </DialogHeader>
+                <div className="flex bg-white dark:bg-[#211E4A] rounded-[14px] p-1 mt-4 w-fit shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setNewTransaction({...newTransaction, type: 'expense', ...(editingTransaction ? {} : { status: 'actual' as const })})}
+                    className={cn("h-9 px-5 rounded-[10px] text-sm font-medium flex items-center gap-2 transition-colors", newTransaction.type !== 'income' ? "bg-rose-400 text-white" : "text-slate-400 dark:text-[#9D99BC]")}
+                  >
+                    <ArrowDownCircle size={16} strokeWidth={2.5} /> Despesa
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewTransaction({...newTransaction, type: 'income', cardId: null, ...(editingTransaction ? {} : { status: 'planned' as const })})}
+                    className={cn("h-9 px-5 rounded-[10px] text-sm font-medium flex items-center gap-2 transition-colors", newTransaction.type === 'income' ? "bg-emerald-400 text-white" : "text-slate-400 dark:text-[#9D99BC]")}
+                  >
+                    <ArrowUpCircle size={16} strokeWidth={2.5} /> Receita
+                  </button>
+                </div>
               </div>
-
-              <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-2 text-center">
-                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Valor</Label>
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-3xl font-medium text-slate-300 dark:text-[#6B679C]">R$</span>
+              <div className="text-right shrink-0 pr-8">
+                <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Valor</Label>
+                <div className="flex items-baseline justify-end gap-2">
+                  <span className="text-2xl font-medium text-slate-300 dark:text-[#7E7AAA]">R$</span>
                   <input
                     inputMode="decimal"
-                    className="bg-transparent outline-none text-center font-heading font-medium text-5xl text-slate-800 dark:text-[#EDE9E3] w-auto max-w-[320px] tracking-tight"
-                    style={{ width: `${Math.max(2, amountInput.length)}ch` }}
+                    autoFocus
+                    aria-label="Valor"
+                    className="bg-transparent outline-none text-right font-heading font-medium text-5xl text-slate-800 dark:text-[#EDE9E3] tracking-tight"
+                    style={{ width: `${Math.max(4, amountInput.length)}ch` }}
                     value={amountInput}
                     onChange={(e) => setAmountInput(maskCurrency(e.target.value))}
                   />
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-6">
-                <div className="p-6 bg-card border border-slate-200/70 dark:border-white/10 rounded-2xl space-y-5">
+            {/* Corpo em duas colunas; cada uma rola sozinha se precisar */}
+            <div className="flex-1 min-h-0 grid grid-cols-2">
+              <div className="min-h-0 overflow-y-auto px-8 py-6 space-y-5 border-r border-slate-200/70 dark:border-white/10">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Descrição</Label>
+                  <Input
+                    placeholder="Ex: Aluguel"
+                    className="h-12 rounded-[14px] border-none bg-white dark:bg-[#211E4A] font-normal text-base px-5 shadow-sm"
+                    value={newTransaction.description || ''}
+                    onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Descrição</Label>
-                    <Input
-                      placeholder="Ex: Aluguel"
-                      className="h-14 rounded-2xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-base px-6"
-                      value={newTransaction.description || ''}
-                      onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
+                    <DateField
+                      className="h-12 rounded-[14px] bg-white dark:bg-[#211E4A] text-sm px-5 shadow-sm"
+                      value={newTransaction.date || ''}
+                      onChange={(v) => { setTxDate(v); setLinkedIncomeDate(v); }}
                     />
                   </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Categoria</Label>
-                        <button type="button" onClick={() => setQuickCategoryOpen(true)} className="text-[11px] font-medium text-primary flex items-center gap-1 pr-1">
-                          <Plus size={12} strokeWidth={2.5} /> Nova categoria
-                        </button>
-                      </div>
-                      <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
-                        <SelectTrigger className="h-14 border-none bg-slate-50 dark:bg-[#16133F] rounded-2xl font-normal text-base px-6">
-                          <SelectValue placeholder="Selecione..." />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-xl border-none shadow-deep p-2">
-                          {categories.filter(c => c.id !== 'all').map(cat => (
-                            <SelectItem key={cat.id} value={cat.name} className="rounded-xl font-normal p-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                                <span>{cat.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Categoria</Label>
+                      <button type="button" onClick={() => setQuickCategoryOpen(true)} className="text-[11px] font-medium text-primary flex items-center gap-1 pr-1">
+                        <Plus size={12} strokeWidth={2.5} /> Nova
+                      </button>
                     </div>
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">{newTransaction.cardId ? 'Data da compra' : 'Data'}</Label>
-                      <DateField
-                        className="h-14 rounded-2xl bg-slate-50 dark:bg-[#16133F] text-sm px-6"
-                        value={newTransaction.date || ''}
-                        onChange={(v) => {
-                          setTxDate(v);
-                          setLinkedIncomeDate(v);
-                        }}
-                      />
+                    <Select value={newTransaction.category || ''} onValueChange={(v) => setNewTransaction({...newTransaction, category: v})}>
+                      <SelectTrigger className="h-12 data-[size=default]:h-12 border-none bg-white dark:bg-[#211E4A] rounded-[14px] font-normal text-sm px-5 shadow-sm">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-none shadow-deep p-2">
+                        {categories.filter(c => c.id !== 'all').map(cat => (
+                          <SelectItem key={cat.id} value={cat.name} className="rounded-xl font-normal p-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                              <span>{cat.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">No cartão de crédito?</Label>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
+                        className={cn("h-10 px-4 rounded-full text-sm font-medium border-2 transition-colors", !newTransaction.cardId ? "bg-white dark:bg-[#211E4A] border-primary text-primary" : "bg-white dark:bg-[#211E4A] border-transparent text-slate-400 dark:text-[#9D99BC]")}
+                      >
+                        Não
+                      </button>
+                      {cards.map(card => (
+                        <button
+                          key={card.id}
+                          type="button"
+                          onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
+                          className={cn("h-10 px-4 rounded-full text-sm font-medium border-2 transition-colors flex items-center gap-2", newTransaction.cardId === card.id ? "bg-white dark:bg-[#211E4A] border-primary text-primary" : "bg-white dark:bg-[#211E4A] border-transparent text-slate-400 dark:text-[#9D99BC]")}
+                        >
+                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
+                          {card.name}
+                        </button>
+                      ))}
                     </div>
                   </div>
-
-                  {(newTransaction.type === 'expense' || newTransaction.type === 'card_purchase') && cards.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">É no cartão de crédito?</Label>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setNewTransaction({ ...newTransaction, cardId: null, type: 'expense' })}
-                          className={cn(
-                            "h-11 px-4 rounded-full text-sm font-medium border-2 transition-all",
-                            !newTransaction.cardId ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
-                          )}
-                        >
-                          Não
-                        </button>
-                        {cards.map(card => (
-                          <button
-                            key={card.id}
-                            type="button"
-                            onClick={() => setNewTransaction({ ...newTransaction, cardId: card.id, type: 'card_purchase' })}
-                            className={cn(
-                              "h-11 px-4 rounded-full text-sm font-medium border-2 transition-all flex items-center gap-2",
-                              newTransaction.cardId === card.id ? "bg-slate-50 dark:bg-[#16133F] border-primary text-primary" : "bg-slate-50 dark:bg-[#16133F] border-transparent text-slate-400 dark:text-[#8D89AC]"
-                            )}
-                          >
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: card.color }} />
-                            {card.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
 
                 {repeatSection}
 
-                {peopleSection}
-
                 {newTransaction.type !== 'card_purchase' && !newTransaction.cardId && (
-                  <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#201C56]">
+                  <div className="flex items-center justify-between rounded-[14px] bg-white dark:bg-[#211E4A] px-5 h-12 shadow-sm">
                     <Label htmlFor="status-d" className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                       {newTransaction.type === 'income' ? 'Já recebido?' : 'Já pago?'}
                     </Label>
@@ -4533,51 +4519,49 @@ export default function App() {
                     />
                   </div>
                 )}
+              </div>
 
-                {editingTransaction?.linkedTransactionId && (
-                  <div className="pt-6 border-t border-slate-100 dark:border-[#201C56]">
-                    <p className="text-[10px] font-medium tracking-wider text-indigo-400 ml-1 mb-2">Lançamento vinculado</p>
-                    {(() => {
-                      const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
-                      if (!linked) return <p className="text-xs font-normal text-slate-300 dark:text-[#6B679C] italic ml-1 font-heading">Lançamento original não encontrado</p>;
-                      return (
-                        <div
-                          onClick={() => handleEditClick(linked)}
-                          className="flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-[1.5rem] border border-indigo-100/50 dark:border-indigo-900/40 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-white dark:bg-[#100E3D] shadow-sm flex items-center justify-center text-indigo-500">
-                              {linked.type === 'income' ? <ArrowUpCircle size={16} strokeWidth={3} /> : <CreditCard size={16} strokeWidth={3} />}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-normal text-slate-700 dark:text-[#EDEAF9] truncate">{linked.description}</p>
-                              <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC]">R$ {linked.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                            </div>
-                          </div>
-                          <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform" />
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
+              <div className="min-h-0 overflow-y-auto px-8 py-6 space-y-5">
+                {peopleSection}
 
-                <div className="flex gap-3">
-                  {editingTransaction && !editingTransaction.id.startsWith('bill-') && (
-                    <Button 
-                      onClick={() => {
-                        setTransactionToDelete(editingTransaction);
-                        setIsDeleteDialogOpen(true);
-                      }}
-                      variant="outline"
-                      className="w-16 h-16 rounded-full bg-rose-50 dark:bg-rose-500/10 border-none text-rose-400 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all flex items-center justify-center shrink-0"
+                {editingTransaction?.linkedTransactionId && (() => {
+                  const linked = transactions.find(t => t.id === editingTransaction.linkedTransactionId);
+                  if (!linked) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => handleEditClick(linked)}
+                      className="w-full flex items-center justify-between p-4 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-[1.25rem] text-left group"
                     >
-                      <Trash2 size={24} />
-                    </Button>
-                  )}
-                  <Button onClick={() => handleAddTransaction()} className="flex-1 h-16 rounded-full font-medium text-lg bg-primary text-white hover:bg-primary/90 transition-all active:scale-95">
-                      Salvar lançamento
-                  </Button>
-                </div>
+                      <span className="min-w-0">
+                        <span className="block text-[10px] font-medium tracking-wider text-indigo-400">Lançamento vinculado</span>
+                        <span className="block text-sm font-normal text-slate-700 dark:text-[#EDEAF9] truncate">{linked.description}</span>
+                      </span>
+                      <ChevronRight size={16} className="text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
+                    </button>
+                  );
+                })()}
+              </div>
+            </div>
+
+            {/* Rodapé fixo */}
+            <div className="shrink-0 px-8 py-4 border-t border-slate-200/70 dark:border-white/10 flex items-center justify-between gap-3">
+              {editingTransaction && !editingTransaction.id.startsWith('bill-') ? (
+                <button
+                  type="button"
+                  onClick={() => { setTransactionToDelete(editingTransaction); setIsDeleteDialogOpen(true); }}
+                  className="h-11 px-4 rounded-full text-sm font-medium text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center gap-2 transition-colors"
+                >
+                  <Trash2 size={16} /> Excluir
+                </button>
+              ) : <span />}
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setIsRegistrarOpen(false)} className="h-11 px-5 rounded-full text-sm font-medium text-slate-500 dark:text-[#C5C1E5] hover:bg-slate-100 dark:hover:bg-[#2A2755] transition-colors">
+                  Cancelar
+                </button>
+                <Button onClick={() => handleAddTransaction()} disabled={!newTransaction.description || parseCurrency(amountInput) === 0} className="h-11 px-8 rounded-full font-medium text-sm bg-primary text-white hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-40">
+                  Salvar lançamento
+                </Button>
               </div>
             </div>
           </DialogContent>
@@ -4585,7 +4569,7 @@ export default function App() {
       </div>
 
       {/* Bottom Navigation - Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-[#F6F4FD] dark:bg-[#0B0A2E] border-t border-slate-200/70 dark:border-white/10 flex items-center justify-around px-4 pt-3 z-40 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-[#F6F4FD] dark:bg-[#17153A] border-t border-slate-200/70 dark:border-white/10 flex items-center justify-around px-4 pt-3 z-40 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <MobileNavItem
           active={activeTab === 'visao-geral'}
           onClick={() => setActiveTab('visao-geral')}
@@ -4615,7 +4599,7 @@ export default function App() {
         />
 
         <Dialog open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
-          <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E] max-h-[85vh] flex flex-col">
+          <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] max-h-[85vh] flex flex-col">
             <div className="p-6 pb-3 pr-14 shrink-0">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Notificações</DialogTitle>
@@ -4629,7 +4613,7 @@ export default function App() {
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-6 space-y-2.5 scrollbar-hide">
               {notifications.length === 0 ? (
-                <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-10">Você não tem notificações.</p>
+                <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA] text-center py-10">Você não tem notificações.</p>
               ) : notifications.map(n => {
                 const sender = people.find(pp => pp.linkedUserId && pp.linkedUserId === n.fromUserId);
                 const action = n.type === 'payment_signal' ? 'avisou que já pagou'
@@ -4655,7 +4639,7 @@ export default function App() {
                           <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-sm">{senderName.charAt(0).toUpperCase()}</div>
                         )}
                         <span className={cn(
-                          "absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white dark:border-[#100E3D] flex items-center justify-center text-white",
+                          "absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white dark:border-[#211E4A] flex items-center justify-center text-white",
                           n.type === 'payment_signal' ? "bg-emerald-500" : "bg-primary"
                         )}>
                           <TypeIcon size={10} strokeWidth={3} />
@@ -4665,7 +4649,7 @@ export default function App() {
                         <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{senderName}</span> {action}
                       </p>
                       <div className="flex items-center gap-1.5 shrink-0 self-start mt-0.5">
-                        <span className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] whitespace-nowrap">
+                        <span className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC] whitespace-nowrap">
                           {formatDistanceToNowStrict(parseISO(n.createdAt), { locale: ptBR, addSuffix: true })}
                         </span>
                         {!n.read && <span className="w-2 h-2 rounded-full bg-primary" aria-label="Não lida" />}
@@ -4673,10 +4657,10 @@ export default function App() {
                     </div>
 
                     {tx ? (
-                      <div className="rounded-2xl bg-slate-50 dark:bg-[#16133F] px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="rounded-2xl bg-slate-50 dark:bg-[#2A2755] px-4 py-3 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{tx.description.split(' · ')[0]}</p>
-                          <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">
+                          <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">
                             {monthLabel(getTransactionEffectiveMonth(tx))}
                             {tx.installments ? ` · parcela ${tx.installments.current}/${tx.installments.total}` : (tx.recurrence !== 'none' || tx.seriesId) ? ' · recorrente' : ''}
                           </p>
@@ -4686,7 +4670,7 @@ export default function App() {
                         </p>
                       </div>
                     ) : n.body ? (
-                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">{n.body}</p>
+                      <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">{n.body}</p>
                     ) : null}
 
                     {n.type === 'payment_signal' && tx && (tx.status === 'actual' ? (
@@ -4735,7 +4719,7 @@ export default function App() {
         </Dialog>
 
         <Dialog open={!!sharedTxDetail} onOpenChange={(open) => { if (!open) setSharedTxDetail(null); }}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
             {sharedTxDetail && (() => {
               const t = sharedTxDetail;
               const iOwe = t.type !== 'income';
@@ -4747,7 +4731,7 @@ export default function App() {
                     <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{t.description.split(' · ')[0]}</DialogTitle>
                     <DialogDescription className="text-xs">Associada a você por {owner?.name || 'outra pessoa'} · {format(parseISO(t.date), 'dd/MM/yyyy')}</DialogDescription>
                   </DialogHeader>
-                  <div className="rounded-2xl bg-white dark:bg-[#100E3D] p-4 flex items-center justify-between">
+                  <div className="rounded-2xl bg-white dark:bg-[#211E4A] p-4 flex items-center justify-between">
                     <span className={cn("text-sm font-medium", iOwe ? "text-rose-500 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400")}>
                       {iOwe ? `Você deve a ${ownerName}` : `${ownerName} te deve`}
                     </span>
@@ -4764,7 +4748,7 @@ export default function App() {
                         Avisar que já paguei
                       </button>
                     ))}
-                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] text-center">Só quem criou pode editar ou excluir essa movimentação.</p>
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] text-center">Só quem criou pode editar ou excluir essa movimentação.</p>
                 </div>
               );
             })()}
@@ -4772,7 +4756,7 @@ export default function App() {
         </Dialog>
 
         <Dialog open={quickCategoryOpen} onOpenChange={setQuickCategoryOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E] z-[80]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] z-[80]">
             <div className="p-6 space-y-4">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Nova categoria</DialogTitle>
@@ -4782,14 +4766,14 @@ export default function App() {
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0" style={{ backgroundColor: quickCategoryColor }}>{quickCategoryIcon}</div>
                 <Input
                   placeholder="Ex: Pet"
-                  className="h-12 rounded-2xl border-none bg-white dark:bg-[#100E3D] font-normal text-sm px-5 shadow-sm"
+                  className="h-12 rounded-2xl border-none bg-white dark:bg-[#211E4A] font-normal text-sm px-5 shadow-sm"
                   value={quickCategoryName}
                   onChange={(e) => setQuickCategoryName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleQuickCreateCategory()}
                   autoFocus
                 />
               </div>
-              <div className="bg-white dark:bg-[#100E3D] rounded-2xl p-2 max-h-40 overflow-y-auto scrollbar-hide">
+              <div className="bg-white dark:bg-[#211E4A] rounded-2xl p-2 max-h-40 overflow-y-auto scrollbar-hide">
                 <div className="grid grid-cols-8 gap-1">
                   {CATEGORY_EMOJIS.map(emoji => (
                     <button
@@ -4810,7 +4794,7 @@ export default function App() {
                     type="button"
                     onClick={() => setQuickCategoryColor(color)}
                     aria-label={`Cor ${color}`}
-                    className={cn("w-7 h-7 rounded-full transition-all", quickCategoryColor === color ? "ring-2 ring-primary ring-offset-2 dark:ring-offset-[#0B0A2E]" : "opacity-60")}
+                    className={cn("w-7 h-7 rounded-full transition-all", quickCategoryColor === color ? "ring-2 ring-primary ring-offset-2 dark:ring-offset-[#17153A]" : "opacity-60")}
                     style={{ backgroundColor: color }}
                   />
                 ))}
@@ -4830,7 +4814,7 @@ export default function App() {
         <ImageCropper src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />
 
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-          <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:w-screen sm:max-w-none sm:translate-x-0 sm:rounded-none">
+          <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:w-screen sm:max-w-none sm:translate-x-0 sm:rounded-none">
             <div className="px-6 pt-6 pb-2 shrink-0">
               <DialogHeader className="sr-only">
                 <DialogTitle>Minha conta</DialogTitle>
@@ -4851,7 +4835,7 @@ export default function App() {
                       (userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()
                     )}
                   </div>
-                  <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-secondary text-secondary-foreground border-2 border-white dark:border-[#100E3D] flex items-center justify-center shadow-sm">
+                  <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 rounded-full bg-secondary text-secondary-foreground border-2 border-white dark:border-[#211E4A] flex items-center justify-center shadow-sm">
                     <Camera size={11} />
                   </div>
                 </button>
@@ -4864,7 +4848,7 @@ export default function App() {
                 />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-slate-800 dark:text-[#EDE9E3] truncate">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
-                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] truncate">
+                  <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] truncate">
                     {userProfile?.username ? `@${userProfile.username} · ` : ''}{user?.email}
                   </p>
                 </div>
@@ -4925,7 +4909,7 @@ export default function App() {
                   />
                 </AccountSection>
 
-                <p className="text-[10px] font-normal text-slate-300 dark:text-[#6B679C] text-center">Feito com carinho, por edinho</p>
+                <p className="text-[10px] font-normal text-slate-300 dark:text-[#7E7AAA] text-center">Feito com carinho, por edinho</p>
               </div>
             </div>
           </DialogContent>
@@ -4934,7 +4918,7 @@ export default function App() {
 
       {/* iOS Install Instructions */}
       <Dialog open={showIOSInstallHelp} onOpenChange={setShowIOSInstallHelp}>
-        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+        <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
           <DialogHeader className="sr-only">
             <DialogTitle>Instalar no iPhone/iPad</DialogTitle>
             <DialogDescription>Passos para adicionar o app à tela de início</DialogDescription>
@@ -4945,7 +4929,7 @@ export default function App() {
             </div>
             <div className="space-y-1.5">
               <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Instalar no iPhone/iPad</h1>
-              <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+              <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">
                 O iOS não permite instalar apps direto pelo navegador. Siga os passos:
               </p>
             </div>
@@ -4963,17 +4947,17 @@ export default function App() {
 
       {/* Account Edit Dialog */}
       <Dialog open={isAccountEditOpen} onOpenChange={setIsAccountEditOpen}>
-        <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E] max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] max-h-[85vh] flex flex-col">
           <div className="p-6 pb-2 shrink-0">
             <DialogHeader>
               <DialogTitle className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Editar informações</DialogTitle>
-              <DialogDescription className="font-normal text-sm text-slate-400 dark:text-[#8D89AC] mt-1">Atualize seus dados de conta</DialogDescription>
+              <DialogDescription className="font-normal text-sm text-slate-400 dark:text-[#9D99BC] mt-1">Atualize seus dados de conta</DialogDescription>
             </DialogHeader>
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Nome</Label>
+                <Label className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] ml-4">Nome</Label>
                 <Input
                   className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6"
                   value={editFirstName}
@@ -4981,7 +4965,7 @@ export default function App() {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Sobrenome</Label>
+                <Label className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] ml-4">Sobrenome</Label>
                 <Input
                   className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6"
                   value={editLastName}
@@ -4990,9 +4974,9 @@ export default function App() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Usuário</Label>
+              <Label className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] ml-4">Usuário</Label>
               <div className="relative">
-                <AtSign size={15} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#6B679C]" />
+                <AtSign size={15} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7E7AAA]" />
                 <Input
                   className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm pl-12 pr-6"
                   value={editUsername}
@@ -5001,7 +4985,7 @@ export default function App() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Apelido</Label>
+              <Label className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] ml-4">Apelido</Label>
               <Input
                 placeholder="Como quer ser chamado no app"
                 className="h-14 rounded-full border border-slate-200/70 dark:border-white/10 bg-white/60 dark:bg-white/5 focus:bg-white dark:focus:bg-white/10 font-normal text-sm px-6"
@@ -5011,11 +4995,11 @@ export default function App() {
             </div>
 
             <div className="pt-4 space-y-3">
-              <p className="text-xs font-medium tracking-widest text-slate-400 dark:text-[#8D89AC] ml-4">Trocar senha (opcional)</p>
+              <p className="text-xs font-medium tracking-widest text-slate-400 dark:text-[#9D99BC] ml-4">Trocar senha (opcional)</p>
               <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Nova senha</Label>
+                <Label className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] ml-4">Nova senha</Label>
                 <div className="relative">
-                  <KeyRound size={15} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#6B679C]" />
+                  <KeyRound size={15} className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7E7AAA]" />
                   <Input
                     type={showEditPassword ? 'text' : 'password'}
                     placeholder="••••••••"
@@ -5026,7 +5010,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setShowEditPassword(v => !v)}
-                    className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#8D89AC] hover:text-primary transition-colors"
+                    className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9D99BC] hover:text-primary transition-colors"
                   >
                     {showEditPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -5034,7 +5018,7 @@ export default function App() {
               </div>
               {editNewPassword && (
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-4">Confirmar nova senha</Label>
+                  <Label className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] ml-4">Confirmar nova senha</Label>
                   <Input
                     type={showEditPassword ? 'text' : 'password'}
                     placeholder="••••••••"
@@ -5058,7 +5042,7 @@ export default function App() {
             >
               Salvar alterações
             </button>
-            <button onClick={() => setIsAccountEditOpen(false)} className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
+            <button onClick={() => setIsAccountEditOpen(false)} className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#9D99BC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
               Cancelar
             </button>
           </div>
@@ -5082,27 +5066,27 @@ export default function App() {
             label="Resumo"
           />
           <NavItem
-            active={activeTab === 'receitas'}
-            onClick={() => { setActiveTab('receitas'); setSelectedCard(null); }}
-            icon={<ArrowUpCircle size={20} />}
-            label="Receitas"
-          />
-          <NavItem 
-            active={activeTab === 'despesas'} 
+            active={activeTab === 'receitas' || activeTab === 'despesas'}
             onClick={() => { setActiveTab('despesas'); setSelectedCard(null); }}
-            icon={<ArrowDownCircle size={20} />}
-            label="Despesas"
+            icon={<ArrowUpDown size={20} />}
+            label="Movimentações"
           />
-          <NavItem 
-            active={isPessoasSummaryOpen} 
-            onClick={() => { setIsPessoasSummaryOpen(true); setIsProfileOpen(false); }}
+          <NavItem
+            active={activeTab === 'cartoes'}
+            onClick={() => setActiveTab('cartoes')}
+            icon={<CreditCard size={20} />}
+            label="Cartões"
+          />
+          <NavItem
+            active={activeTab === 'pessoas'}
+            onClick={() => setActiveTab('pessoas')}
             icon={<Users size={20} />}
             label="Pessoas"
           />
         </nav>
 
         <div className="mt-auto pt-6 flex flex-col gap-2">
-          <button className="w-full flex items-center gap-3 p-2 rounded-[1.75rem] hover:bg-slate-50 dark:hover:bg-[#16133F] transition-colors group" onClick={() => setIsProfileOpen(true)}>
+          <button className="w-full flex items-center gap-3 p-2 rounded-[1.75rem] hover:bg-slate-50 dark:hover:bg-[#2A2755] transition-colors group" onClick={() => setIsProfileOpen(true)}>
             <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg shrink-0 overflow-hidden">
               {userProfile?.photoURL ? (
                 <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -5112,14 +5096,14 @@ export default function App() {
             </div>
             <div className="flex-1 overflow-hidden text-left">
               <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3] truncate tracking-tight">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
-              <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] truncate tracking-tight">{user?.email}</p>
+              <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] truncate tracking-tight">{user?.email}</p>
             </div>
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 pt-4 md:p-12 md:pt-12 max-w-7xl mx-auto w-full pb-48 md:pb-12 text-slate-400 dark:text-[#8D89AC]">
+      <main className="flex-1 p-6 pt-4 md:p-12 md:pt-10 max-w-3xl mx-auto w-full pb-48 md:pb-32 text-slate-400 dark:text-[#9D99BC]">
         <AnimatePresence mode="wait">
           {activeTab === 'visao-geral' && (
             <motion.div
@@ -5129,15 +5113,15 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-8 pb-32"
             >
-              <div className="hidden md:flex items-center justify-between flex-wrap gap-4">
+              <div className="hidden">
                 <div>
                   <h2 className="text-3xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
                     Olá, {userProfile?.nickname || 'de novo'} 👋
                   </h2>
-                  <p className="text-slate-400 dark:text-[#8D89AC] font-normal text-sm mt-1">{monthLabel(currentDate)}</p>
+                  <p className="text-slate-400 dark:text-[#9D99BC] font-normal text-sm mt-1">{monthLabel(currentDate)}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 bg-white dark:bg-[#100E3D] px-1.5 py-1.5 rounded-full shadow-soft">
+                  <div className="flex items-center gap-1 bg-white dark:bg-[#211E4A] px-1.5 py-1.5 rounded-full shadow-soft">
                     <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 text-primary transition-all active:scale-95" onClick={prevMonth}>
                       <ChevronLeft size={18} strokeWidth={3} />
                     </Button>
@@ -5160,7 +5144,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setCurrentDate(new Date())}
-                      className="h-11 px-4 rounded-full bg-white dark:bg-[#100E3D] shadow-soft text-xs font-medium text-primary shrink-0"
+                      className="h-11 px-4 rounded-full bg-white dark:bg-[#211E4A] shadow-soft text-xs font-medium text-primary shrink-0"
                     >
                       Hoje
                     </button>
@@ -5169,18 +5153,18 @@ export default function App() {
               </div>
 
               {/* Hero de saldo (mobile) — no estilo "Your Balance" da referência */}
-              <div className="md:hidden space-y-5">
+              <div className="space-y-5">
                 {mobileTopHeader}
 
                 <div>
-                  <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight">{monthLabel(currentDate)}</p>
+                  <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight">{monthLabel(currentDate)}</p>
                   <h1 className="text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mt-1">Balanço do mês</h1>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     {(() => {
                       const [intPart, decPart] = Math.abs(homeBalance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                       return (
                         <p className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
-                          {homeBalance < 0 && '-'}R$ {intPart}<span className="text-slate-300 dark:text-[#5C5686]">,{decPart}</span>
+                          {homeBalance < 0 && '-'}R$ {intPart}<span className="text-slate-300 dark:text-[#6A6594]">,{decPart}</span>
                         </p>
                       );
                     })()}
@@ -5199,13 +5183,13 @@ export default function App() {
                     className={cn(
                       "mt-2 inline-flex items-center gap-1.5 rounded-full border-[1.5px] pl-1.5 pr-3 py-1 text-[11px] font-medium transition-colors",
                       onlyCompleted
-                        ? "border-primary text-primary bg-white dark:bg-[#100E3D]"
-                        : "border-slate-200 dark:border-[#2A2566] text-slate-400 dark:text-[#8D89AC] bg-white dark:bg-[#100E3D]"
+                        ? "border-primary text-primary bg-white dark:bg-[#211E4A]"
+                        : "border-slate-200 dark:border-[#423D78] text-slate-400 dark:text-[#9D99BC] bg-white dark:bg-[#211E4A]"
                     )}
                   >
                     <span className={cn(
                       "w-4 h-4 rounded-[5px] border-[1.5px] flex items-center justify-center",
-                      onlyCompleted ? "bg-primary border-primary text-white" : "border-slate-300 dark:border-[#3A3470] text-transparent"
+                      onlyCompleted ? "bg-primary border-primary text-white" : "border-slate-300 dark:border-[#4B4683] text-transparent"
                     )}>
                       <Check size={10} strokeWidth={3.5} />
                     </span>
@@ -5240,7 +5224,7 @@ export default function App() {
                   const thumbLabel = "text-[10px] font-normal text-slate-500 dark:text-[#A8A4CC] truncate w-14 text-center";
                   const addButton = (onClick: () => void, label: string) => (
                     <button type="button" onClick={onClick} className="flex flex-col items-center gap-1.5 shrink-0" aria-label={label}>
-                      <span className="w-12 h-12 rounded-full border-2 border-dashed border-slate-200 dark:border-[#2A2566] text-slate-400 dark:text-[#8D89AC] flex items-center justify-center">
+                      <span className="w-12 h-12 rounded-full border-2 border-dashed border-slate-200 dark:border-[#423D78] text-slate-400 dark:text-[#9D99BC] flex items-center justify-center">
                         <Plus size={18} strokeWidth={2.5} />
                       </span>
                       <span className={thumbLabel}>Adicionar</span>
@@ -5250,7 +5234,7 @@ export default function App() {
                   return (
                     <>
                       <div>
-                        <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight mb-3">Pessoas</p>
+                        <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight mb-3">Pessoas</p>
                         <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1">
                           {visiblePeople.map(p => (
                             <button
@@ -5270,7 +5254,7 @@ export default function App() {
                       </div>
 
                       <div>
-                        <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-tight mb-3">Cartões</p>
+                        <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight mb-3">Cartões</p>
                         <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1">
                           {cards.map(c => (
                             <button
@@ -5312,7 +5296,7 @@ export default function App() {
 
               {floatingMonthPicker}
 
-              <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="hidden">
                 <StatCard
                   title="Receitas confirmadas"
                   value={stats.incomeActual}
@@ -5334,8 +5318,8 @@ export default function App() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                <ShadcnCard className="lg:col-span-3 border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#100E3D] py-0 gap-0">
+              <div className="grid grid-cols-1 gap-6">
+                <ShadcnCard className="border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#211E4A] py-0 gap-0">
                   <CardContent className="px-5 py-4">
                     <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Receitas x despesas (últimos 6 meses)</h3>
                     <ResponsiveContainer width="100%" height={140}>
@@ -5360,11 +5344,11 @@ export default function App() {
                   </CardContent>
                 </ShadcnCard>
 
-                <ShadcnCard className="lg:col-span-2 border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#100E3D] py-0 gap-0">
+                <ShadcnCard className="border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#211E4A] py-0 gap-0">
                   <CardContent className="px-5 py-4">
                     <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Principais categorias</h3>
                     {chartData.length === 0 ? (
-                      <p className="text-xs font-normal text-slate-300 dark:text-[#6B679C] py-16 text-center">Sem despesas neste mês.</p>
+                      <p className="text-xs font-normal text-slate-300 dark:text-[#7E7AAA] py-16 text-center">Sem despesas neste mês.</p>
                     ) : (() => {
                       // Barra segmentada (a divisão do mês num relance) + ranking em
                       // barras horizontais: as 4 maiores categorias e "Outros".
@@ -5386,7 +5370,7 @@ export default function App() {
                         <div className="space-y-4">
                           <div>
                             <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{brl(total)}</p>
-                            <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC]">em {sorted.length} {sorted.length === 1 ? 'categoria' : 'categorias'}</p>
+                            <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">em {sorted.length} {sorted.length === 1 ? 'categoria' : 'categorias'}</p>
                           </div>
                           <div className="flex h-2.5 gap-[2px] rounded-full overflow-hidden" role="img" aria-label={groups.map(g => `${g.name} ${pct(g.value)}%`).join(', ')}>
                             {groups.map(g => (
@@ -5396,7 +5380,7 @@ export default function App() {
                           <div className="space-y-1.5">
                             {groups.map(g => (
                               <div key={g.name} className="flex items-center gap-3" title={`${g.name}: ${brl(g.value)} (${pct(g.value)}%)`}>
-                                <div className="relative flex-1 min-w-0 h-9 rounded-xl bg-slate-50 dark:bg-[#16133F] overflow-hidden">
+                                <div className="relative flex-1 min-w-0 h-9 rounded-xl bg-slate-50 dark:bg-[#2A2755] overflow-hidden">
                                   <div
                                     className="absolute inset-y-0 left-0 rounded-xl"
                                     style={{ width: `${Math.max(6, (g.value / max) * 100)}%`, backgroundColor: `${g.color}40` }}
@@ -5408,7 +5392,7 @@ export default function App() {
                                 </div>
                                 <div className="text-right shrink-0 w-20">
                                   <p className="text-xs font-medium text-slate-800 dark:text-[#EDE9E3] tabular-nums">{brl(g.value)}</p>
-                                  <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] tabular-nums">{pct(g.value)}%</p>
+                                  <p className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC] tabular-nums">{pct(g.value)}%</p>
                                 </div>
                               </div>
                             ))}
@@ -5430,7 +5414,7 @@ export default function App() {
                   if (debtors.length === 0) {
                     return (
                       <div className="bg-card rounded-[1.75rem] shadow-soft p-10 text-center">
-                        <p className="text-xs font-normal text-slate-300 dark:text-[#6B679C]">Ninguém deve nada neste mês. 🎉</p>
+                        <p className="text-xs font-normal text-slate-300 dark:text-[#7E7AAA]">Ninguém deve nada neste mês. 🎉</p>
                       </div>
                     );
                   }
@@ -5477,7 +5461,7 @@ export default function App() {
                       );
                     })}
                     {(!(groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'] || (groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'].length === 0) && (
-                      <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#6B679C] bg-card rounded-3xl">Nenhum lançamento ainda.</p>
+                      <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#7E7AAA] bg-card rounded-3xl">Nenhum lançamento ainda.</p>
                     )}
                   </div>
               </div>
@@ -5491,7 +5475,7 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32"
             >
-              <div className="md:hidden space-y-5">
+              <div className="space-y-5">
                 {mobileTopHeader}
                 <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
                   Movimentações
@@ -5501,7 +5485,7 @@ export default function App() {
                     onClick={() => setMovTab('movimentacoes')}
                     className={cn(
                       "text-base transition-colors",
-                      movTab === 'movimentacoes' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
+                      movTab === 'movimentacoes' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#7E7AAA]"
                     )}
                   >
                     Tudo
@@ -5510,7 +5494,7 @@ export default function App() {
                     onClick={() => setMovTab('apagar')}
                     className={cn(
                       "text-base transition-colors",
-                      movTab === 'apagar' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
+                      movTab === 'apagar' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#7E7AAA]"
                     )}
                   >
                     A pagar
@@ -5519,7 +5503,7 @@ export default function App() {
                     onClick={() => setMovTab('areceber')}
                     className={cn(
                       "text-base transition-colors",
-                      movTab === 'areceber' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#6B679C]"
+                      movTab === 'areceber' ? "font-medium text-slate-800 dark:text-[#EDE9E3]" : "font-normal text-slate-400 dark:text-[#7E7AAA]"
                     )}
                   >
                     A receber
@@ -5527,12 +5511,12 @@ export default function App() {
                 </div>
 
                 {movTab === 'movimentacoes' && (
-                  <div className="flex bg-slate-100 dark:bg-[#1C1852] p-1 rounded-full shadow-inner w-fit">
+                  <div className="flex bg-slate-100 dark:bg-[#312D62] p-1 rounded-full shadow-inner w-fit">
                     <button
                       onClick={() => setMovStatusFilter('all')}
                       className={cn(
                         "px-4 py-2 rounded-full text-xs font-medium transition-all",
-                        movStatusFilter === 'all' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                        movStatusFilter === 'all' ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC]"
                       )}
                     >
                       Tudo
@@ -5541,7 +5525,7 @@ export default function App() {
                       onClick={() => setMovStatusFilter('planned')}
                       className={cn(
                         "px-4 py-2 rounded-full text-xs font-medium transition-all",
-                        movStatusFilter === 'planned' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                        movStatusFilter === 'planned' ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC]"
                       )}
                     >
                       Previsto
@@ -5550,7 +5534,7 @@ export default function App() {
                       onClick={() => setMovStatusFilter('actual')}
                       className={cn(
                         "px-4 py-2 rounded-full text-xs font-medium transition-all",
-                        movStatusFilter === 'actual' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC]"
+                        movStatusFilter === 'actual' ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC]"
                       )}
                     >
                       Pago
@@ -5559,10 +5543,10 @@ export default function App() {
                 )}
 
                 <div className="relative">
-                  <Search size={16} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#6B679C]" />
+                  <Search size={16} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7E7AAA]" />
                   <Input
                     placeholder="Buscar movimentações"
-                    className="h-11 rounded-full border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm pl-11 pr-11 shadow-sm"
+                    className="h-11 rounded-full border-none bg-slate-50 dark:bg-[#2A2755] font-normal text-sm pl-11 pr-11 shadow-sm"
                     value={movSearchQuery}
                     onChange={(e) => setMovSearchQuery(e.target.value)}
                   />
@@ -5570,7 +5554,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setMovSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 dark:text-[#9D99BC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
                       aria-label="Limpar busca"
                     >
                       <X size={14} strokeWidth={2.5} />
@@ -5579,14 +5563,14 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="hidden md:flex md:items-center justify-between gap-6">
+              <div className="hidden">
                 <div className="flex items-center gap-2 flex-1 relative">
-                  <div className="flex bg-slate-100 dark:bg-[#1C1852] p-1 rounded-full shadow-inner">
+                  <div className="flex bg-slate-100 dark:bg-[#312D62] p-1 rounded-full shadow-inner">
                     <button 
                       onClick={() => setTransactionFilter('all')}
                       className={cn(
                         "px-6 py-2.5 rounded-full text-xs font-medium transition-all",
-                        transactionFilter === 'all' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+                        transactionFilter === 'all' ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
                       )}
                     >
                       Todas
@@ -5595,7 +5579,7 @@ export default function App() {
                       onClick={() => setTransactionFilter('pending')}
                       className={cn(
                         "px-6 py-2.5 rounded-full text-xs font-medium transition-all",
-                        transactionFilter === 'pending' ? "bg-white dark:bg-[#100E3D] text-primary shadow-sm" : "text-slate-400 dark:text-[#8D89AC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+                        transactionFilter === 'pending' ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
                       )}
                     >
                       Pendentes
@@ -5605,19 +5589,19 @@ export default function App() {
                   <div className="ml-auto flex items-center gap-2">
                     <Popover>
                       <PopoverTrigger render={
-                        <Button variant="outline" className="h-11 w-11 p-0 border-none bg-slate-100/50 dark:bg-[#1C1852]/50 hover:bg-slate-100 dark:hover:bg-[#1C1852] rounded-xl shadow-sm">
+                        <Button variant="outline" className="h-11 w-11 p-0 border-none bg-slate-100/50 dark:bg-[#312D62]/50 hover:bg-slate-100 dark:hover:bg-[#312D62] rounded-xl shadow-sm">
                           <LayoutDashboard size={18} strokeWidth={3} className="text-primary" />
                         </Button>
                       } />
-                      <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#100E3D] z-50">
+                      <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#211E4A] z-50">
                         <div className="space-y-3">
-                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Agrupamento</Label>
+                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Agrupamento</Label>
                           <div className="flex flex-col gap-2">
                             <button 
                               onClick={() => setGroupMode('date')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                groupMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                                groupMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                               )}
                             >
                               Agrupar por data
@@ -5626,7 +5610,7 @@ export default function App() {
                               onClick={() => setGroupMode('category')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                groupMode === 'category' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                                groupMode === 'category' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                               )}
                             >
                               Agrupar por categoria
@@ -5635,7 +5619,7 @@ export default function App() {
                               onClick={() => setGroupMode('person')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                groupMode === 'person' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                                groupMode === 'person' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                               )}
                             >
                               Agrupar por pessoa
@@ -5647,19 +5631,19 @@ export default function App() {
 
                     <Popover>
                       <PopoverTrigger render={
-                        <Button variant="outline" className="h-11 w-11 p-0 border-none bg-slate-100/50 dark:bg-[#1C1852]/50 hover:bg-slate-100 dark:hover:bg-[#1C1852] rounded-xl shadow-sm">
+                        <Button variant="outline" className="h-11 w-11 p-0 border-none bg-slate-100/50 dark:bg-[#312D62]/50 hover:bg-slate-100 dark:hover:bg-[#312D62] rounded-xl shadow-sm">
                           <ArrowUpDown size={18} strokeWidth={3} className="text-primary" />
                         </Button>
                       } />
-                      <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#100E3D] z-50">
+                      <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#211E4A] z-50">
                         <div className="space-y-3">
-                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Ordenamento</Label>
+                          <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Ordenamento</Label>
                           <div className="flex flex-col gap-2">
                             <button 
                               onClick={() => setSortMode('date')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                sortMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                                sortMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                               )}
                             >
                               Por data (mais antigos primeiro)
@@ -5668,7 +5652,7 @@ export default function App() {
                               onClick={() => setSortMode('min')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                sortMode === 'min' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                                sortMode === 'min' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                               )}
                             >
                               Menor valor
@@ -5677,7 +5661,7 @@ export default function App() {
                               onClick={() => setSortMode('max')}
                               className={cn(
                                 "w-full py-3 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                                sortMode === 'max' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                                sortMode === 'max' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                               )}
                             >
                               Maior valor
@@ -5689,10 +5673,10 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex-1 bg-white dark:bg-[#100E3D] px-6 py-4 rounded-[1.75rem] border border-white dark:border-[#100E3D] shadow-soft flex justify-between items-center relative overflow-hidden">
+                <div className="flex-1 bg-white dark:bg-[#211E4A] px-6 py-4 rounded-[1.75rem] border border-white dark:border-[#211E4A] shadow-soft flex justify-between items-center relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary/2 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-125 duration-700"></div>
                   <div>
-                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest opacity-60">Total</p>
+                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest opacity-60">Total</p>
                     <p className={cn(
                       "text-lg font-heading font-bold tracking-tighter",
                       activeTab === 'receitas' ? "text-emerald-500" : "text-rose-400"
@@ -5700,9 +5684,9 @@ export default function App() {
                       R$ {(activeTab === 'receitas' ? stats.incomeTotal : stats.expenseTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
-                  <div className="w-px h-8 bg-slate-100 dark:bg-[#1C1852] mx-2" />
+                  <div className="w-px h-8 bg-slate-100 dark:bg-[#312D62] mx-2" />
                   <div className="text-right">
-                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest opacity-60">Pendente</p>
+                    <p className="text-[9px] font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest opacity-60">Pendente</p>
                     <p className={cn(
                       "text-lg font-heading font-bold tracking-tighter",
                       activeTab === 'receitas' ? "text-emerald-500" : "text-rose-400"
@@ -5714,7 +5698,7 @@ export default function App() {
               </div>
 
               {/* Movimentações (mobile) — cards no estilo Transactions.png / Upcoming Bills.png */}
-              <div className="md:hidden space-y-6">
+              <div className="space-y-6">
                 {movTab === 'movimentacoes' && (
                   <>
                     <div className="grid grid-cols-2 gap-3">
@@ -5748,7 +5732,7 @@ export default function App() {
                           .filter(t => movStatusFilter === 'all' ? true : t.status === movStatusFilter)
                           .filter(t => t.description.toLowerCase().includes(movSearchQuery.trim().toLowerCase()));
                         return filtered.length === 0 ? (
-                          <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">Nenhuma movimentação neste mês.</p>
+                          <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA] text-center py-12">Nenhuma movimentação neste mês.</p>
                         ) : (
                           filtered.map(t => {
                             const person = people.find(p => p.id === t.payerPayee);
@@ -5786,14 +5770,14 @@ export default function App() {
                     if (d < 0) return { label: `Atrasado há ${-d} ${-d === 1 ? 'dia' : 'dias'}`, cls: "bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400" };
                     if (d === 0) return { label: isPay ? 'Vence hoje' : 'Hoje', cls: "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400" };
                     if (d === 1) return { label: isPay ? 'Vence amanhã' : 'Amanhã', cls: "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400" };
-                    return { label: `${format(parseISO(t.date), "dd 'de' MMM", { locale: ptBR })} · em ${d} dias`, cls: "bg-slate-100 dark:bg-[#1C1852] text-slate-500 dark:text-[#A8A4CC]" };
+                    return { label: `${format(parseISO(t.date), "dd 'de' MMM", { locale: ptBR })} · em ${d} dias`, cls: "bg-slate-100 dark:bg-[#312D62] text-slate-500 dark:text-[#A8A4CC]" };
                   };
                   return (
                     <div className="space-y-3">
                       {list.length > 0 && (
                         <div className="flex items-end justify-between px-2 pb-1">
                           <div>
-                            <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">{isPay ? 'Total a pagar' : 'Total a receber'} · {list.length} {list.length === 1 ? 'item' : 'itens'}</p>
+                            <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">{isPay ? 'Total a pagar' : 'Total a receber'} · {list.length} {list.length === 1 ? 'item' : 'itens'}</p>
                             <p className={cn("text-2xl font-heading font-medium tracking-tighter", isPay ? "text-rose-400" : "text-emerald-500")}>{brl(total)}</p>
                           </div>
                           {overdue.length > 0 && (
@@ -5808,7 +5792,7 @@ export default function App() {
                           <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 dark:bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
                             <Check size={22} strokeWidth={2.5} />
                           </div>
-                          <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">
+                          <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC]">
                             {isPay ? 'Nada pendente para pagar neste mês.' : 'Nada pendente para receber neste mês.'}
                           </p>
                         </div>
@@ -5844,7 +5828,7 @@ export default function App() {
                                 )}
                                 <div className="flex-1 min-w-0">
                                   <p className="text-[15px] font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate">{t.description}</p>
-                                  <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] truncate">{meta}</p>
+                                  <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] truncate">{meta}</p>
                                 </div>
                                 <p className={cn("font-heading font-medium tracking-tighter whitespace-nowrap text-base shrink-0", isPay ? "text-rose-400" : "text-emerald-500")}>
                                   {brl(t.amount)}
@@ -5873,16 +5857,16 @@ export default function App() {
                 })()}
               </div>
 
-              <div className="hidden md:block space-y-6">
+              <div className="hidden">
               {Object.entries(groupedTransactions as Record<string, Transaction[]>).map(([date, items], groupIndex) => (
                 <div key={date} className="space-y-4">
                   <div className={cn("flex items-center gap-3 ml-2 group", groupIndex > 0 && "md:hidden")}>
                     <div className="w-1.5 h-6 rounded-full bg-primary/20 group-hover:bg-primary transition-colors"></div>
-                    <h3 className="text-sm font-medium tracking-tight text-slate-400 dark:text-[#8D89AC] lowercase first-letter:uppercase">
+                    <h3 className="text-sm font-medium tracking-tight text-slate-400 dark:text-[#9D99BC] lowercase first-letter:uppercase">
                       {sortMode !== 'date' || groupMode === 'category' || groupMode === 'person' || activeTab === 'visao-geral' ? date : format(parseISO(date), "EEEE, dd 'de' MMMM", { locale: ptBR })}
                     </h3>
                   </div>
-                  <ShadcnCard className="border-none shadow-none md:shadow-soft rounded-[1.25rem] md:rounded-2xl overflow-visible md:overflow-hidden py-0 md:py-4 bg-transparent md:bg-white dark:bg-transparent md:dark:bg-[#100E3D]">
+                  <ShadcnCard className="border-none shadow-none md:shadow-soft rounded-[1.25rem] md:rounded-2xl overflow-visible md:overflow-hidden py-0 md:py-4 bg-transparent md:bg-white dark:bg-transparent md:dark:bg-[#211E4A]">
                     {/* Mobile: card list */}
                     <div className="md:hidden space-y-2">
                       {items.map(t => {
@@ -5906,14 +5890,14 @@ export default function App() {
                     {/* Desktop: table */}
                     <Table className="hidden md:table">
                       <TableHeader>
-                        <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#201C56]">
+                        <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#37336A]">
                           <TableHead className="w-10 pl-6"></TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Data</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Descrição</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Categoria</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Pessoa</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Status</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] text-right pr-6">Valor</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Data</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Descrição</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Categoria</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Pessoa</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Status</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] text-right pr-6">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -5925,7 +5909,7 @@ export default function App() {
                             <TableRow
                               key={t.id}
                               onClick={() => handleTransactionClick(t)}
-                              className="cursor-pointer border-slate-50 dark:border-[#1C1852] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                              className="cursor-pointer border-slate-50 dark:border-[#312D62] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                             >
                               <TableCell className="pl-6">
                                 {t.status === 'actual' ? (
@@ -5937,13 +5921,13 @@ export default function App() {
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handleQuickConfirm(t); }}
                                     title={t.type === 'income' ? 'Marcar como recebido' : 'Marcar como pago'}
-                                    className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#2A2566] hover:border-primary hover:bg-primary/10 active:scale-90 transition-all flex items-center justify-center text-transparent hover:text-primary"
+                                    className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#423D78] hover:border-primary hover:bg-primary/10 active:scale-90 transition-all flex items-center justify-center text-transparent hover:text-primary"
                                   >
                                     <CheckCircle2 size={14} strokeWidth={3} />
                                   </button>
                                 )}
                               </TableCell>
-                              <TableCell className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">{format(parseISO(t.date), 'dd/MM/yyyy')}</TableCell>
+                              <TableCell className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">{format(parseISO(t.date), 'dd/MM/yyyy')}</TableCell>
                               <TableCell className="font-normal text-slate-700 dark:text-[#EDEAF9] max-w-xs truncate">
                                 <span className="flex items-center gap-2">
                                   {t.description}
@@ -5955,7 +5939,7 @@ export default function App() {
                               <TableCell>
                                 <Badge variant="outline" className={cn(
                                   "rounded-md text-[9px] border-none px-2 h-5 font-medium",
-                                  t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#1C1852] text-slate-400 dark:text-[#8D89AC]"
+                                  t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#312D62] text-slate-400 dark:text-[#9D99BC]"
                                 )}>
                                   {t.status === 'actual' ? 'Confirmado' : 'Planejado'}
                                 </Badge>
@@ -5988,14 +5972,14 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32"
             >
-              <div className="md:hidden space-y-5">
+              <div className="space-y-5">
                 {mobileTopHeader}
                 {!showCardForm && (
                   <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Cartões</h1>
                 )}
               </div>
 
-              <div className="md:hidden space-y-6">
+              <div className="space-y-6">
                 {showCardForm ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -6012,19 +5996,19 @@ export default function App() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Nome do cartão</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Nome do cartão</Label>
                         <Input
                           placeholder="Ex: Nubank"
-                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#2A2755] font-normal text-sm shadow-sm"
                           value={newCardName || ''}
                           onChange={(e) => setNewCardName(e.target.value)}
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Limite</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Limite</Label>
                         <Input
                           placeholder="0,00"
-                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-medium text-sm px-4 shadow-sm"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#2A2755] font-medium text-sm px-4 shadow-sm"
                           inputMode="decimal"
                           value={limitInput || ''}
                           onChange={(e) => setLimitInput(maskCurrency(e.target.value))}
@@ -6033,28 +6017,28 @@ export default function App() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Fechamento</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Fechamento</Label>
                         <Input
                           type="number"
                           placeholder="1"
-                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#2A2755] font-normal text-sm shadow-sm"
                           value={newCardClosingDay || ''}
                           onChange={(e) => setNewCardClosingDay(e.target.value)}
                         />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Vencimento</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Vencimento</Label>
                         <Input
                           type="number"
                           placeholder="10"
-                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#16133F] font-normal text-sm shadow-sm"
+                          className="h-11 rounded-xl border-none bg-slate-50 dark:bg-[#2A2755] font-normal text-sm shadow-sm"
                           value={newCardDueDay || ''}
                           onChange={(e) => setNewCardDueDay(e.target.value)}
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Visual do cartão</Label>
+                      <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Visual do cartão</Label>
                       <div
                         className="rounded-[1.75rem] h-24 shadow-sm flex items-end p-4 transition-colors duration-300 relative overflow-hidden"
                         style={{ backgroundColor: newCardColor }}
@@ -6064,7 +6048,7 @@ export default function App() {
                         </svg>
                         <span className="text-white font-medium text-sm drop-shadow-sm truncate relative z-10">{newCardName || 'Novo cartão'}</span>
                       </div>
-                      <div className="grid grid-cols-6 gap-2 bg-slate-50 dark:bg-[#16133F] p-3 rounded-2xl shadow-sm">
+                      <div className="grid grid-cols-6 gap-2 bg-slate-50 dark:bg-[#2A2755] p-3 rounded-2xl shadow-sm">
                         {CARD_COLOR_PRESETS.map(color => (
                           <button
                             key={color}
@@ -6084,7 +6068,7 @@ export default function App() {
                           onClick={() => colorInputRef.current?.click()}
                           className={cn(
                             "aspect-square rounded-xl border-2 border-dashed flex items-center justify-center transition-all",
-                            !CARD_COLOR_PRESETS.includes(newCardColor) ? "border-primary text-primary ring-2 ring-offset-2 ring-primary" : "border-slate-200 dark:border-[#2A2566] text-slate-400 dark:text-[#8D89AC] hover:border-primary hover:text-primary"
+                            !CARD_COLOR_PRESETS.includes(newCardColor) ? "border-primary text-primary ring-2 ring-offset-2 ring-primary" : "border-slate-200 dark:border-[#423D78] text-slate-400 dark:text-[#9D99BC] hover:border-primary hover:text-primary"
                           )}
                           style={{ backgroundColor: !CARD_COLOR_PRESETS.includes(newCardColor) ? newCardColor : undefined }}
                         >
@@ -6173,9 +6157,9 @@ export default function App() {
                             setNewCardColor('#8A7FF5');
                             setShowCardForm(true);
                           }}
-                          className="w-full h-44 rounded-[1.75rem] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#8D89AC] hover:border-primary hover:text-primary transition-all"
+                          className="w-full h-44 rounded-[1.75rem] border-2 border-dashed border-slate-200 dark:border-[#423D78] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#9D99BC] hover:border-primary hover:text-primary transition-all"
                         >
-                          <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#1C1852] flex items-center justify-center">
+                          <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#312D62] flex items-center justify-center">
                             <Plus size={20} strokeWidth={2.5} />
                           </div>
                           <span className="text-sm font-medium">Adicionar cartão</span>
@@ -6190,7 +6174,7 @@ export default function App() {
                             key={card.id}
                             className={cn(
                               "h-1.5 rounded-full transition-all",
-                              (selectedCard || cards[0].id) === card.id ? "w-5 bg-primary" : "w-1.5 bg-slate-200 dark:bg-[#2A2566]"
+                              (selectedCard || cards[0].id) === card.id ? "w-5 bg-primary" : "w-1.5 bg-slate-200 dark:bg-[#423D78]"
                             )}
                           />
                         ))}
@@ -6205,7 +6189,7 @@ export default function App() {
                       return (
                         <>
                           <div className="space-y-3">
-                            <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Evolução da fatura</p>
+                            <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] ml-2 tracking-widest">Evolução da fatura</p>
                             <div className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2 overflow-hidden">
                               <div ref={billChartScrollRef} className="overflow-x-auto scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
                                 <ComposedChart key={`${activeCard.id}-${cardBillHistory.length}`} width={cardBillHistory.length * CHART_BAR_WIDTH} height={130} data={cardBillHistory}>
@@ -6227,7 +6211,7 @@ export default function App() {
 
                           <div className="space-y-3">
                             <div className="flex items-center justify-between ml-2 gap-3">
-                              <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest shrink-0">
+                              <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest shrink-0">
                                 Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
                               </p>
                               <button
@@ -6255,7 +6239,7 @@ export default function App() {
                             </p>
                             {cardBillItems.length === 0 ? (
                               <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
-                                <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nenhuma compra nesta fatura.</p>
+                                <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA]">Nenhuma compra nesta fatura.</p>
                               </div>
                             ) : (
                               <>
@@ -6294,14 +6278,14 @@ export default function App() {
                 )}
               </div>
 
-              <div className="hidden md:block space-y-6">
+              <div className="hidden">
               <div className="flex items-center gap-2 w-full overflow-hidden px-1">
                 <div className="flex gap-2.5 items-center overflow-x-auto pb-2 pt-1 scrollbar-hide flex-1 relative fade-edge-x px-4 -mx-4">
                   <button
                     onClick={() => setSelectedCard(null)}
                     className={cn(
                       "px-5 py-2.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0",
-                      !selectedCard ? "bg-primary text-white scale-105" : "bg-card text-slate-400 dark:text-[#8D89AC] hover:bg-slate-50 dark:hover:bg-[#16133F] shadow-soft"
+                      !selectedCard ? "bg-primary text-white scale-105" : "bg-card text-slate-400 dark:text-[#9D99BC] hover:bg-slate-50 dark:hover:bg-[#2A2755] shadow-soft"
                     )}
                   >
                     Meus Cartões
@@ -6312,7 +6296,7 @@ export default function App() {
                       onClick={() => setSelectedCard(card.id)}
                       className={cn(
                         "px-5 py-2.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0",
-                        selectedCard === card.id ? "text-white scale-105" : "bg-card text-slate-400 dark:text-[#8D89AC] hover:bg-slate-50 dark:hover:bg-[#16133F] shadow-soft"
+                        selectedCard === card.id ? "text-white scale-105" : "bg-card text-slate-400 dark:text-[#9D99BC] hover:bg-slate-50 dark:hover:bg-[#2A2755] shadow-soft"
                       )}
                       style={{ 
                         backgroundColor: selectedCard === card.id ? card.color : undefined,
@@ -6324,22 +6308,22 @@ export default function App() {
                   ))}
                 </div>
 
-                <div className="flex items-center gap-2 pl-2 shrink-0 border-l border-slate-100/50 dark:border-[#201C56]/50">
+                <div className="flex items-center gap-2 pl-2 shrink-0 border-l border-slate-100/50 dark:border-[#37336A]/50">
                   <Popover>
                     <PopoverTrigger render={
-                      <Button variant="outline" className="h-10 w-10 p-0 border-none bg-slate-100/50 dark:bg-[#1C1852]/50 hover:bg-slate-100 dark:hover:bg-[#1C1852] rounded-xl transition-all active:scale-95">
+                      <Button variant="outline" className="h-10 w-10 p-0 border-none bg-slate-100/50 dark:bg-[#312D62]/50 hover:bg-slate-100 dark:hover:bg-[#312D62] rounded-xl transition-all active:scale-95">
                         <ArrowUpDown size={16} strokeWidth={3} className="text-primary" />
                       </Button>
                     } />
-                    <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#100E3D] z-50">
+                    <PopoverContent className="w-64 p-5 rounded-[2rem] border-none shadow-deep bg-white dark:bg-[#211E4A] z-50">
                       <div className="space-y-3">
-                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Ordenamento</Label>
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Ordenamento</Label>
                         <div className="flex flex-col gap-2">
                           <button 
                             onClick={() => setSortMode('date')}
                             className={cn(
                               "w-full py-3.5 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                              sortMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                              sortMode === 'date' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                             )}
                           >
                             Por data (mais antigos primeiro)
@@ -6348,7 +6332,7 @@ export default function App() {
                             onClick={() => setSortMode('min')}
                             className={cn(
                               "w-full py-3.5 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                              sortMode === 'min' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                              sortMode === 'min' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                             )}
                           >
                             Menor valor
@@ -6357,7 +6341,7 @@ export default function App() {
                             onClick={() => setSortMode('max')}
                             className={cn(
                               "w-full py-3.5 px-4 rounded-xl text-xs font-normal text-left transition-all",
-                              sortMode === 'max' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                              sortMode === 'max' ? "bg-primary/10 text-primary" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                             )}
                           >
                             Maior valor
@@ -6371,7 +6355,7 @@ export default function App() {
 
               {Object.entries(groupedTransactions as Record<string, Transaction[]>).map(([date, items], groupIndex) => (
                 <div key={date} className="space-y-3">
-                  <h3 className={cn("text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-2", groupIndex > 0 && "md:hidden")}>
+                  <h3 className={cn("text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-2", groupIndex > 0 && "md:hidden")}>
                     {sortMode !== 'date' || groupMode === 'category' || groupMode === 'person' ? date : format(parseISO(date), "dd 'de' MMMM", { locale: ptBR })}
                   </h3>
                   <ShadcnCard className="border-none shadow-none md:shadow-sm rounded-[1.25rem] md:rounded-2xl overflow-visible md:overflow-hidden py-0 md:py-4 bg-transparent md:bg-card">
@@ -6398,14 +6382,14 @@ export default function App() {
                     {/* Desktop: table */}
                     <Table className="hidden md:table">
                       <TableHeader>
-                        <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#201C56]">
+                        <TableRow className="hover:bg-transparent border-slate-100 dark:border-[#37336A]">
                           <TableHead className="w-10 pl-6"></TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Data</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Descrição</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Categoria</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Cartão</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC]">Pessoa</TableHead>
-                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] text-right pr-6">Valor</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Data</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Descrição</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Categoria</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Cartão</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">Pessoa</TableHead>
+                          <TableHead className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] text-right pr-6">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -6416,7 +6400,7 @@ export default function App() {
                             <TableRow
                               key={t.id}
                               onClick={() => handleTransactionClick(t)}
-                              className="cursor-pointer border-slate-50 dark:border-[#1C1852] hover:bg-slate-50 dark:hover:bg-[#16133F]"
+                              className="cursor-pointer border-slate-50 dark:border-[#312D62] hover:bg-slate-50 dark:hover:bg-[#2A2755]"
                             >
                               <TableCell className="pl-6">
                                 {t.status === 'actual' ? (
@@ -6428,13 +6412,13 @@ export default function App() {
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handleQuickConfirm(t); }}
                                     title="Marcar como pago"
-                                    className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#2A2566] hover:border-primary hover:bg-primary/10 active:scale-90 transition-all flex items-center justify-center text-transparent hover:text-primary"
+                                    className="w-5 h-5 rounded-full border-2 border-slate-200 dark:border-[#423D78] hover:border-primary hover:bg-primary/10 active:scale-90 transition-all flex items-center justify-center text-transparent hover:text-primary"
                                   >
                                     <CheckCircle2 size={14} strokeWidth={3} />
                                   </button>
                                 )}
                               </TableCell>
-                              <TableCell className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">{format(parseISO(t.date), 'dd/MM/yyyy')}</TableCell>
+                              <TableCell className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">{format(parseISO(t.date), 'dd/MM/yyyy')}</TableCell>
                               <TableCell className="font-normal text-slate-700 dark:text-[#EDEAF9] max-w-xs truncate">{t.description}</TableCell>
                               <TableCell className="text-xs font-normal text-slate-500 dark:text-[#A8A4CC]">{t.category}</TableCell>
                               <TableCell className="text-xs font-normal text-slate-500 dark:text-[#A8A4CC]">
@@ -6469,14 +6453,14 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32"
             >
-              <div className="md:hidden space-y-5">
+              <div className="space-y-5">
                 {mobileTopHeader}
                 {!showPersonForm && (
                   <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Pessoas</h1>
                 )}
               </div>
 
-              <div className="md:hidden space-y-6">
+              <div className="space-y-6">
                 {showPersonForm ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
@@ -6579,9 +6563,9 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => { handleCancelEditPerson(); setShowPersonForm(true); }}
-                          className="w-full h-[230px] rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-[#2A2566] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#8D89AC] hover:border-primary hover:text-primary transition-all"
+                          className="w-full h-[230px] rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-[#423D78] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#9D99BC] hover:border-primary hover:text-primary transition-all"
                         >
-                          <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#1C1852] flex items-center justify-center">
+                          <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#312D62] flex items-center justify-center">
                             <Plus size={20} strokeWidth={2.5} />
                           </div>
                           <span className="text-sm font-medium">Adicionar pessoa</span>
@@ -6596,7 +6580,7 @@ export default function App() {
                             key={person.id}
                             className={cn(
                               "h-1.5 rounded-full transition-all",
-                              (selectedPersonId || people[0].id) === person.id ? "w-5 bg-primary" : "w-1.5 bg-slate-200 dark:bg-[#2A2566]"
+                              (selectedPersonId || people[0].id) === person.id ? "w-5 bg-primary" : "w-1.5 bg-slate-200 dark:bg-[#423D78]"
                             )}
                           />
                         ))}
@@ -6611,7 +6595,7 @@ export default function App() {
                       return (
                         <>
                           <div className="space-y-3">
-                            <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] ml-2 tracking-widest">Evolução</p>
+                            <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] ml-2 tracking-widest">Evolução</p>
                             <div className="bg-card rounded-[1.75rem] shadow-soft p-5 pb-2 overflow-hidden">
                               <div ref={personChargeScrollRef} className="overflow-x-auto scrollbar-hide" style={{ scrollBehavior: 'smooth' }}>
                                 <ComposedChart key={`${activePerson.id}-${personChargeHistory.length}`} width={personChargeHistory.length * CHART_BAR_WIDTH} height={130} data={personChargeHistory}>
@@ -6654,7 +6638,7 @@ export default function App() {
                               <div className="space-y-5">
                                 <div className="bg-card rounded-[1.75rem] shadow-soft p-5 space-y-3">
                                   <div className="flex items-center justify-between gap-3">
-                                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest">
+                                    <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest">
                                       Saldo de {format(selectedChargeDate, "MMMM", { locale: ptBR })}
                                     </p>
                                     <span className={cn(
@@ -6674,7 +6658,7 @@ export default function App() {
                                     )}>
                                       {brl(Math.abs(charges.balance))}
                                     </p>
-                                    <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">
+                                    <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] mt-0.5">
                                       {charges.balance > 0 ? `${firstName} te deve` : charges.balance < 0 ? `Você deve a ${firstName}` : `Você e ${firstName} estão quites`}
                                     </p>
                                   </div>
@@ -6712,20 +6696,20 @@ export default function App() {
 
                                 {!hasAny && (
                                   <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
-                                    <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C]">Nada com {firstName} neste mês.</p>
+                                    <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA]">Nada com {firstName} neste mês.</p>
                                   </div>
                                 )}
 
                                 {charges.items.length > 0 && (
                                   <div className="space-y-3">
-                                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest ml-2">{firstName} te deve</p>
+                                    <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest ml-2">{firstName} te deve</p>
                                     {renderList(charges.items)}
                                   </div>
                                 )}
 
                                 {charges.payableItems.length > 0 && (
                                   <div className="space-y-3">
-                                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] tracking-widest ml-2">Você deve a {firstName}</p>
+                                    <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest ml-2">Você deve a {firstName}</p>
                                     {renderList(charges.payableItems)}
                                   </div>
                                 )}
@@ -6739,8 +6723,8 @@ export default function App() {
                 )}
               </div>
 
-              <div className="hidden md:block space-y-6">
-                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC]">
+              <div className="hidden">
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC]">
                   Use o menu lateral "Pessoas" para gerenciar contatos no desktop.
                 </p>
               </div>
@@ -6751,8 +6735,8 @@ export default function App() {
 
       {/* Pessoas Management Modal */}
       <Dialog open={isPessoasOpen} onOpenChange={(open) => { setIsPessoasOpen(open); if (!open) handleCancelEditPerson(); }}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none overflow-hidden flex flex-col p-0 border-none shadow-deep z-[60] bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
-          <div className="p-8 bg-white dark:bg-[#100E3D] flex flex-col h-full overflow-hidden">
+        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none overflow-hidden flex flex-col p-0 border-none shadow-deep z-[60] bg-[#F6F4FD] dark:bg-[#17153A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+          <div className="p-8 bg-white dark:bg-[#211E4A] flex flex-col h-full overflow-hidden">
             <DialogHeader className="shrink-0 mb-6">
               <DialogTitle className="text-3xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter">Pessoas</DialogTitle>
               <DialogDescription className="font-normal text-sm text-slate-500 dark:text-[#A8A4CC] tracking-tight mt-1">Sua rede de contatos</DialogDescription>
@@ -6760,7 +6744,7 @@ export default function App() {
 
             <ScrollArea className="flex-1 -mx-2 px-2 overflow-y-auto">
               <div className="space-y-8 pr-2 pb-10">
-                <div className="space-y-5 p-6 bg-slate-50 dark:bg-[#16133F] rounded-[2rem] border-none shadow-inner">
+                <div className="space-y-5 p-6 bg-slate-50 dark:bg-[#2A2755] rounded-[2rem] border-none shadow-inner">
                   {editingPerson && (
                     <div className="flex items-center justify-between bg-primary/10 text-primary text-xs font-medium rounded-xl px-4 py-2.5">
                       <span>Editando "{editingPerson.name}"</span>
@@ -6777,33 +6761,33 @@ export default function App() {
                 </div>
 
                 <div className="space-y-4">
-                  <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#8D89AC] ml-1">Pessoas cadastradas ({people.length})</p>
+                  <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Pessoas cadastradas ({people.length})</p>
                   <div className="grid grid-cols-1 gap-3">
                     {people.map(p => (
-                      <div key={p.id} className="flex items-center gap-4 p-4 bg-white dark:bg-[#100E3D] rounded-2xl border border-slate-50 dark:border-[#1C1852] shadow-soft group hover:bg-slate-50 dark:hover:bg-[#16133F] transition-colors">
+                      <div key={p.id} className="flex items-center gap-4 p-4 bg-white dark:bg-[#211E4A] rounded-2xl border border-slate-50 dark:border-[#312D62] shadow-soft group hover:bg-slate-50 dark:hover:bg-[#2A2755] transition-colors">
                         <img src={p.image} alt="" className="w-12 h-12 rounded-2xl object-cover shadow-sm transition-transform group-hover:scale-105" />
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-slate-800 dark:text-[#EDE9E3] text-sm truncate flex items-center gap-1.5">
                             {p.name}
                             {p.linkedUserId && <UserCheck size={12} className="text-primary shrink-0" />}
                           </p>
-                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#8D89AC] truncate tracking-tight">{p.phone || (p.linkedUserId ? 'Usa o Financeiro' : '')}</p>
+                          <p className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC] truncate tracking-tight">{p.phone || (p.linkedUserId ? 'Usa o Financeiro' : '')}</p>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => handleTogglePersonVisibility(p)}
                             className={cn(
                               "h-10 px-3 rounded-xl text-[9px] font-medium transition-all flex flex-col items-center justify-center gap-0.5 shrink-0",
-                              p.visible !== false ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20" : "bg-slate-100 dark:bg-[#1C1852] text-slate-400 dark:text-[#8D89AC] border border-slate-200 dark:border-[#2A2566]"
+                              p.visible !== false ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-500/20" : "bg-slate-100 dark:bg-[#312D62] text-slate-400 dark:text-[#9D99BC] border border-slate-200 dark:border-[#423D78]"
                             )}
                           >
                             <div className={cn("w-1.5 h-1.5 rounded-full", p.visible !== false ? "bg-emerald-500" : "bg-slate-400 dark:bg-[#555555]")} />
                             {p.visible !== false ? 'Visível' : 'Oculto'}
                           </button>
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-300 dark:text-[#6B679C] hover:text-primary rounded-xl transition-all" onClick={() => handleEditPersonClick(p)}>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-300 dark:text-[#7E7AAA] hover:text-primary rounded-xl transition-all" onClick={() => handleEditPersonClick(p)}>
                             <Settings size={14} strokeWidth={2.5} />
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 dark:text-[#5C5686] hover:text-rose-400 hover:bg-rose-50 rounded-xl transition-all" onClick={() => setPersonToDelete(p)}>
+                          <Button variant="ghost" size="icon" className="h-10 w-10 text-slate-200 dark:text-[#6A6594] hover:text-rose-400 hover:bg-rose-50 rounded-xl transition-all" onClick={() => setPersonToDelete(p)}>
                             <Trash2 size={16} strokeWidth={2.5} />
                           </Button>
                         </div>
@@ -6822,7 +6806,7 @@ export default function App() {
         setIsPessoasSummaryOpen(open);
         if (!open) setSelectedPersonId(null);
       }}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-[#F6F4FD] dark:bg-[#0B0A2E] sm:top-auto sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-full sm:max-w-4xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl">
+        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep overflow-hidden flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] sm:top-auto sm:bottom-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-full sm:max-w-4xl sm:h-auto sm:max-h-[85vh] sm:rounded-3xl">
           <div className="p-6 md:p-8 shrink-0 flex items-center justify-between gap-3">
             <div className="flex items-center gap-4 min-w-0">
               {selectedPersonId && (
@@ -6857,7 +6841,7 @@ export default function App() {
             {!selectedPersonId ? (
               <div className="space-y-2 max-w-2xl mx-auto">
                 {people.length === 0 && (
-                  <p className="text-sm font-normal text-slate-300 dark:text-[#6B679C] text-center py-12">Nenhuma pessoa cadastrada ainda.</p>
+                  <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA] text-center py-12">Nenhuma pessoa cadastrada ainda.</p>
                 )}
                 {people.map(p => {
                   const charges = getPersonMonthlyCharges(p.id, currentDate);
@@ -6896,7 +6880,7 @@ export default function App() {
                       ) : (
                         <button
                           onClick={() => setSelectedPersonId(p.id)}
-                          className="w-11 h-11 rounded-full flex items-center justify-center text-slate-300 dark:text-[#6B679C] shrink-0"
+                          className="w-11 h-11 rounded-full flex items-center justify-center text-slate-300 dark:text-[#7E7AAA] shrink-0"
                           aria-label="Ver detalhes"
                         >
                           <ChevronRight size={18} />
@@ -6917,12 +6901,12 @@ export default function App() {
                       <img src={p.image} alt="" className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC]">Total do mês</p>
+                      <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">Total do mês</p>
                       <p className={cn("text-3xl font-heading font-medium tracking-tighter", charges.pendingTotal > 0 ? "text-rose-400" : "text-emerald-500")}>
                         R$ {charges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       {charges.paidTotal > 0 && (
-                        <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">
+                        <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] mt-0.5">
                           + R$ {charges.paidTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} já confirmado
                         </p>
                       )}
@@ -6930,18 +6914,18 @@ export default function App() {
                   </div>
 
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-slate-400 dark:text-[#8D89AC] px-2 tracking-widest">Despesas do mês ({charges.items.length})</p>
+                    <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] px-2 tracking-widest">Despesas do mês ({charges.items.length})</p>
                     {charges.items.length > 0 ? (
                       charges.items.map(t => (
                         <div key={t.id} className="flex items-center justify-between gap-3 bg-card rounded-full pl-3 pr-4 py-3 shadow-soft">
                           <div className="min-w-0 flex-1 pr-2">
                             <p className="text-sm font-medium text-slate-800 dark:text-[#EDEAF9] truncate tracking-tight">{t.description}</p>
-                            <p className="text-xs font-normal text-slate-400 dark:text-[#8D89AC] mt-0.5">{format(parseISO(t.date), 'dd/MM/yyyy')} · {t.category}</p>
+                            <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] mt-0.5">{format(parseISO(t.date), 'dd/MM/yyyy')} · {t.category}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <Badge variant="outline" className={cn(
                               "rounded-md text-[8px] border-none px-2 leading-none h-4 font-medium",
-                              t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#1C1852] text-slate-400 dark:text-[#8D89AC]"
+                              t.status === 'actual' ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-[#312D62] text-slate-400 dark:text-[#9D99BC]"
                             )}>
                               {t.status === 'actual' ? 'Pago' : 'Pendente'}
                             </Badge>
@@ -6953,7 +6937,7 @@ export default function App() {
                       ))
                     ) : (
                       <div className="py-12 text-center">
-                        <p className="text-slate-300 dark:text-[#6B679C] font-normal italic text-sm">Nenhuma despesa vinculada a {p.name.split(' ')[0]} neste mês.</p>
+                        <p className="text-slate-300 dark:text-[#7E7AAA] font-normal italic text-sm">Nenhuma despesa vinculada a {p.name.split(' ')[0]} neste mês.</p>
                       </div>
                     )}
                   </div>
@@ -6974,14 +6958,14 @@ export default function App() {
       </Dialog>
         {/* Alert Popup */}
         <Dialog open={alertConfig.open} onOpenChange={(open) => setAlertConfig({ ...alertConfig, open })}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
             <div className="p-7 space-y-6 text-center">
               <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
                 <Info size={28} strokeWidth={2.5} />
               </div>
               <div className="space-y-1.5">
                 <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{alertConfig.title}</h1>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">{alertConfig.message}</p>
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">{alertConfig.message}</p>
               </div>
               <button onClick={() => setAlertConfig({ ...alertConfig, open: false })} className="w-full h-14 rounded-full font-medium bg-primary text-white hover:bg-primary/90 transition-all active:scale-95">
                 Entendi
@@ -6992,14 +6976,14 @@ export default function App() {
 
         {/* Delete Transaction Modal */}
         <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
             <div className="p-7 space-y-6 text-center">
               <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 rounded-full flex items-center justify-center mx-auto text-rose-400">
                 <Trash2 size={28} strokeWidth={2.5} />
               </div>
               <div className="space-y-1.5">
                 <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Excluir lançamento</h1>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">
                   {(transactionToDelete?.recurrence && transactionToDelete?.recurrence !== 'none') || transactionToDelete?.installments
                     ? "Este lançamento é parcelado ou recorrente. Como deseja prosseguir?"
                     : "Tem certeza que deseja apagar este lançamento? Esta ação não pode ser desfeita."}
@@ -7042,7 +7026,7 @@ export default function App() {
                 <button
                   onClick={() => setIsDeleteDialogOpen(false)}
                   disabled={isDeletingTransaction}
-                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#9D99BC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -7052,14 +7036,14 @@ export default function App() {
         </Dialog>
 
         <Dialog open={!!personToDelete} onOpenChange={(open) => !open && setPersonToDelete(null)}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
             <div className="p-7 space-y-6 text-center">
               <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 rounded-full flex items-center justify-center mx-auto text-rose-400">
                 <Trash2 size={28} strokeWidth={2.5} />
               </div>
               <div className="space-y-1.5">
                 <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Excluir pessoa</h1>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">
                   Tem certeza que deseja remover {personToDelete?.name}? Os lançamentos já atribuídos a ela não serão apagados.
                 </p>
               </div>
@@ -7072,7 +7056,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setPersonToDelete(null)}
-                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#9D99BC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -7082,14 +7066,14 @@ export default function App() {
         </Dialog>
 
         <Dialog open={!!cardToDelete} onOpenChange={(open) => !open && setCardToDelete(null)}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
             <div className="p-7 space-y-6 text-center">
               <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 rounded-full flex items-center justify-center mx-auto text-rose-400">
                 <Trash2 size={28} strokeWidth={2.5} />
               </div>
               <div className="space-y-1.5">
                 <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Excluir cartão</h1>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">
                   Tem certeza que deseja excluir {cardToDelete?.name}? As compras já lançadas nele não serão apagadas.
                 </p>
               </div>
@@ -7108,7 +7092,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => setCardToDelete(null)}
-                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#9D99BC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -7118,18 +7102,18 @@ export default function App() {
         </Dialog>
 
         <Dialog open={isDeleteAllConfirmOpen} onOpenChange={setIsDeleteAllConfirmOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
             <div className="p-7 space-y-6 text-center">
               <div className="w-16 h-16 bg-rose-50 dark:bg-rose-500/10 rounded-full flex items-center justify-center mx-auto text-rose-400">
                 <Trash2 size={28} strokeWidth={2.5} />
               </div>
               <div className="space-y-2">
                 <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Apagar tudo</h1>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">
                   Tem certeza? Isso apagará TODOS os seus lançamentos, cartões, categorias e pessoas para sempre. Sua conta e login continuam ativos.
                 </p>
                 <div className="pt-4 space-y-2 text-left">
-                  <Label className="text-xs font-medium tracking-widest text-slate-400 dark:text-[#8D89AC] ml-1">Para confirmar, digite:</Label>
+                  <Label className="text-xs font-medium tracking-widest text-slate-400 dark:text-[#9D99BC] ml-1">Para confirmar, digite:</Label>
                   <p className="text-xs font-medium text-slate-700 dark:text-[#EDE9E3] bg-card p-3 rounded-2xl shadow-soft">
                     Eu {userProfile?.nickname || 'usuário'}, sei que não é possível recuperar os dados apagados
                   </p>
@@ -7151,7 +7135,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => { setIsDeleteAllConfirmOpen(false); setDeleteConfirmText(''); }}
-                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#9D99BC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Cancelar
                 </button>
@@ -7162,31 +7146,31 @@ export default function App() {
 
         {/* Data Options Modal */}
         <Dialog open={isDataModalOpen} onOpenChange={setIsDataModalOpen}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
             <div className="p-7 space-y-6">
               <div className="text-center space-y-1.5">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto text-primary">
                   <Database size={28} strokeWidth={2.5} />
                 </div>
                 <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Opções de dados</h1>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed">Gerencie seus lançamentos e backups</p>
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed">Gerencie seus lançamentos e backups</p>
               </div>
 
               <div className="space-y-2 pt-2">
-                <button className="w-full h-14 rounded-full font-medium bg-card shadow-soft hover:bg-slate-50 dark:hover:bg-[#16133F] flex items-center justify-between px-6 transition-colors" onClick={handleExportGlobalCSV}>
+                <button className="w-full h-14 rounded-full font-medium bg-card shadow-soft hover:bg-slate-50 dark:hover:bg-[#2A2755] flex items-center justify-between px-6 transition-colors" onClick={handleExportGlobalCSV}>
                   <div className="flex items-center gap-3">
                     <Download size={18} className="text-primary" />
                     <span>Exportar CSV</span>
                   </div>
-                  <ChevronRight size={18} className="text-slate-300 dark:text-[#6B679C]" />
+                  <ChevronRight size={18} className="text-slate-300 dark:text-[#7E7AAA]" />
                 </button>
 
-                <button className="w-full h-14 rounded-full font-medium bg-card shadow-soft hover:bg-slate-50 dark:hover:bg-[#16133F] flex items-center justify-between px-6 transition-colors" onClick={handleSeedTestData}>
+                <button className="w-full h-14 rounded-full font-medium bg-card shadow-soft hover:bg-slate-50 dark:hover:bg-[#2A2755] flex items-center justify-between px-6 transition-colors" onClick={handleSeedTestData}>
                   <div className="flex items-center gap-3">
                     <Sparkles size={18} className="text-primary" />
                     <span>Gerar dados de teste</span>
                   </div>
-                  <ChevronRight size={18} className="text-slate-300 dark:text-[#6B679C]" />
+                  <ChevronRight size={18} className="text-slate-300 dark:text-[#7E7AAA]" />
                 </button>
 
                 <button
@@ -7201,7 +7185,7 @@ export default function App() {
                 </button>
               </div>
 
-              <button onClick={() => setIsDataModalOpen(false)} className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors mt-2">
+              <button onClick={() => setIsDataModalOpen(false)} className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#9D99BC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors mt-2">
                 Voltar
               </button>
             </div>
@@ -7210,7 +7194,7 @@ export default function App() {
 
         {/* Series Edit Choice Dialog */}
         <Dialog open={showSeriesEditDialog} onOpenChange={setShowSeriesEditDialog}>
-          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#0B0A2E]">
+          <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
             <DialogHeader className="sr-only">
               <DialogTitle>Lançamento em série</DialogTitle>
               <DialogDescription>Escolha como aplicar as alterações</DialogDescription>
@@ -7221,7 +7205,7 @@ export default function App() {
                   <Repeat size={28} strokeWidth={2.5} />
                 </div>
                 <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Lançamento em série</h1>
-                <p className="text-sm font-normal text-slate-400 dark:text-[#8D89AC] leading-relaxed px-2">
+                <p className="text-sm font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed px-2">
                   Este lançamento faz parte de uma sequência. Como deseja aplicar as alterações?
                 </p>
               </div>
@@ -7250,7 +7234,7 @@ export default function App() {
                     setShowSeriesEditDialog(false);
                     setIsRegistrarOpen(true);
                   }}
-                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#8D89AC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  className="w-full h-12 rounded-full font-normal text-slate-400 dark:text-[#9D99BC] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   Voltar e revisar
                 </button>
@@ -7270,7 +7254,7 @@ function NavItem({ active, onClick, icon, label }: { active: boolean, onClick: (
         "w-full flex items-center gap-3 px-6 py-4 rounded-[1.75rem] transition-all duration-500 group relative overflow-hidden",
         active 
           ? "bg-primary text-white font-normal shadow-soft" 
-          : "text-slate-400 dark:text-[#8D89AC] hover:bg-slate-50 dark:hover:bg-[#16133F] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+          : "text-slate-400 dark:text-[#9D99BC] hover:bg-slate-50 dark:hover:bg-[#2A2755] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
       )}
     >
       {active && (
@@ -7287,7 +7271,7 @@ function NavItem({ active, onClick, icon, label }: { active: boolean, onClick: (
       {active && (
         <motion.div 
           layoutId="active-indicator" 
-          className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-white/80 dark:bg-[#100E3D]/80 shadow-[0_0_8px_rgba(255,255,255,0.6)]" 
+          className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-white/80 dark:bg-[#211E4A]/80 shadow-[0_0_8px_rgba(255,255,255,0.6)]" 
         />
       )}
     </button>
@@ -7300,7 +7284,7 @@ function MobileNavItem({ active, onClick, icon }: { active: boolean, onClick: ()
       onClick={onClick}
       className="flex items-center justify-center h-11 w-11 shrink-0 active:scale-90 transition-transform"
     >
-      <div className={cn("transition-colors duration-300", active ? "text-slate-800 dark:text-white" : "text-slate-400 dark:text-[#6B679C]")}>
+      <div className={cn("transition-colors duration-300", active ? "text-slate-800 dark:text-white" : "text-slate-400 dark:text-[#7E7AAA]")}>
         {React.cloneElement(icon as React.ReactElement, { strokeWidth: active ? 2.25 : 1.75, size: 26 })}
       </div>
     </button>
@@ -7310,20 +7294,20 @@ function MobileNavItem({ active, onClick, icon }: { active: boolean, onClick: ()
 function StatCard({ title, value, icon, trend, subValue }: { title: string, value: number, icon: React.ReactNode, trend?: 'up' | 'down', subValue?: string }) {
   const [intPart, decPart] = value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
   return (
-    <ShadcnCard className="border-none shadow-soft hover:shadow-deep transition-all duration-500 rounded-[1.75rem] group bg-white dark:bg-[#100E3D] overflow-hidden relative">
+    <ShadcnCard className="border-none shadow-soft hover:shadow-deep transition-all duration-500 rounded-[1.75rem] group bg-white dark:bg-[#211E4A] overflow-hidden relative">
       <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-125 duration-700"></div>
       <CardContent className="p-6 relative z-10">
         <div className="flex items-center gap-4 mb-3">
           <div className="p-3 bg-accent/80 rounded-2xl group-hover:bg-primary group-hover:text-white transition-all duration-500 shadow-sm shrink-0">
             {React.cloneElement(icon as React.ReactElement, { strokeWidth: 2.5, size: 20 })}
           </div>
-          <p className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight truncate flex-1">{title}</p>
+          <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] tracking-tight truncate flex-1">{title}</p>
         </div>
         <p className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] truncate">
-          R$ {intPart}<span className="text-slate-300 dark:text-[#5C5686]">,{decPart}</span>
+          R$ {intPart}<span className="text-slate-300 dark:text-[#6A6594]">,{decPart}</span>
         </p>
         {subValue && (
-          <p className="text-[11px] font-normal text-slate-500 dark:text-[#A8A4CC] mt-4 flex items-center gap-2 truncate bg-slate-50 dark:bg-[#16133F] px-4 py-2 rounded-full w-fit group-hover:bg-primary/5 group-hover:text-primary transition-colors">
+          <p className="text-[11px] font-normal text-slate-500 dark:text-[#A8A4CC] mt-4 flex items-center gap-2 truncate bg-slate-50 dark:bg-[#2A2755] px-4 py-2 rounded-full w-fit group-hover:bg-primary/5 group-hover:text-primary transition-colors">
             <span className="w-2 h-2 rounded-full bg-primary/40"></span>
             {subValue}
           </p>
@@ -7470,7 +7454,7 @@ function TransactionItem({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 overflow-hidden">
               {!hideDate && (
-                <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] tracking-tight shrink-0">
+                <span className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] tracking-tight shrink-0">
                   {formattedDate}
                 </span>
               )}
@@ -7480,10 +7464,10 @@ function TransactionItem({
                 </span>
               )}
               {personName && (
-                <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {personName}</span>
+                <span className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">· {personName}</span>
               )}
               {cardName && (
-                <span className="text-[11px] font-normal text-slate-400 dark:text-[#8D89AC] truncate">· {cardName}</span>
+                <span className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">· {cardName}</span>
               )}
               {transaction.linkedToCard && (
                 <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 shrink-0">· vinculado</span>
