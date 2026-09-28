@@ -41,7 +41,6 @@ import {
   Pencil,
   ArrowLeftRight,
   Minus,
-  Sparkles,
   Home,
   Bell,
   ArrowUp,
@@ -767,64 +766,6 @@ export default function App() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  /** Cria cartões, pessoas e um punhado de lançamentos de exemplo (mês atual e anterior) para testar o app. */
-  const handleSeedTestData = async () => {
-    if (!user) return;
-    setIsDataModalOpen(false);
-    try {
-      let seedCards = cards;
-      if (seedCards.length === 0) {
-        await api.createCard(user.id, { name: 'Nubank', limit: 5000, closingDay: 20, dueDay: 27, color: '#8A7FF5' });
-        await api.createCard(user.id, { name: 'Inter', limit: 3000, closingDay: 5, dueDay: 12, color: '#f59e0b' });
-        seedCards = await api.fetchCards(user.id);
-      }
-
-      let seedPeople = people;
-      if (seedPeople.length < 2) {
-        await api.createPerson(user.id, { name: 'Ana Souza', email: 'ana@exemplo.com', phone: '11987654321', image: 'https://picsum.photos/seed/ana-teste/200/200', visible: true });
-        await api.createPerson(user.id, { name: 'Bruno Lima', email: 'bruno@exemplo.com', phone: '11976543210', image: 'https://picsum.photos/seed/bruno-teste/200/200', visible: true });
-        seedPeople = await api.fetchPeople(user.id);
-      }
-
-      const catName = (name: string) => categories.find(c => c.name.toLowerCase().includes(name.toLowerCase()))?.name || categories[0]?.name || 'Outros';
-      const cardA = seedCards[0]?.id ?? null;
-      const cardB = seedCards[1]?.id ?? null;
-      const personA = seedPeople[0]?.id || 'geral';
-      const personB = seedPeople[1]?.id || 'geral';
-      const personAName = seedPeople[0]?.name.split(' ')[0] || 'Ana';
-      const personBName = seedPeople[1]?.name.split(' ')[0] || 'Bruno';
-
-      const rows: Array<Transaction & { userId: string }> = [];
-      [subMonths(currentDate, 1), currentDate].forEach((month, mi) => {
-        const y = month.getFullYear();
-        const m = month.getMonth();
-        const isPastMonth = mi === 0;
-        const mk = (day: number) => format(new Date(y, m, day), 'yyyy-MM-dd');
-
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'income', description: 'Salário', amount: 5200, date: mk(5), category: catName('Salário'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'income', description: 'Freelance de design', amount: 850, date: mk(16), category: catName('Salário'), status: isPastMonth ? 'actual' : 'planned', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: 'Aluguel', amount: 1800, date: mk(10), category: catName('Moradia'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: 'Internet', amount: 119.9, date: mk(8), category: catName('Moradia'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: `Conta de luz dividida com ${personAName}`, amount: 240, date: mk(12), category: catName('Moradia'), status: isPastMonth ? 'actual' : 'planned', recurrence: 'none', payerPayee: personA, assignments: [], linkedToCard: false } as Transaction & { userId: string });
-        rows.push({ id: api.newTransactionId(), userId: user.id, type: 'expense', description: 'Curso de inglês', amount: 350, date: mk(20), category: catName('Lazer'), status: 'planned', recurrence: 'none', payerPayee: 'geral', assignments: [], linkedToCard: false } as Transaction & { userId: string });
-        if (cardA) {
-          rows.push({ id: api.newTransactionId(), userId: user.id, type: 'card_purchase', description: 'Supermercado', amount: 430.5, date: mk(7), category: catName('Alimentação'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], cardId: cardA, linkedToCard: false } as Transaction & { userId: string });
-          rows.push({ id: api.newTransactionId(), userId: user.id, type: 'card_purchase', description: `Cinema com ${personBName}`, amount: 90, date: mk(18), category: catName('Lazer'), status: 'actual', recurrence: 'none', payerPayee: personB, assignments: [], cardId: cardA, linkedToCard: false } as Transaction & { userId: string });
-        }
-        if (cardB) {
-          rows.push({ id: api.newTransactionId(), userId: user.id, type: 'card_purchase', description: 'Assinatura streaming', amount: 39.9, date: mk(3), category: catName('Lazer'), status: 'actual', recurrence: 'none', payerPayee: 'geral', assignments: [], cardId: cardB, linkedToCard: false } as Transaction & { userId: string });
-        }
-      });
-
-      await api.insertTransactions(rows);
-      await Promise.all([loadCards(), loadPeople(), loadTransactions()]);
-      showAlert('Dados de teste criados!', `${rows.length} lançamentos, ${seedPeople.length >= 2 ? 'pessoas' : 'sem pessoas novas'} e cartões de exemplo foram adicionados.`);
-    } catch (err) {
-      handleSupabaseError(err, OperationType.WRITE, 'transactions');
-      showAlert('Erro', 'Não foi possível gerar os dados de teste.');
-    }
   };
 
   // Auth Listener
@@ -7366,14 +7307,6 @@ export default function App() {
                   <div className="flex items-center gap-3">
                     <Download size={18} className="text-primary" />
                     <span>Exportar CSV</span>
-                  </div>
-                  <ChevronRight size={18} className="text-slate-300 dark:text-[#7E7AAA]" />
-                </button>
-
-                <button className="w-full h-14 rounded-full font-medium bg-card shadow-soft hover:bg-slate-50 dark:hover:bg-[#2A2755] flex items-center justify-between px-6 transition-colors" onClick={handleSeedTestData}>
-                  <div className="flex items-center gap-3">
-                    <Sparkles size={18} className="text-primary" />
-                    <span>Gerar dados de teste</span>
                   </div>
                   <ChevronRight size={18} className="text-slate-300 dark:text-[#7E7AAA]" />
                 </button>
