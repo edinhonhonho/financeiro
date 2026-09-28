@@ -33,8 +33,12 @@ export const signUpWithPassword = (email: string, password: string, profile: Sig
 export const signInWithPassword = (email: string, password: string) =>
   supabase.auth.signInWithPassword({ email, password });
 
+// Endereço para onde o link do e-mail leva. Com VITE_SITE_URL definido, o link
+// sempre abre o site publicado, mesmo que o pedido tenha sido feito do localhost.
+const siteUrl = (import.meta.env.VITE_SITE_URL as string | undefined)?.replace(/\/+$/, '') || window.location.origin;
+
 export const resetPasswordForEmail = (email: string) =>
-  supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+  supabase.auth.resetPasswordForEmail(email, { redirectTo: siteUrl });
 
 export const updatePassword = (newPassword: string) =>
   supabase.auth.updateUser({ password: newPassword });
