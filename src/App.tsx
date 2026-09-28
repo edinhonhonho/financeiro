@@ -100,7 +100,8 @@ import {
   Bar,
   ComposedChart,
   XAxis,
-  YAxis
+  YAxis,
+  ReferenceLine,
 } from 'recharts';
 import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth, getDaysInMonth, startOfDay, formatDistanceToNowStrict } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -1806,28 +1807,33 @@ export default function App() {
     })).filter(d => d.value > 0);
   }, [transactions, currentDate]);
 
+  // 7 meses com o mês selecionado sempre no meio (3 antes, 3 depois). Segue o
+  // mesmo critério do balanço: tudo do mês, ou só o concluído.
   const evolutionData = useMemo(() => {
     const data = [];
-    for (let i = 5; i >= 0; i--) {
-      const date = subMonths(currentDate, i);
+    for (let i = -3; i <= 3; i++) {
+      const date = addMonths(currentDate, i);
       const start = startOfMonth(date);
       const end = endOfMonth(date);
-      const monthTransactions = transactions.filter(t => 
-        isWithinInterval(parseISO(t.date), { start, end })
+      const monthTransactions = transactions.filter(t =>
+        isWithinInterval(parseISO(t.date), { start, end }) && (!onlyCompleted || t.status === 'actual')
       );
-      
+
       const netted = getNettedOut(date);
-      const income = monthTransactions.filter(t => t.type === 'income' && t.status === 'actual').reduce((acc, t) => acc + t.amount, 0) - netted.incomeActual;
-      const expense = monthTransactions.filter(t => (t.type === 'expense' || t.type === 'card_purchase') && t.status === 'actual').reduce((acc, t) => acc + t.amount, 0) - netted.expensesActual;
+      const nettedIncome = netted.incomeActual + (onlyCompleted ? 0 : netted.incomePlanned);
+      const nettedExpense = netted.expensesActual + (onlyCompleted ? 0 : netted.expensesPlanned);
+      const income = monthTransactions.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0) - nettedIncome;
+      const expense = monthTransactions.filter(t => t.type === 'expense' || t.type === 'card_purchase').reduce((acc, t) => acc + t.amount, 0) - nettedExpense;
 
       data.push({
         name: format(date, 'MMM', { locale: ptBR }),
-        receitas: income,
-        despesas: expense
+        current: i === 0,
+        receitas: Math.max(0, income),
+        despesas: Math.max(0, expense)
       });
     }
     return data;
-  }, [transactions, people, currentDate]);
+  }, [transactions, people, currentDate, onlyCompleted]);
 
   const COLORS = ['#8A7FF5', '#37D6A3', '#FF6F61', '#FDB8D7', '#6FA8FF', '#FFC168'];
 
@@ -5439,7 +5445,7 @@ export default function App() {
               <div className="grid grid-cols-1 gap-6 lg:col-span-8 lg:grid-cols-2 lg:order-4">
                 <ShadcnCard className="border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#211E4A] py-0 gap-0">
                   <CardContent className="px-5 py-4">
-                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Receitas x despesas (últimos 6 meses)</h3>
+                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Receitas x despesas</h3>
                     <ResponsiveContainer width="100%" height={140}>
                       <AreaChart data={evolutionData}>
                         <defs>
@@ -5452,8 +5458,22 @@ export default function App() {
                             <stop offset="95%" stopColor="#FF6F61" stopOpacity={0} />
                           </linearGradient>
                         </defs>
-                        <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fontSize: 11, fontWeight: 500, fill: '#A0947F' }} />
+                        <XAxis
+                          dataKey="name"
+                          tickLine={false}
+                          axisLine={false}
+                          interval={0}
+                          tick={(props: { x: number; y: number; index: number; payload: { value: string } }) => {
+                            const isCurrent = evolutionData[props.index]?.current;
+                            return (
+                              <text x={props.x} y={props.y + 12} textAnchor="middle" fontSize={11} fontWeight={isCurrent ? 700 : 500} fill={isCurrent ? '#8A7FF5' : '#A0947F'}>
+                                {props.payload.value}
+                              </text>
+                            );
+                          }}
+                        />
                         <YAxis hide />
+                        <ReferenceLine x={evolutionData[3]?.name} stroke="#8A7FF5" strokeOpacity={0.35} strokeDasharray="3 3" />
                         <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
                         <Area type="monotone" dataKey="receitas" name="Receitas" stroke="#37D6A3" strokeWidth={3} fill="url(#colorReceitas)" />
                         <Area type="monotone" dataKey="despesas" name="Despesas" stroke="#FF6F61" strokeWidth={3} fill="url(#colorDespesas)" />
