@@ -5807,7 +5807,7 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Movimentações (mobile) — cards no estilo Transactions.png / Upcoming Bills.png */}
+              {/* Movimentações */}
               <div className="space-y-6 lg:col-span-8 lg:h-full lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-3 lg:pb-24">
                 {movTab === 'movimentacoes' && (
                   <>

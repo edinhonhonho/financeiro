@@ -125,7 +125,7 @@
 }
 
 :root {
-    /* Paleta inspirada em light_tema.svg/dark_tema.svg: lavanda vibrante,
+    /* Paleta: lavanda vibrante,
        menta, coral e rosa sobre fundo claro que degrada de lavanda pro branco. */
     --background: #F6F4FD;
     --foreground: #221D3B; /* Roxo quase-preto */
@@ -209,7 +209,7 @@ body {
 }
 
 .dark {
-    /* Azul-marinho profundo, como em dark_tema.svg — quase sólido, sem o
+    /* Azul-marinho profundo — quase sólido, sem o
        degrade lavanda do modo claro. */
     --background: #17153A;
     --foreground: #F2F1FC;
