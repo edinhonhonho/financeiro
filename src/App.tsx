@@ -412,7 +412,7 @@ function AccountRow({
 }) {
   const content = (
     <>
-      <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shrink-0", danger ? "bg-rose-50 text-rose-400" : "bg-primary/10 text-primary")}>
+      <div className={cn("w-11 h-11 rounded-2xl flex items-center justify-center shrink-0", danger ? "bg-rose-50 dark:bg-rose-500/15 text-rose-400" : "bg-primary/10 text-primary")}>
         {icon}
       </div>
       <div className="flex-1 min-w-0">
@@ -3105,7 +3105,7 @@ export default function App() {
             </div>
 
             {recoveryError && (
-              <p className="text-xs font-normal text-rose-500 bg-rose-50 rounded-2xl px-5 py-3">{recoveryError}</p>
+              <p className="text-xs font-normal text-rose-500 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400 rounded-2xl px-5 py-3">{recoveryError}</p>
             )}
 
             <button
@@ -4071,7 +4071,7 @@ export default function App() {
                   {confirmingTransaction?.id.startsWith('bill-') ? 'Ver detalhes' : 'Editar'}
                 </Button>
                 {(!confirmingTransaction?.id.startsWith('bill-')) && (
-                  <Button variant="ghost" className="flex-1 h-12 rounded-2xl font-normal text-rose-400 hover:bg-rose-50 hover:text-rose-500" onClick={() => {
+                  <Button variant="ghost" className="flex-1 h-12 rounded-2xl font-normal text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-500" onClick={() => {
                     if (confirmingTransaction) {
                       setTransactionToDelete(confirmingTransaction);
                       setIsDeleteDialogOpen(true);
@@ -5124,7 +5124,7 @@ export default function App() {
             </div>
 
             {editError && (
-              <p className="text-xs font-normal text-rose-500 bg-rose-50 rounded-2xl px-5 py-3">{editError}</p>
+              <p className="text-xs font-normal text-rose-500 bg-rose-50 dark:bg-rose-500/10 dark:text-rose-400 rounded-2xl px-5 py-3">{editError}</p>
             )}
           </div>
           <div className="p-6 shrink-0 space-y-2">
