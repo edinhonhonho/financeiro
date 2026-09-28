@@ -3949,11 +3949,11 @@ export default function App() {
             setPickerYear(format(currentDate, 'yyyy'));
             setIsMonthPickerOpen(true);
           }}
-          className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5] md:w-auto md:h-11 md:pl-3.5 md:pr-4 md:gap-2 md:border-none md:bg-card md:shadow-soft md:text-sm md:font-medium md:text-slate-700 dark:md:text-[#EDEAF9] whitespace-nowrap"
+          className="hidden md:flex items-center h-11 pl-3.5 pr-4 gap-2 rounded-full bg-card shadow-soft text-sm font-medium text-slate-700 dark:text-[#EDEAF9] whitespace-nowrap"
           aria-label="Selecionar mês"
         >
-          <CalendarIcon size={18} className="md:w-4 md:h-4 md:text-primary" />
-          <span className="hidden md:inline">{monthLabel(currentDate)}</span>
+          <CalendarIcon size={16} className="text-primary" />
+          <span>{monthLabel(currentDate)}</span>
         </button>
         <Popover open={isNotificationsOpen && isDesktopView} onOpenChange={setIsNotificationsOpen}>
           <PopoverTrigger
