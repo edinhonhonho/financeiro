@@ -678,8 +678,12 @@ export default function App() {
       return `Oi ${firstName}! Fechando as contas de ${monthName}, não ficou nada pendente por aqui. 🙌`;
     }
 
-    const line = (t: { description: string; type: string; amount: number; status: string }) =>
-      `• ${t.description}${t.type === 'card_purchase' ? ' (cartão)' : ''} — ${brl(t.amount)}${t.status === 'actual' ? ' ✅' : ''}\n`;
+    // Parcela (ex: "3/10"): da própria linha ou, no reembolso, da despesa que o originou.
+    const line = (t: Transaction) => {
+      const inst = t.installments || transactions.find(x => x.id === t.linkedTransactionId)?.installments;
+      const parcel = inst ? ` (parcela ${inst.current}/${inst.total})` : '';
+      return `• ${t.description.split(' · ')[0]}${parcel}${t.type === 'card_purchase' ? ' (cartão)' : ''} — ${brl(t.amount)}${t.status === 'actual' ? ' ✅' : ''}\n`;
+    };
 
     let message = `Oi ${firstName}! 👋\nFechando as contas de *${monthName}*:\n\n`;
     if (charges.items.length > 0) {
