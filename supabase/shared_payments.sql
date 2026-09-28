@@ -37,7 +37,12 @@ begin
   values (
     t."userId", auth.uid(), 'payment_signal',
     coalesce(payer_name, 'Alguém') || ' disse que já pagou',
-    t.description || ' — R$ ' || to_char(t.amount, 'FM999G999G990D00'),
+    t.description
+      || coalesce(' (parcela ' || (t.installments->>'current') || '/' || (t.installments->>'total') || ')', '')
+      || ' — R$ ' || to_char(t.amount, 'FM999G999G990D00')
+      || ' · referente a '
+      || (array['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'])[extract(month from t.date)::int]
+      || ' de ' || extract(year from t.date)::int,
     t.id, 'paid:' || t.id::text
   );
 end;

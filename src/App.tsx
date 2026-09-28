@@ -4630,9 +4630,16 @@ export default function App() {
                   {n.type === 'payment_signal' && (() => {
                     const tx = transactions.find(x => x.id === n.transactionId);
                     if (!tx) return null;
-                    if (tx.status === 'actual') return <p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 pl-5">Recebimento confirmado</p>;
+                    const reference = (
+                      <p className="text-[11px] font-medium text-slate-500 dark:text-[#A8A4CC] pl-5">
+                        Referente a {monthLabel(getTransactionEffectiveMonth(tx)).toLowerCase()}
+                        {tx.installments ? ` · parcela ${tx.installments.current}/${tx.installments.total}` : tx.recurrence !== 'none' || tx.seriesId ? ' · recorrente' : ''}
+                      </p>
+                    );
+                    if (tx.status === 'actual') return <>{reference}<p className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 pl-5">Recebimento confirmado</p></>;
                     return (
-                      <div className="pl-5">
+                      <div className="pl-5 space-y-2">
+                        <div className="-ml-5">{reference}</div>
                         <button
                           type="button"
                           onClick={async () => {
