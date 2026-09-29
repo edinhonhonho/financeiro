@@ -226,7 +226,7 @@ begin
       values (
         person."linkedUserId", new."userId", 'assigned',
         owner_name || ' associou uma movimentação a você',
-        new.description || ' — R$ ' || to_char(coalesce(person_amount, new.amount), 'FM999G999G990D00')
+        new.description || ' — R$ ' || translate(to_char(coalesce(person_amount, new.amount), 'FM999G999G990D00'), ',.', '.,')
           || case when consent_row.status = 'accepted' then '' else ' · Aceite o pedido de compartilhamento para ver no app.' end,
         new.id, group_key
       );

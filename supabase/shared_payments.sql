@@ -39,7 +39,7 @@ begin
     coalesce(payer_name, 'Alguém') || ' disse que já pagou',
     t.description
       || coalesce(' (parcela ' || (t.installments->>'current') || '/' || (t.installments->>'total') || ')', '')
-      || ' — R$ ' || to_char(t.amount, 'FM999G999G990D00')
+      || ' — R$ ' || translate(to_char(t.amount, 'FM999G999G990D00'), ',.', '.,')
       || ' · referente a '
       || (array['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'])[extract(month from t.date)::int]
       || ' de ' || extract(year from t.date)::int,
@@ -94,7 +94,7 @@ begin
   values (
     payer, auth.uid(), 'payment_rejected',
     coalesce(owner_name, 'Alguém') || ' não reconheceu seu pagamento',
-    t.description || ' — R$ ' || to_char(t.amount, 'FM999G999G990D00') || ' · continua em aberto',
+    t.description || ' — R$ ' || translate(to_char(t.amount, 'FM999G999G990D00'), ',.', '.,') || ' · continua em aberto',
     t.id, 'rejected:' || t.id::text || ':' || extract(epoch from now())::bigint
   );
 end;
