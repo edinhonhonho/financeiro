@@ -98,6 +98,7 @@ import {
   Legend,
   AreaChart,
   Area,
+  Line,
   BarChart,
   Bar,
   ComposedChart,
@@ -2117,7 +2118,8 @@ export default function App() {
         name: format(date, 'MMM', { locale: ptBR }),
         current: i === 0,
         receitas: Math.max(0, income),
-        despesas: Math.max(0, expense)
+        despesas: Math.max(0, expense),
+        saldo: income - expense
       });
     }
     return data;
@@ -5864,9 +5866,30 @@ export default function App() {
               <div className="grid grid-cols-1 gap-6 lg:col-span-8 lg:grid-cols-2 lg:order-4">
                 <ShadcnCard className="border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#211E4A] py-0 gap-0">
                   <CardContent className="px-5 py-4">
-                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Receitas x despesas</h3>
-                    <ResponsiveContainer width="100%" height={140}>
-                      <AreaChart data={evolutionData}>
+                    {(() => {
+                      // Previsão integrada: saldo previsto do mês (pago ou não) no topo do gráfico.
+                      const projected = monthTotals(currentDate).balance;
+                      return (
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div>
+                            <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Receitas x despesas</h3>
+                            <div className="flex items-center gap-3 mt-1 text-[10px] font-medium text-slate-400 dark:text-[#9D99BC]">
+                              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#37D6A3]" />Receitas</span>
+                              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#FF6F61]" />Despesas</span>
+                              <span className="flex items-center gap-1"><span className="w-3 border-t-2 border-dashed border-[#8A7FF5]" />Saldo</span>
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC]">Previsto para o fim de {format(currentDate, 'MMMM', { locale: ptBR })}</p>
+                            <p className={cn("text-base font-heading font-medium tracking-tight tabular-nums", projected >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400")}>
+                              {projected < 0 ? '-' : ''}R$ {Math.abs(projected).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    <ResponsiveContainer width="100%" height={150}>
+                      <ComposedChart data={evolutionData}>
                         <defs>
                           <linearGradient id="colorReceitas" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#37D6A3" stopOpacity={0.35} />
@@ -5896,7 +5919,8 @@ export default function App() {
                         <Tooltip formatter={(v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
                         <Area type="monotone" dataKey="receitas" name="Receitas" stroke="#37D6A3" strokeWidth={3} fill="url(#colorReceitas)" />
                         <Area type="monotone" dataKey="despesas" name="Despesas" stroke="#FF6F61" strokeWidth={3} fill="url(#colorDespesas)" />
-                      </AreaChart>
+                        <Line type="monotone" dataKey="saldo" name="Saldo" stroke="#8A7FF5" strokeWidth={2} strokeDasharray="5 4" dot={{ r: 3, fill: '#8A7FF5', strokeWidth: 0 }} />
+                      </ComposedChart>
                     </ResponsiveContainer>
                   </CardContent>
                 </ShadcnCard>
@@ -6003,40 +6027,6 @@ export default function App() {
                     })}
                   </div>
                 )}
-              </div>
-
-              {/* Saldo projetado */}
-              <div className="lg:col-span-4 lg:order-5">
-                <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4 ml-2">Previsão</h3>
-                {(() => {
-                  const brl = (v: number) => `${v < 0 ? '-' : ''}R$ ${Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                  const months = [0, 1, 2, 3].map(i => {
-                    const date = addMonths(currentDate, i);
-                    return { date, ...monthTotals(date) };
-                  });
-                  let running = 0;
-                  return (
-                    <div className="bg-card rounded-[1.5rem] shadow-soft p-5 space-y-3">
-                      <div>
-                        <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">Fim de {format(currentDate, 'MMMM', { locale: ptBR })}, se tudo acontecer como previsto</p>
-                        <p className={cn("text-2xl font-heading font-medium tracking-tighter tabular-nums", months[0].balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400")}>{brl(months[0].balance)}</p>
-                      </div>
-                      <div className="divide-y divide-slate-100 dark:divide-white/5">
-                        {months.map((m, i) => {
-                          running += m.balance;
-                          return (
-                            <div key={i} className="flex items-center justify-between gap-3 py-2 text-xs">
-                              <span className="font-medium text-slate-600 dark:text-[#C5C1E5] capitalize w-16 shrink-0">{format(m.date, 'MMM yy', { locale: ptBR })}</span>
-                              <span className={cn("tabular-nums flex-1 text-right", m.balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400")}>{brl(m.balance)}</span>
-                              <span className="tabular-nums text-slate-400 dark:text-[#9D99BC] w-28 text-right shrink-0">acum. {brl(running)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <p className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC]">Receitas menos despesas previstas de cada mês, com recorrências e parcelas.</p>
-                    </div>
-                  );
-                })()}
               </div>
 
               <div className="lg:col-span-4 lg:order-5">
