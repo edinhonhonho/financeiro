@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financeiro-shell-v3';
+const CACHE_NAME = 'financeiro-shell-v4';
 const SHELL_URLS = ['/', '/manifest.json', '/icon.svg', '/icon-192.png'];
 
 self.addEventListener('install', (event) => {
@@ -28,7 +28,9 @@ self.addEventListener('fetch', (event) => {
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/')))
+      // Sem rede: usa a cópia salva. Só páginas caem na tela inicial; chamadas
+      // de dados sem cópia falham normalmente (o app usa os dados do aparelho).
+      .catch(() => caches.match(event.request).then((cached) => cached || (event.request.mode === 'navigate' ? caches.match('/') : Response.error())))
   );
 });
 

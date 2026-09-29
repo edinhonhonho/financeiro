@@ -185,6 +185,13 @@ export async function insertTransactions(rows: Array<Transaction & { userId: str
   if (error) handleSupabaseError(error, OperationType.CREATE, 'transactions');
 }
 
+/** Envia a fila de lançamentos feitos sem internet; linhas que já chegaram antes são ignoradas. */
+export async function insertTransactionsIgnoringDuplicates(rows: Array<Transaction & { userId: string }>) {
+  const clean = rows.map(({ pendingSync, ...row }) => row);
+  const { error } = await supabase.from('transactions').upsert(clean, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) handleSupabaseError(error, OperationType.CREATE, 'transactions');
+}
+
 export async function updateTransaction(id: string, data: Partial<Transaction>) {
   const { error } = await supabase.from('transactions').update(data).eq('id', id);
   if (error) handleSupabaseError(error, OperationType.UPDATE, 'transactions');

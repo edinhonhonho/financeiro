@@ -41,6 +41,8 @@ export interface Transaction {
   owedByPerson?: boolean | null;
   // Quando quem foi associado avisou que já pagou (movimentação compartilhada).
   sharedPaidAt?: string | null;
+  // Só no aparelho: criado sem internet e ainda não enviado (nunca vai para o banco).
+  pendingSync?: boolean;
 }
 
 export interface Person {

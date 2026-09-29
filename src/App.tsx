@@ -63,6 +63,7 @@ import { createPortal } from 'react-dom';
 import { ImageCropper } from './ImageCropper';
 import { useDragScroll } from './useDragScroll';
 import { getPushSupport, getCurrentPushSubscription, subscribeToPush } from './push';
+import * as offline from './offline';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -718,6 +719,7 @@ export default function App() {
   const settlePersonMonth = async (charges: ReturnType<typeof getPersonMonthlyCharges>) => {
     const toSettle = [...charges.pending, ...charges.payablePending].filter(t => !t.id.startsWith('person-bill-'));
     if (toSettle.length === 0) return;
+    if (!navigator.onLine) { showAlert('Sem internet', 'Quitar o mês precisa de conexão.'); return; }
     const today = format(new Date(), 'yyyy-MM-dd');
     try {
       for (const t of toSettle) {
@@ -780,12 +782,22 @@ export default function App() {
 
   // Auth Listener
   React.useEffect(() => {
+    // Sem internet a sessão pode não conseguir se renovar: usa o último usuário
+    // conhecido para abrir o app com os dados salvos no aparelho.
+    const fallbackUser = () => (navigator.onLine ? null : offline.readRememberedUser());
     supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
+      const u = data.session?.user ?? fallbackUser();
+      if (data.session?.user) offline.rememberUser(data.session.user);
+      setUser(u);
+      setIsAuthReady(true);
+    }).catch(() => {
+      setUser(fallbackUser());
       setIsAuthReady(true);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
+      if (session?.user) offline.rememberUser(session.user);
+      if (event === 'SIGNED_OUT') offline.forgetUser();
+      setUser(session?.user ?? (event === 'SIGNED_OUT' ? null : fallbackUser()));
       setIsAuthReady(true);
       if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
     });
@@ -802,13 +814,22 @@ export default function App() {
     try {
       const profile = await api.fetchProfile(user.id);
       setUserProfile(profile);
+      offline.saveCache(user.id, 'profile', profile);
       if (!profile?.nickname) setIsNicknameModalOpen(true);
     } catch (err) {
+      const cached = offline.readCache<UserProfile>(user.id, 'profile');
+      if (cached && offline.isNetworkError(err)) { setUserProfile(cached); return; }
       handleSupabaseError(err, OperationType.GET, 'profiles');
     }
   }, [user]);
 
   const creatingOwnerCardsRef = useRef(false);
+  /** Junta à lista os lançamentos criados sem internet que ainda não foram enviados. */
+  const withQueuedRows = (userId: string, list: Transaction[]) => {
+    const known = new Set(list.map(t => t.id));
+    const queued = offline.getQueue(userId).filter(r => !known.has(r.id)).map(r => ({ ...r, pendingSync: true }));
+    return [...list, ...queued];
+  };
   const loadTransactions = React.useCallback(async () => {
     if (!user) return;
     try {
@@ -855,11 +876,60 @@ export default function App() {
       } catch (sharedErr) {
         console.warn('Compartilhamento indisponível:', sharedErr);
       }
-      setTransactions([...data, ...mirrors]);
+      const all = [...data, ...mirrors];
+      offline.saveCache(user.id, 'transactions', all);
+      setTransactions(withQueuedRows(user.id, all));
     } catch (err) {
+      const cached = offline.readCache<Transaction[]>(user.id, 'transactions');
+      if (offline.isNetworkError(err)) { setTransactions(withQueuedRows(user.id, cached ?? [])); return; }
       handleSupabaseError(err, OperationType.LIST, 'transactions');
     }
   }, [user]);
+
+  // Conexão e envio da fila de lançamentos feitos sem internet.
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [queuedCount, setQueuedCount] = useState(0);
+  const flushingRef = useRef(false);
+  const flushOfflineQueue = React.useCallback(async () => {
+    if (!user) return;
+    const queue = offline.getQueue(user.id);
+    setQueuedCount(queue.length);
+    if (queue.length === 0 || flushingRef.current || !navigator.onLine) return;
+    flushingRef.current = true;
+    try {
+      await api.insertTransactionsIgnoringDuplicates(queue);
+      offline.setQueue(user.id, []);
+      setQueuedCount(0);
+      await loadTransactions();
+      showAlert('Lançamentos enviados', `${queue.length === 1 ? 'O lançamento feito' : `Os ${queue.length} lançamentos feitos`} sem internet ${queue.length === 1 ? 'foi salvo' : 'foram salvos'}.`);
+    } catch (err) {
+      if (!offline.isNetworkError(err)) showAlert('Não foi possível enviar os lançamentos pendentes', extractErrorMessage(err));
+    } finally {
+      flushingRef.current = false;
+    }
+  }, [user, loadTransactions]);
+
+  useEffect(() => {
+    const goOnline = () => { setIsOnline(true); flushOfflineQueue(); };
+    const goOffline = () => setIsOnline(false);
+    const onVisible = () => { if (document.visibilityState === 'visible') flushOfflineQueue(); };
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    document.addEventListener('visibilitychange', onVisible);
+    flushOfflineQueue();
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [flushOfflineQueue]);
+
+  /** Ações que mexem em dados já salvos precisam de internet. */
+  const requireOnline = (what = 'Essa ação') => {
+    if (navigator.onLine) return true;
+    showAlert('Sem internet', `${what} precisa de conexão. Lançamentos novos você pode criar normalmente: eles são enviados quando a internet voltar.`);
+    return false;
+  };
 
   const loadNotifications = React.useCallback(async () => {
     if (!user) return;
@@ -984,7 +1054,10 @@ export default function App() {
     try {
       const data = await api.fetchCards(user.id);
       setCards(data);
+      offline.saveCache(user.id, 'cards', data);
     } catch (err) {
+      const cached = offline.readCache<Card[]>(user.id, 'cards');
+      if (cached && offline.isNetworkError(err)) { setCards(cached); return; }
       handleSupabaseError(err, OperationType.LIST, 'cards');
     }
   }, [user]);
@@ -994,7 +1067,10 @@ export default function App() {
     try {
       const data = await api.fetchPeople(user.id);
       setPeople(data);
+      offline.saveCache(user.id, 'people', data);
     } catch (err) {
+      const cached = offline.readCache<Person[]>(user.id, 'people');
+      if (cached && offline.isNetworkError(err)) { setPeople(cached); return; }
       handleSupabaseError(err, OperationType.LIST, 'people');
     }
   }, [user]);
@@ -1008,7 +1084,10 @@ export default function App() {
         data = await api.fetchCategories(user.id);
       }
       setCategories(data);
+      offline.saveCache(user.id, 'categories', data);
     } catch (err) {
+      const cached = offline.readCache<Category[]>(user.id, 'categories');
+      if (cached && offline.isNetworkError(err)) { setCategories(cached); return; }
       handleSupabaseError(err, OperationType.LIST, 'categories');
     }
   }, [user]);
@@ -1950,6 +2029,7 @@ export default function App() {
         ? assignments.filter(a => a.amount > 0 && a.owedByPerson !== false)
         : [];
 
+      if (editingTransaction && !requireOnline('Editar um lançamento')) return;
       if (editingTransaction) {
         const isActuallySeries = !!(editingTransaction.seriesId) ||
                                  (editingTransaction.recurrence && editingTransaction.recurrence !== 'none') ||
@@ -2365,7 +2445,14 @@ export default function App() {
           }
         }
 
-        await api.insertTransactions(rows);
+        try {
+          await api.insertTransactions(rows);
+        } catch (err) {
+          if (!offline.isNetworkError(err)) throw err;
+          // Sem internet: guarda no aparelho e envia quando a conexão voltar.
+          offline.enqueueRows(userId, rows);
+          setQueuedCount(offline.getQueue(userId).length);
+        }
       }
 
       await loadTransactions();
@@ -2545,6 +2632,10 @@ export default function App() {
     }
     if (t.id.startsWith('shared-')) {
       setSharedTxDetail(t);
+      return;
+    }
+    if (t.pendingSync) {
+      showAlert('Aguardando internet', 'Esse lançamento foi criado sem conexão e ainda não foi enviado. Ele poderá ser editado depois que a internet voltar.');
       return;
     }
     if (t.id.startsWith('person-bill-')) {
@@ -2832,7 +2923,7 @@ export default function App() {
   };
 
   const handleConfirmTransaction = async (id: string, actualAmount: number, actualDate: string, referenceDate?: string) => {
-    if (!user) return;
+    if (!user || !requireOnline('Marcar como pago')) return;
     try {
       if (id.startsWith('bill-')) {
         const cardId = id.replace('bill-', '');
@@ -2903,6 +2994,7 @@ export default function App() {
 
   const handleDeleteTransaction = async (id: string, deleteAllFuture = false) => {
     if (!user || isDeletingTransaction) return;
+    if (!requireOnline('Excluir um lançamento')) return;
     setIsDeletingTransaction(true);
     try {
       // Find the transaction to see if it has linked entries
@@ -3990,6 +4082,21 @@ export default function App() {
     </div>
   );
 
+  const offlineBanner = (!isOnline || queuedCount > 0) ? createPortal(
+    <div className="fixed top-[calc(env(safe-area-inset-top,0px)+8px)] left-1/2 -translate-x-1/2 z-[80] pointer-events-none">
+      <div className={cn(
+        "flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium shadow-soft whitespace-nowrap",
+        !isOnline ? "bg-slate-800 text-white dark:bg-[#EDEAF9] dark:text-[#211E4A]" : "bg-primary text-white"
+      )}>
+        <span className={cn("w-2 h-2 rounded-full", !isOnline ? "bg-amber-400" : "bg-white animate-pulse")} />
+        {!isOnline
+          ? (queuedCount > 0 ? `Sem internet · ${queuedCount} ${queuedCount === 1 ? 'lançamento aguardando' : 'lançamentos aguardando'} envio` : 'Sem internet · novos lançamentos serão enviados depois')
+          : `Enviando ${queuedCount} ${queuedCount === 1 ? 'lançamento' : 'lançamentos'}...`}
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
   // Cabeçalho mobile compartilhado (foto + "Oi, Nome!" + calendário + notificações),
   // igual em toda página — dispensa qualquer controle de mês flutuante à parte.
   const mobileTopHeader = (
@@ -5001,6 +5108,8 @@ export default function App() {
             })()}
           </DialogContent>
         </Dialog>
+
+        {offlineBanner}
 
         <ImageCropper src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />
 
@@ -7747,6 +7856,11 @@ function TransactionItem({
               )}
               {transaction.linkedToCard && (
                 <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 shrink-0">· vinculado</span>
+              )}
+              {transaction.pendingSync && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 bg-slate-500/15 text-slate-500 dark:text-[#A8A4CC]">
+                  Aguardando envio
+                </span>
               )}
               {statusBadge && (
                 <span className={cn(
