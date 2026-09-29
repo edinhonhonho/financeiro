@@ -340,3 +340,23 @@ export async function deleteNotifications(ids: string[]) {
   const { error } = await supabase.from('notifications').delete().in('id', ids);
   if (error) handleSupabaseError(error, OperationType.DELETE, 'notifications');
 }
+
+// ----------------------------------------------------------------------------
+// Notificações no celular (ver supabase/push_notifications.sql)
+// ----------------------------------------------------------------------------
+
+export async function savePushSubscription(userId: string, sub: PushSubscriptionJSON) {
+  const { error } = await supabase.from('push_subscriptions').upsert({
+    userId,
+    endpoint: sub.endpoint,
+    p256dh: sub.keys?.p256dh,
+    auth: sub.keys?.auth,
+    userAgent: navigator.userAgent
+  }, { onConflict: 'endpoint' });
+  if (error) handleSupabaseError(error, OperationType.WRITE, 'push_subscriptions');
+}
+
+export async function deletePushSubscription(endpoint: string) {
+  const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+  if (error) handleSupabaseError(error, OperationType.DELETE, 'push_subscriptions');
+}

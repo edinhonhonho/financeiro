@@ -62,6 +62,7 @@ import { Input } from '@/components/ui/input';
 import { createPortal } from 'react-dom';
 import { ImageCropper } from './ImageCropper';
 import { useDragScroll } from './useDragScroll';
+import { getPushSupport, getCurrentPushSubscription, subscribeToPush } from './push';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -559,6 +560,10 @@ export default function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [respondingConsentId, setRespondingConsentId] = useState<string | null>(null);
   const [sharedTxDetail, setSharedTxDetail] = useState<Transaction | null>(null);
+  // Notificações no celular (Web Push) neste aparelho.
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const pushSupport = getPushSupport();
   const [settleConfirm, setSettleConfirm] = useState<{ person: Person; month: Date; charges: ReturnType<typeof getPersonMonthlyCharges> } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingCard, setIsSubmittingCard] = useState(false);
@@ -912,6 +917,54 @@ export default function App() {
       await loadNotifications();
     } catch (err) {
       showAlert('Não foi possível limpar', extractErrorMessage(err));
+    }
+  };
+
+  // Confere se este aparelho já recebe notificações (e reenvia a inscrição ao banco).
+  useEffect(() => {
+    if (!user || pushSupport !== 'supported') return;
+    getCurrentPushSubscription().then(sub => {
+      const granted = !!sub && Notification.permission === 'granted';
+      setPushEnabled(granted);
+      if (sub && granted) api.savePushSubscription(user.id, sub.toJSON()).catch(() => {});
+    }).catch(() => {});
+  }, [user, pushSupport]);
+
+  // Tocar numa notificação do celular com o app aberto abre o painel de notificações.
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return;
+    const onMessage = (e: MessageEvent) => { if (e.data?.type === 'open-notifications') setIsNotificationsOpen(true); };
+    navigator.serviceWorker.addEventListener('message', onMessage);
+    if (window.location.search.includes('notificacoes')) {
+      setIsNotificationsOpen(true);
+      window.history.replaceState(window.history.state, '', window.location.pathname);
+    }
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage);
+  }, []);
+
+  const togglePush = async (enable: boolean) => {
+    if (!user || pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (enable) {
+        const sub = await subscribeToPush();
+        await api.savePushSubscription(user.id, sub.toJSON());
+        setPushEnabled(true);
+      } else {
+        const sub = await getCurrentPushSubscription();
+        if (sub) {
+          await api.deletePushSubscription(sub.endpoint).catch(() => {});
+          await sub.unsubscribe();
+        }
+        setPushEnabled(false);
+      }
+    } catch (err) {
+      const message = extractErrorMessage(err);
+      showAlert('Notificações no celular', /push_subscriptions|schema cache/i.test(message)
+        ? 'Falta configurar o banco: rode o arquivo supabase/push_notifications.sql no SQL Editor do Supabase.'
+        : message);
+    } finally {
+      setPushBusy(false);
     }
   };
 
@@ -5022,6 +5075,18 @@ export default function App() {
                 </AccountSection>
 
                 <AccountSection label="Aplicativo">
+                  <AccountRow
+                    icon={<Bell size={18} />}
+                    title="Notificações no celular"
+                    description={pushSupport === 'supported'
+                      ? (pushEnabled ? 'Ativadas neste aparelho' : 'Receba avisos de pagamentos e compartilhamentos mesmo com o app fechado')
+                      : pushSupport === 'needs-install'
+                        ? 'No iPhone, instale o app na tela inicial para ativar'
+                        : 'Este navegador não suporta notificações'}
+                    right={pushSupport === 'supported'
+                      ? <ToggleSwitch checked={pushEnabled} onChange={(v) => { if (!pushBusy) togglePush(v); }} />
+                      : <></>}
+                  />
                   <AccountRow
                     icon={darkMode ? <Moon size={18} /> : <Sun size={18} />}
                     title="Modo escuro"
