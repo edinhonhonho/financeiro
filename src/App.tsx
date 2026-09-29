@@ -1555,6 +1555,8 @@ export default function App() {
   const [editingShareId, setEditingShareId] = useState<string | null>(null);
   // Quantos meses uma recorrência dura (vira recurrenceEndDate).
   const [recurrenceCount, setRecurrenceCount] = useState(12);
+  // Texto sendo digitado no número de parcelas/meses (null = mostra o valor atual).
+  const [repeatDraft, setRepeatDraft] = useState<string | null>(null);
 
   const colorInputRef = React.useRef<HTMLInputElement>(null);
   const cardsCarouselRef = React.useRef<HTMLDivElement>(null);
@@ -3642,6 +3644,15 @@ export default function App() {
     if (k === 1) { setIsRecurrent(true); setIsInstallment(false); applyRecurrenceCount(recurrenceCount || 12); }
     if (k === 2) { setIsInstallment(true); setIsRecurrent(false); setInstallmentCount(c => Math.max(2, c)); }
   };
+  const setRepeatCountExact = (n: number) => {
+    if (!Number.isFinite(n)) return;
+    if (repeatKind === 2) setInstallmentCount(Math.min(84, Math.max(2, n)));
+    else applyRecurrenceCount(Math.min(120, Math.max(2, n)));
+  };
+  const commitRepeatDraft = () => {
+    if (repeatDraft !== null && repeatDraft !== '') setRepeatCountExact(parseInt(repeatDraft, 10));
+    setRepeatDraft(null);
+  };
   const changeRepeatCount = (delta: number) => {
     if (repeatKind === 2) setInstallmentCount(c => Math.min(84, Math.max(2, c + delta)));
     else applyRecurrenceCount(Math.min(120, Math.max(2, recurrenceCount + delta)));
@@ -3657,12 +3668,26 @@ export default function App() {
       "h-8 px-3 rounded-full text-xs font-medium transition-all whitespace-nowrap",
       active ? "bg-primary text-white shadow-sm" : "bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5]"
     );
-    const stepper = (value: React.ReactNode, onMinus: () => void, onPlus: () => void, label: string) => (
+    const stepper = (value: React.ReactNode, onMinus: () => void, onPlus: () => void, label: string, editable = false) => (
       <div className="flex items-center bg-white dark:bg-[#211E4A] rounded-full p-1 shadow-sm shrink-0">
         <button type="button" onClick={onMinus} aria-label={`Diminuir ${label}`} className="w-8 h-8 rounded-full text-primary flex items-center justify-center active:scale-90 transition-transform">
           <Minus size={15} />
         </button>
-        <span className="min-w-[2rem] text-center font-heading font-medium text-base text-slate-800 dark:text-[#EDE9E3] tabular-nums">{value}</span>
+        {editable ? (
+          <input
+            type="text"
+            inputMode="numeric"
+            aria-label={`Quantidade de ${label}`}
+            value={repeatDraft ?? String(value)}
+            onFocus={(e) => { setRepeatDraft(String(value)); e.currentTarget.select(); }}
+            onChange={(e) => setRepeatDraft(e.target.value.replace(/\D/g, '').slice(0, 3))}
+            onBlur={commitRepeatDraft}
+            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+            className="w-10 text-center bg-transparent outline-none font-heading font-medium text-base text-slate-800 dark:text-[#EDE9E3] tabular-nums rounded-lg focus:bg-primary/10"
+          />
+        ) : (
+          <span className="min-w-[2rem] text-center font-heading font-medium text-base text-slate-800 dark:text-[#EDE9E3] tabular-nums">{value}</span>
+        )}
         <button type="button" onClick={onPlus} aria-label={`Aumentar ${label}`} className="w-8 h-8 rounded-full text-primary flex items-center justify-center active:scale-90 transition-transform">
           <Plus size={15} />
         </button>
@@ -3698,7 +3723,7 @@ export default function App() {
                       : `Até ${format(addMonths(parseISO(startDate), repeatCount - 1), "MMM 'de' yyyy", { locale: ptBR })}`}
                   </p>
                 </div>
-                {stepper(repeatCount, () => changeRepeatCount(-1), () => changeRepeatCount(1), repeatKind === 2 ? 'parcelas' : 'meses')}
+                {stepper(repeatCount, () => changeRepeatCount(-1), () => changeRepeatCount(1), repeatKind === 2 ? 'parcelas' : 'meses', true)}
               </div>
 
               {repeatKind === 1 && (

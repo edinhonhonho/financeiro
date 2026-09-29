@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financeiro-shell-v6';
+const CACHE_NAME = 'financeiro-shell-v7';
 const SHELL_URLS = ['/', '/manifest.json', '/icon-192.png'];
 
 self.addEventListener('install', (event) => {
@@ -41,8 +41,9 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'Financeiro', {
       body: data.body || '',
-      // Só o ícone pequeno (silhueta branca): o Android já mostra o do app,
-      // e um "icon" grande aparecia repetido à direita.
+      // O Chrome do Android sempre mostra uma imagem à direita: sem "icon" ele
+      // desenha a inicial do site (o "F" cinza). Com o gatinho, fica igual ao app.
+      icon: '/icon-192.png',
       badge: '/badge-96.png',
       tag: data.tag,
       data: { url: data.url || '/' }
