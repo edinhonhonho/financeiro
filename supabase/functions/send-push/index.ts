@@ -36,6 +36,21 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (error || !notification) return new Response('not found', { status: 404 });
 
+    // Preferências da pessoa (Minha conta → Notificações): ausente = ligado.
+    const prefKey: Record<string, string> = {
+      assigned: 'shared', consent_request: 'shared', consent_response: 'shared',
+      payment_signal: 'payments', payment_rejected: 'payments',
+      due_reminder: 'due', card_reminder: 'cards', budget_alert: 'budget'
+    };
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('"notificationPrefs"')
+      .eq('id', notification.userId)
+      .maybeSingle();
+    const prefs = (profile?.notificationPrefs ?? {}) as Record<string, boolean>;
+    const key = prefKey[notification.type];
+    if (key && prefs[key] === false) return new Response(JSON.stringify({ sent: 0, skipped: key }), { headers: { 'Content-Type': 'application/json' } });
+
     const { data: subscriptions } = await supabase
       .from('push_subscriptions')
       .select('id, endpoint, p256dh, auth')

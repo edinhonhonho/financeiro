@@ -53,3 +53,17 @@ export function isNetworkError(err: unknown) {
   const message = err instanceof Error ? err.message : String((err as { message?: string })?.message ?? err);
   return /failed to fetch|networkerror|network request failed|load failed|fetch failed|timeout|err_internet/i.test(message);
 }
+
+/** Apaga tudo o que o app guardou no aparelho para esse usuário (dados, fila e último login). */
+export function clearUserData(userId: string) {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith(`${PREFIX}cache:${userId}:`) || k === `${PREFIX}queue:${userId}` || k === `${PREFIX}lastUser`)) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+  } catch {
+    /* armazenamento bloqueado */
+  }
+}

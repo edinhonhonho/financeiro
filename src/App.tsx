@@ -109,7 +109,7 @@ import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths
 import { ptBR } from 'date-fns/locale';
 import Papa from 'papaparse';
 
-import { Transaction, Card, TransactionType, RecurrenceType, Person, UserProfile, Category, PublicProfile, AppNotification } from './types';
+import { Transaction, Card, TransactionType, RecurrenceType, Person, UserProfile, Category, PublicProfile, AppNotification, NotificationPrefKey } from './types';
 import { mockCategories } from './mockData';
 import { cn } from '@/lib/utils';
 import { supabase, signInWithPassword, signUpWithPassword, resetPasswordForEmail, updatePassword, logout, OperationType, handleSupabaseError, translateAuthError } from './supabaseClient';
@@ -561,6 +561,14 @@ export default function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [respondingConsentId, setRespondingConsentId] = useState<string | null>(null);
   const [sharedTxDetail, setSharedTxDetail] = useState<Transaction | null>(null);
+  // Esconder valores (olho no topo): troca os R$ por "•••" em toda a tela.
+  const [hideValues, setHideValues] = useState(() => {
+    try { return localStorage.getItem('financeiro:hideValues') === '1'; } catch { return false; }
+  });
+  const toggleHideValues = () => setHideValues(v => {
+    try { localStorage.setItem('financeiro:hideValues', v ? '0' : '1'); } catch { /* sem armazenamento */ }
+    return !v;
+  });
   // Notificações no celular (Web Push) neste aparelho.
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -1036,6 +1044,95 @@ export default function App() {
     } finally {
       setPushBusy(false);
     }
+  };
+
+  // Mascara valores direto no texto da tela (e devolve os originais ao desligar).
+  // Os valores aparecem como "R$ 1.234,56" num só texto ou como "R$ " + número
+  // (+ ",56" num span à parte), então os três formatos são tratados.
+  useEffect(() => {
+    if (!hideValues) return;
+    const originals = new Map<Text, string>();
+    const MONEY = /R\$\s?-?[\d.]+(,\d{1,2})?/g;
+    const NUMBER = /^\s*-?[\d.]+(,\d{1,2})?\s*$/;
+    const prevText = (node: Node) => {
+      let prev = node.previousSibling;
+      while (prev && prev.nodeType === 3 && !(prev.nodeValue || '').trim()) prev = prev.previousSibling;
+      return prev && prev.nodeType === 3 ? (prev as Text) : null;
+    };
+    const setMasked = (node: Text, value: string) => {
+      if (!originals.has(node) || !(node.nodeValue || '').includes('•••')) originals.set(node, node.nodeValue || '');
+      node.nodeValue = value;
+    };
+    const mask = (node: Text) => {
+      const v = node.nodeValue || '';
+      if (!v || v.includes('•••')) return;
+      if (/R\$\s?-?\d/.test(v)) { setMasked(node, v.replace(MONEY, 'R$ •••')); return; }
+      const prev = prevText(node);
+      if (NUMBER.test(v) && prev && /R\$\s*-?$/.test((originals.get(prev) ?? prev.nodeValue ?? '').trim() + ' ')) { setMasked(node, '•••'); return; }
+      if (/^,\d{1,2}$/.test(v.trim())) {
+        const parentPrev = node.parentElement?.previousSibling;
+        if (parentPrev && parentPrev.nodeType === 3 && originals.has(parentPrev as Text)) setMasked(node, '');
+      }
+    };
+    const walk = (root: Node) => {
+      if (root.nodeType === 3) { mask(root as Text); return; }
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let n: Node | null;
+      while ((n = walker.nextNode())) mask(n as Text);
+    };
+    walk(document.body);
+    const observer = new MutationObserver(mutations => {
+      for (const m of mutations) {
+        if (m.type === 'characterData') {
+          const t = m.target as Text;
+          if (!(t.nodeValue || '').includes('•••')) { originals.delete(t); mask(t); }
+        }
+        m.addedNodes.forEach(n => walk(n));
+      }
+    });
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+    return () => {
+      observer.disconnect();
+      originals.forEach((value, node) => { if (node.isConnected) node.nodeValue = value; });
+    };
+  }, [hideValues]);
+
+  const notificationPrefs = userProfile?.notificationPrefs ?? {};
+  const setNotificationPref = async (key: NotificationPrefKey, value: boolean) => {
+    if (!user) return;
+    const next = { ...notificationPrefs, [key]: value };
+    setUserProfile(prev => prev ? { ...prev, notificationPrefs: next } : prev);
+    try {
+      await api.saveProfile(user.id, { notificationPrefs: next });
+    } catch (err) {
+      const message = extractErrorMessage(err);
+      showAlert('Preferência não salva', /notificationPrefs|schema cache/i.test(message)
+        ? 'Falta configurar o banco: rode o arquivo supabase/features_v2.sql no SQL Editor do Supabase.'
+        : message);
+      loadProfile();
+    }
+  };
+
+  /** Sair: apaga do aparelho a cópia dos dados, a fila offline e o aviso no celular. */
+  const handleLogout = async () => {
+    if (user) {
+      const pending = offline.getQueue(user.id).length;
+      if (pending > 0 && !window.confirm(`Há ${pending} ${pending === 1 ? 'lançamento feito' : 'lançamentos feitos'} sem internet que ainda não ${pending === 1 ? 'foi enviado' : 'foram enviados'}. Sair agora vai descartá-${pending === 1 ? 'lo' : 'los'}. Sair mesmo assim?`)) return;
+      try {
+        const sub = await getCurrentPushSubscription();
+        if (sub) {
+          await api.deletePushSubscription(sub.endpoint).catch(() => {});
+          await sub.unsubscribe().catch(() => false);
+        }
+      } catch { /* sem suporte a notificações */ }
+      offline.clearUserData(user.id);
+    }
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    } catch { /* sem Cache Storage */ }
+    setIsProfileOpen(false);
+    await logout();
   };
 
   const markAllNotificationsRead = async () => {
@@ -1933,6 +2030,39 @@ export default function App() {
       cardTotals
     };
   }, [transactions, cards, people, currentDate]);
+
+  /** Receitas e despesas previstas de um mês (tudo, pago ou não), com as mesmas regras dos totais. */
+  const monthTotals = (date: Date) => {
+    const key = format(date, 'yyyy-MM');
+    let income = 0;
+    let expense = 0;
+    transactions.forEach(t => {
+      if (isBillPaymentRow(t) || format(getTransactionEffectiveMonth(t), 'yyyy-MM') !== key) return;
+      if (t.type === 'income') income += t.amount;
+      else expense += t.amount;
+    });
+    const netted = getNettedOut(date);
+    income -= netted.incomePlanned + netted.incomeActual;
+    expense -= netted.expensesPlanned + netted.expensesActual;
+    return { income, expense, balance: income - expense };
+  };
+
+  /** Quanto já foi gasto (pago ou previsto) em cada categoria com orçamento no mês selecionado. */
+  const budgetProgress = useMemo(() => {
+    const key = format(currentDate, 'yyyy-MM');
+    return categories
+      .filter(c => (c.monthlyBudget ?? 0) > 0)
+      .map(c => {
+        const spent = transactions
+          .filter(t => (t.type === 'expense' || t.type === 'card_purchase') && !isBillPaymentRow(t) &&
+            (t.categoryId ? t.categoryId === c.id : t.category === c.name) &&
+            format(getTransactionEffectiveMonth(t), 'yyyy-MM') === key)
+          .reduce((acc, t) => acc + t.amount, 0);
+        const budget = c.monthlyBudget as number;
+        return { category: c, spent, budget, pct: budget > 0 ? spent / budget : 0 };
+      })
+      .sort((a, b) => b.pct - a.pct);
+  }, [categories, transactions, currentDate, cards]);
 
   // Balanço da página inicial: por padrão soma tudo do mês (pago ou não);
   // "Só concluídos" considera apenas o que já foi pago/recebido.
@@ -2870,6 +3000,7 @@ export default function App() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryColor, setNewCategoryColor] = useState('#8A7FF5');
   const [newCategoryIcon, setNewCategoryIcon] = useState('');
+  const [newCategoryBudget, setNewCategoryBudget] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   // Criar categoria direto do lançamento (atalho no seletor de categoria).
   const [quickCategoryOpen, setQuickCategoryOpen] = useState(false);
@@ -2906,27 +3037,40 @@ export default function App() {
     }
     if (!user) return;
     try {
-      const catData = {
+      const budget = parseCurrency(newCategoryBudget);
+      const catData: Omit<Category, 'id'> = {
         name: newCategoryName.trim(),
         color: newCategoryColor,
-        icon: newCategoryIcon.trim()
+        icon: newCategoryIcon.trim(),
+        monthlyBudget: budget > 0 ? budget : null
       };
+      // Sem a coluna de orçamento no banco (SQL ainda não rodado): salva o resto e avisa.
+      const saveCat = async (data: Omit<Category, 'id'>) => {
+        if (editingCategory) await api.updateCategory(editingCategory.id, data);
+        else await api.createCategory(user.id, data);
+      };
+      try {
+        await saveCat(catData);
+      } catch (err) {
+        if (!/monthlyBudget/i.test(extractErrorMessage(err))) throw err;
+        const { monthlyBudget: _b, ...withoutBudget } = catData;
+        await saveCat(withoutBudget as Omit<Category, 'id'>);
+        if (budget > 0) showAlert('Orçamento não salvo', 'Para guardar orçamentos, rode o arquivo supabase/features_v2.sql no SQL Editor do Supabase.');
+      }
 
       if (editingCategory) {
-        await api.updateCategory(editingCategory.id, catData);
         // Lançamentos guardam a categoria pelo nome: acompanha a renomeação.
         if (editingCategory.name !== catData.name) {
           await api.renameTransactionCategory(user.id, editingCategory.name, catData.name);
           await loadTransactions();
         }
         setEditingCategory(null);
-      } else {
-        await api.createCategory(user.id, catData);
       }
       await loadCategories();
       setNewCategoryName('');
       setNewCategoryColor('#8A7FF5');
       setNewCategoryIcon('');
+      setNewCategoryBudget('');
       setShowEmojiPicker(false);
     } catch (err) {
       handleSupabaseError(err, editingCategory ? OperationType.UPDATE : OperationType.CREATE, 'categories');
@@ -4005,25 +4149,31 @@ export default function App() {
         const tx = n.transactionId
           ? transactions.find(x => x.id === n.transactionId) || transactions.find(x => x.id === `shared-${n.transactionId}`)
           : undefined;
-        const TypeIcon = n.type === 'payment_signal' ? CheckCircle2 : n.type === 'payment_rejected' ? X : n.type === 'assigned' ? ArrowLeftRight : n.type === 'consent_request' ? Users : UserCheck;
+        const isSystem = !n.fromUserId;
+        const TypeIcon = n.type === 'payment_signal' ? CheckCircle2 : n.type === 'payment_rejected' ? X : n.type === 'assigned' ? ArrowLeftRight : n.type === 'consent_request' ? Users
+          : n.type === 'due_reminder' ? Clock : n.type === 'card_reminder' ? CreditCard : n.type === 'budget_alert' ? PieChartIcon : UserCheck;
         return (
           <div key={n.id} className={cn("rounded-[1.5rem] p-4 space-y-3 bg-card shadow-soft", !n.read && "ring-1 ring-primary/30")}>
             <div className="flex items-center gap-3">
               <div className="relative shrink-0">
-                {sender?.image ? (
+                {isSystem ? (
+                  <img src="/icon-192.png" alt="" className="w-10 h-10 rounded-full object-cover" />
+                ) : sender?.image ? (
                   <img src={sender.image} alt="" className="w-10 h-10 rounded-full object-cover" />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium text-sm">{senderName.charAt(0).toUpperCase()}</div>
                 )}
                 <span className={cn(
                   "absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white dark:border-[#211E4A] flex items-center justify-center text-white",
-                  n.type === 'payment_signal' ? "bg-emerald-500" : n.type === 'payment_rejected' ? "bg-rose-500" : "bg-primary"
+                  n.type === 'payment_signal' ? "bg-emerald-500" : n.type === 'payment_rejected' || n.type === 'budget_alert' ? "bg-rose-500" : n.type === 'due_reminder' || n.type === 'card_reminder' ? "bg-amber-500" : "bg-primary"
                 )}>
                   <TypeIcon size={10} strokeWidth={3} />
                 </span>
               </div>
               <p className="flex-1 min-w-0 text-sm leading-snug text-slate-500 dark:text-[#A8A4CC]">
-                <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{senderName}</span> {action}
+                {isSystem
+                  ? <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{n.title}</span>
+                  : <><span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{senderName}</span> {action}</>}
               </p>
               <div className="flex items-center gap-1.5 shrink-0 self-start mt-0.5">
                 <span className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC] whitespace-nowrap">
@@ -4168,6 +4318,15 @@ export default function App() {
         >
           <CalendarIcon size={16} className="text-primary" />
           <span>{monthLabel(currentDate)}</span>
+        </button>
+        <button
+          type="button"
+          onClick={toggleHideValues}
+          className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
+          aria-label={hideValues ? 'Mostrar valores' : 'Esconder valores'}
+          title={hideValues ? 'Mostrar valores' : 'Esconder valores'}
+        >
+          {hideValues ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
         <Popover open={isNotificationsOpen && isDesktopView} onOpenChange={setIsNotificationsOpen}>
           <PopoverTrigger
@@ -4661,6 +4820,20 @@ export default function App() {
                     />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Orçamento mensal (opcional)</Label>
+                  <div className="relative">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 text-sm text-slate-400 dark:text-[#9D99BC] pointer-events-none">R$</span>
+                    <Input
+                      inputMode="numeric"
+                      placeholder="0,00"
+                      className="h-12 rounded-2xl border-none bg-white dark:bg-[#211E4A] font-normal text-sm pl-12 pr-5 shadow-sm"
+                      value={newCategoryBudget}
+                      onChange={(e) => setNewCategoryBudget(e.target.value.replace(/\D/g, '') ? maskCurrency(e.target.value) : '')}
+                    />
+                  </div>
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] ml-1">O app mostra quanto já foi usado e avisa em 80% e 100%.</p>
+                </div>
                 {showEmojiPicker && (
                   <div className="bg-white dark:bg-[#211E4A] rounded-2xl shadow-sm p-3 max-h-52 overflow-y-auto scrollbar-hide">
                     <div className="grid grid-cols-8 gap-1">
@@ -4724,7 +4897,10 @@ export default function App() {
                       <div className="w-10 h-10 rounded-full flex items-center justify-center text-base shrink-0" style={{ backgroundColor: cat.color }}>
                         {cat.icon || DEFAULT_CATEGORY_ICON}
                       </div>
-                      <span className="flex-1 font-medium text-slate-700 dark:text-[#EDEAF9] text-sm truncate tracking-tight">{cat.name}</span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block font-medium text-slate-700 dark:text-[#EDEAF9] text-sm truncate tracking-tight">{cat.name}</span>
+                        {!!cat.monthlyBudget && <span className="block text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">Orçamento R$ {cat.monthlyBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mês</span>}
+                      </span>
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           className="h-9 w-9 flex items-center justify-center text-slate-300 dark:text-[#7E7AAA] hover:text-primary rounded-full transition-all"
@@ -4733,6 +4909,7 @@ export default function App() {
                             setNewCategoryName(cat.name);
                             setNewCategoryColor(cat.color);
                             setNewCategoryIcon(cat.icon);
+                            setNewCategoryBudget(cat.monthlyBudget ? maskCurrency(String(Math.round(cat.monthlyBudget * 100))) : '');
                             setShowEmojiPicker(false);
                             categoriesScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
@@ -5238,6 +5415,28 @@ export default function App() {
                       ? <ToggleSwitch checked={pushEnabled} onChange={(v) => { if (!pushBusy) togglePush(v); }} />
                       : <></>}
                   />
+                </AccountSection>
+
+                <AccountSection label="Quais avisos receber">
+                  {([
+                    ['shared', 'Compartilhamentos', 'Quando alguém associar uma movimentação a você', Users],
+                    ['payments', 'Pagamentos', 'Avisos de "já paguei" e de pagamento não reconhecido', CheckCircle2],
+                    ['due', 'Vencimentos', 'Um dia antes de uma despesa vencer', Clock],
+                    ['cards', 'Faturas', 'Três dias antes do vencimento da fatura', CreditCard],
+                    ['budget', 'Orçamentos', 'Ao chegar em 80% e 100% do orçamento de uma categoria', PieChartIcon]
+                  ] as const).map(([key, title, description, Icon]) => (
+                    <React.Fragment key={key}>
+                      <AccountRow
+                        icon={<Icon size={18} />}
+                        title={title}
+                        description={description}
+                        right={<ToggleSwitch checked={notificationPrefs[key] !== false} onChange={(v) => setNotificationPref(key, v)} />}
+                      />
+                    </React.Fragment>
+                  ))}
+                </AccountSection>
+
+                <AccountSection label="Aparência">
                   <AccountRow
                     icon={darkMode ? <Moon size={18} /> : <Sun size={18} />}
                     title="Modo escuro"
@@ -5258,7 +5457,7 @@ export default function App() {
                     icon={<LogOut size={18} />}
                     title="Sair do aplicativo"
                     description="Encerra sua sessão neste dispositivo"
-                    onClick={() => { setIsProfileOpen(false); logout(); }}
+                    onClick={handleLogout}
                     danger
                   />
                 </AccountSection>
@@ -5463,7 +5662,7 @@ export default function App() {
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
-              className="space-y-8 pb-32 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start"
+              className="space-y-8 pb-32 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start lg:grid-flow-row-dense"
             >
               <div className="hidden">
                 <div>
@@ -5760,6 +5959,84 @@ export default function App() {
                     })()}
                   </CardContent>
                 </ShadcnCard>
+              </div>
+
+              {/* Orçamentos do mês */}
+              <div className="lg:col-span-8 lg:order-4">
+                <div className="flex items-center justify-between mb-4 ml-2">
+                  <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Orçamentos</h3>
+                  <button type="button" onClick={() => setIsCategoriasOpen(true)} className="text-xs font-medium text-primary">
+                    {budgetProgress.length > 0 ? 'Editar' : 'Definir'}
+                  </button>
+                </div>
+                {budgetProgress.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsCategoriasOpen(true)}
+                    className="w-full bg-card rounded-[1.5rem] shadow-soft p-5 text-left flex items-center gap-4"
+                  >
+                    <span className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><PieChartIcon size={20} /></span>
+                    <span className="text-sm font-normal text-slate-500 dark:text-[#A8A4CC]">Defina quanto quer gastar por mês em cada categoria e acompanhe aqui.</span>
+                  </button>
+                ) : (
+                  <div className="bg-card rounded-[1.5rem] shadow-soft p-5 grid gap-4 sm:grid-cols-2">
+                    {budgetProgress.map(({ category, spent, budget, pct }) => {
+                      const tone = pct >= 1 ? 'bg-rose-500' : pct >= 0.8 ? 'bg-amber-500' : 'bg-primary';
+                      const left = budget - spent;
+                      return (
+                        <div key={category.id} className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] truncate">{category.icon} {category.name}</span>
+                            <span className={cn("text-[11px] font-medium shrink-0", pct >= 1 ? "text-rose-500 dark:text-rose-400" : pct >= 0.8 ? "text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-[#9D99BC]")}>
+                              {Math.round(pct * 100)}%
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full bg-slate-100 dark:bg-[#2A2755] overflow-hidden">
+                            <div className={cn("h-full rounded-full transition-all", tone)} style={{ width: `${Math.min(100, pct * 100)}%` }} />
+                          </div>
+                          <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">
+                            R$ {spent.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} de R$ {budget.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {' · '}{left >= 0 ? `restam R$ ${left.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `passou R$ ${(-left).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Saldo projetado */}
+              <div className="lg:col-span-4 lg:order-5">
+                <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4 ml-2">Previsão</h3>
+                {(() => {
+                  const brl = (v: number) => `${v < 0 ? '-' : ''}R$ ${Math.abs(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                  const months = [0, 1, 2, 3].map(i => {
+                    const date = addMonths(currentDate, i);
+                    return { date, ...monthTotals(date) };
+                  });
+                  let running = 0;
+                  return (
+                    <div className="bg-card rounded-[1.5rem] shadow-soft p-5 space-y-3">
+                      <div>
+                        <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">Fim de {format(currentDate, 'MMMM', { locale: ptBR })}, se tudo acontecer como previsto</p>
+                        <p className={cn("text-2xl font-heading font-medium tracking-tighter tabular-nums", months[0].balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400")}>{brl(months[0].balance)}</p>
+                      </div>
+                      <div className="divide-y divide-slate-100 dark:divide-white/5">
+                        {months.map((m, i) => {
+                          running += m.balance;
+                          return (
+                            <div key={i} className="flex items-center justify-between gap-3 py-2 text-xs">
+                              <span className="font-medium text-slate-600 dark:text-[#C5C1E5] capitalize w-16 shrink-0">{format(m.date, 'MMM yy', { locale: ptBR })}</span>
+                              <span className={cn("tabular-nums flex-1 text-right", m.balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400")}>{brl(m.balance)}</span>
+                              <span className="tabular-nums text-slate-400 dark:text-[#9D99BC] w-28 text-right shrink-0">acum. {brl(running)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC]">Receitas menos despesas previstas de cada mês, com recorrências e parcelas.</p>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="lg:col-span-4 lg:order-5">

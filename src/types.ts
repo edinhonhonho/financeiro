@@ -41,6 +41,7 @@ export interface Transaction {
   owedByPerson?: boolean | null;
   // Quando quem foi associado avisou que já pagou (movimentação compartilhada).
   sharedPaidAt?: string | null;
+  categoryId?: string | null;
   // Só no aparelho: criado sem internet e ainda não enviado (nunca vai para o banco).
   pendingSync?: boolean;
 }
@@ -64,7 +65,10 @@ export interface UserProfile {
   firstName?: string | null;
   lastName?: string | null;
   username?: string | null;
+  notificationPrefs?: Partial<Record<NotificationPrefKey, boolean>> | null;
 }
+
+export type NotificationPrefKey = 'shared' | 'payments' | 'due' | 'cards' | 'budget';
 
 export interface PublicProfile {
   id: string;
@@ -89,6 +93,7 @@ export interface Category {
   name: string;
   icon: string;
   color: string;
+  monthlyBudget?: number | null;
 }
 
 export interface PersonConsent {
@@ -102,7 +107,7 @@ export interface AppNotification {
   id: string;
   userId: string;
   fromUserId?: string | null;
-  type: 'consent_request' | 'assigned' | 'consent_response' | 'payment_signal' | 'payment_rejected';
+  type: 'consent_request' | 'assigned' | 'consent_response' | 'payment_signal' | 'payment_rejected' | 'due_reminder' | 'card_reminder' | 'budget_alert';
   title: string;
   body?: string | null;
   transactionId?: string | null;
