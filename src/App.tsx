@@ -5335,7 +5335,7 @@ export default function App() {
         {offlineBanner}
 
         <Dialog open={isAvisosOpen} onOpenChange={setIsAvisosOpen}>
-          <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] max-h-[88dvh] flex flex-col z-[70]">
+          <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] h-[85dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col z-[70]">
             <div className="p-6 pb-2 pr-14 shrink-0">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Avisos</DialogTitle>
@@ -5344,7 +5344,7 @@ export default function App() {
                 </DialogDescription>
               </DialogHeader>
             </div>
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-6 space-y-5">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] space-y-5" style={{ WebkitOverflowScrolling: 'touch' }}>
               <div className="rounded-2xl bg-white dark:bg-[#211E4A] p-4 flex items-center gap-3">
                 <span className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><Smartphone size={18} /></span>
                 <div className="flex-1 min-w-0">
@@ -5904,8 +5904,8 @@ export default function App() {
                       // Previsão integrada: saldo previsto do mês (pago ou não) no topo do gráfico.
                       const projected = monthTotals(currentDate).balance;
                       return (
-                        <div className="flex items-start justify-between gap-3 mb-2">
-                          <div>
+                        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 mb-2">
+                          <div className="min-w-0">
                             <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Receitas x despesas</h3>
                             <div className="flex items-center gap-3 mt-1 text-[10px] font-medium text-slate-400 dark:text-[#9D99BC]">
                               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#37D6A3]" />Receitas</span>
@@ -5913,7 +5913,7 @@ export default function App() {
                               <span className="flex items-center gap-1"><span className="w-3 border-t-2 border-dashed border-[#8A7FF5]" />Saldo</span>
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
+                          <div className="min-w-0">
                             <p className="text-[10px] font-normal text-slate-400 dark:text-[#9D99BC]">Previsto para o fim de {format(currentDate, 'MMMM', { locale: ptBR })}</p>
                             <p className={cn("text-base font-heading font-medium tracking-tight tabular-nums", projected >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400")}>
                               {projected < 0 ? '-' : ''}R$ {Math.abs(projected).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
