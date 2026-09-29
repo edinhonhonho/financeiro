@@ -1203,6 +1203,21 @@ export default function App() {
     format(parseISO(t.date), 'yyyy-MM') === format(month, 'yyyy-MM')
   );
 
+  /** "Pagamento Fatura": só registra que a fatura foi paga; os gastos já são as compras. */
+  const isBillPaymentRow = (t: Transaction) =>
+    t.type === 'expense' && (t.category === 'Fatura Cartão' || t.category === 'Fatura cartão');
+
+  /**
+   * Status que vale para os totais: compra no cartão conta como paga quando a
+   * fatura dela foi paga (a compra em si fica "planejada" até lá).
+   */
+  const effectiveStatus = (t: Transaction): 'planned' | 'actual' => {
+    if (t.type === 'card_purchase' && t.cardId) {
+      return isCardBillPaid(t.cardId, getTransactionEffectiveMonth(t)) ? 'actual' : 'planned';
+    }
+    return t.status;
+  };
+
   // Pares "lançamento:pessoa" que já têm uma receita de reembolso vinculada
   // (numa divisão, cada pessoa que te deve tem a sua).
   const linkedPairs = useMemo(() => {
@@ -1869,7 +1884,10 @@ export default function App() {
   const stats = useMemo(() => {
     const targetMonthStr = format(currentDate, 'yyyy-MM');
 
+    // Compras no cartão entram pelo mês da fatura; o lançamento "Pagamento
+    // Fatura" não entra (senão o cartão contaria duas vezes).
     const monthTransactions = transactions.filter(t => {
+      if (isBillPaymentRow(t)) return false;
       const effectiveMonth = getTransactionEffectiveMonth(t);
       return format(effectiveMonth, 'yyyy-MM') === targetMonthStr;
     });
@@ -1887,11 +1905,11 @@ export default function App() {
       .reduce((acc, t) => acc + t.amount, 0) - netted.incomeActual;
 
     const expensesPlanned = monthTransactions
-      .filter(t => (t.type === 'expense' || t.type === 'card_purchase') && t.status === 'planned')
+      .filter(t => (t.type === 'expense' || t.type === 'card_purchase') && effectiveStatus(t) === 'planned')
       .reduce((acc, t) => acc + t.amount, 0) - netted.expensesPlanned;
 
     const expensesActual = monthTransactions
-      .filter(t => (t.type === 'expense' || t.type === 'card_purchase') && t.status === 'actual')
+      .filter(t => (t.type === 'expense' || t.type === 'card_purchase') && effectiveStatus(t) === 'actual')
       .reduce((acc, t) => acc + t.amount, 0) - netted.expensesActual;
 
     const incomeTotal = incomeActual + incomePlanned;
@@ -1932,10 +1950,10 @@ export default function App() {
   const homeBalance = homeIncome - homeExpense;
 
   const chartData = useMemo(() => {
-    const start = startOfMonth(currentDate);
-    const end = endOfMonth(currentDate);
-    const currentMonthTransactions = transactions.filter(t => 
-      isWithinInterval(parseISO(t.date), { start, end })
+    const targetMonth = format(currentDate, 'yyyy-MM');
+    const currentMonthTransactions = transactions.filter(t =>
+      !isBillPaymentRow(t) && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === targetMonth &&
+      (!onlyCompleted || effectiveStatus(t) === 'actual')
     );
 
     const categories = Array.from(new Set(currentMonthTransactions.map(t => t.category)));
@@ -1945,7 +1963,7 @@ export default function App() {
         .filter(t => t.category === cat && (t.type === 'expense' || t.type === 'card_purchase'))
         .reduce((acc, t) => acc + t.amount, 0)
     })).filter(d => d.value > 0);
-  }, [transactions, currentDate]);
+  }, [transactions, currentDate, cards, onlyCompleted]);
 
   // 7 meses com o mês selecionado sempre no meio (3 antes, 3 depois). Segue o
   // mesmo critério do balanço: tudo do mês, ou só o concluído.
@@ -1953,10 +1971,10 @@ export default function App() {
     const data = [];
     for (let i = -3; i <= 3; i++) {
       const date = addMonths(currentDate, i);
-      const start = startOfMonth(date);
-      const end = endOfMonth(date);
+      const monthKey = format(date, 'yyyy-MM');
       const monthTransactions = transactions.filter(t =>
-        isWithinInterval(parseISO(t.date), { start, end }) && (!onlyCompleted || t.status === 'actual')
+        !isBillPaymentRow(t) && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthKey &&
+        (!onlyCompleted || effectiveStatus(t) === 'actual')
       );
 
       const netted = getNettedOut(date);
@@ -1973,7 +1991,7 @@ export default function App() {
       });
     }
     return data;
-  }, [transactions, people, currentDate, onlyCompleted]);
+  }, [transactions, people, cards, currentDate, onlyCompleted]);
 
   const COLORS = ['#8A7FF5', '#37D6A3', '#FF6F61', '#FDB8D7', '#6FA8FF', '#FFC168'];
 
@@ -6045,7 +6063,7 @@ export default function App() {
                       <div className="bg-secondary dark:bg-[#211E4A] shadow-soft rounded-xl p-4">
                         <p className="text-sm font-normal text-emerald-600/70 dark:text-emerald-400/70 truncate">Receita</p>
                         {(() => {
-                          const [i, d] = stats.incomeTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                          const [i, d] = (movStatusFilter === 'actual' ? stats.incomeActual : movStatusFilter === 'planned' ? stats.incomePlanned : stats.incomeTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                           return (
                             <p className="text-2xl font-heading font-medium tracking-tighter text-emerald-600 dark:text-emerald-400 truncate mt-1">
                               R$ {i}<span className="opacity-50 font-normal">,{d}</span>
@@ -6056,7 +6074,7 @@ export default function App() {
                       <div className="bg-secondary dark:bg-[#211E4A] shadow-soft rounded-xl p-4">
                         <p className="text-sm font-normal text-rose-500/70 dark:text-rose-400/70 truncate">Despesa</p>
                         {(() => {
-                          const [i, d] = stats.expenseTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
+                          const [i, d] = (movStatusFilter === 'actual' ? stats.expensesActual : movStatusFilter === 'planned' ? stats.expensesPlanned : stats.expenseTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).split(',');
                           return (
                             <p className="text-2xl font-heading font-medium tracking-tighter text-rose-500 dark:text-rose-400 truncate mt-1">
                               R$ {i}<span className="opacity-50 font-normal">,{d}</span>
