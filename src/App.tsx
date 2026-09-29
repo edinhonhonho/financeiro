@@ -2671,7 +2671,8 @@ export default function App() {
     let initialType: TransactionType = 'expense';
     if (activeTab === 'receitas') initialType = 'income';
     if (activeTab === 'cartoes') initialType = 'card_purchase';
-    if (typeOverride) initialType = typeOverride;
+    // Só aceita um tipo de verdade (se vier o evento de clique, ignora).
+    if (typeOverride === 'income' || typeOverride === 'expense' || typeOverride === 'card_purchase') initialType = typeOverride;
     
     setNewTransaction({
       type: initialType,
@@ -4719,7 +4720,7 @@ export default function App() {
             render={
               <Button 
                 className="w-16 h-16 rounded-full bg-primary hover:active:scale-90 shadow-deep p-0 border-[6px] border-white dark:border-[#211E4A] transition-all duration-500 overflow-hidden group"
-                onClick={handleOpenRegistrar}
+                onClick={() => handleOpenRegistrar()}
               >
                 <Plus size={32} className="text-white relative z-10 transition-transform duration-500 group-hover:rotate-90" strokeWidth={3} />
               </Button>
