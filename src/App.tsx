@@ -3270,9 +3270,7 @@ export default function App() {
       <div className="min-h-screen flex flex-col p-6">
         <div className="flex-1 flex flex-col justify-center max-w-sm w-full mx-auto">
           <div className="flex items-center gap-3 mb-10">
-            <div className="w-11 h-11 bg-primary rounded-2xl flex items-center justify-center text-white shadow-bubbly rotate-3 shrink-0">
-              <Wallet size={20} strokeWidth={2.5} />
-            </div>
+            <img src="/icon-192.png" alt="" className="w-11 h-11 rounded-2xl object-cover shadow-bubbly rotate-3 shrink-0" />
             <span className="text-lg font-heading font-medium text-slate-800 dark:text-[#EDE9E3] tracking-tight">Financeiro</span>
           </div>
 
@@ -5364,9 +5362,7 @@ export default function App() {
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex flex-col fixed left-4 top-4 bottom-4 w-72 bg-card rounded-[3rem] shadow-bubbly p-8 z-50">
     <div className="flex items-center gap-4 mb-12 px-2 transition-transform hover:scale-105 duration-500">
-      <div className="w-14 h-14 bg-primary rounded-full flex items-center justify-center text-white shadow-bubbly">
-        <Wallet size={26} strokeWidth={2.5} />
-      </div>
+      <img src="/icon-192.png" alt="" className="w-14 h-14 rounded-2xl object-cover shadow-bubbly shrink-0" />
       <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Financeiro</h1>
     </div>
 
