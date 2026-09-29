@@ -562,6 +562,7 @@ export default function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [respondingConsentId, setRespondingConsentId] = useState<string | null>(null);
   const [sharedTxDetail, setSharedTxDetail] = useState<Transaction | null>(null);
+  const [isAvisosOpen, setIsAvisosOpen] = useState(false);
   // Esconder valores (olho no topo): troca os R$ por "•••" em toda a tela.
   const [hideValues, setHideValues] = useState(() => {
     try { return localStorage.getItem('financeiro:hideValues') === '1'; } catch { return false; }
@@ -3251,7 +3252,7 @@ export default function App() {
   // ---------------------------------------------------------------------------
   const anyOverlayOpen = isRegistrarOpen || !!confirmingTransaction || isProfileOpen || isCategoriasOpen ||
     isPessoasOpen || isNotificationsOpen || !!sharedTxDetail || showPersonForm || showCardForm ||
-    isMonthPickerOpen || isDeleteDialogOpen || isDataModalOpen || isPessoasSummaryOpen || isAccountEditOpen;
+    isMonthPickerOpen || isDeleteDialogOpen || isDataModalOpen || isPessoasSummaryOpen || isAccountEditOpen || isAvisosOpen;
   const navRef = useRef({ fromPop: false, ignorePops: 0, overlayPushed: false, closedByPop: false, mounted: false });
   const backStateRef = useRef({ activeTab, registrarStep, isRegistrarOpen, anyOverlayOpen });
   backStateRef.current = { activeTab, registrarStep, isRegistrarOpen, anyOverlayOpen };
@@ -3340,6 +3341,7 @@ export default function App() {
         setIsDataModalOpen(false);
         setIsPessoasSummaryOpen(false);
         setIsAccountEditOpen(false);
+        setIsAvisosOpen(false);
         return;
       }
       const tab = (e.state && e.state.tab) as string | undefined;
@@ -5332,6 +5334,62 @@ export default function App() {
 
         {offlineBanner}
 
+        <Dialog open={isAvisosOpen} onOpenChange={setIsAvisosOpen}>
+          <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] max-h-[88dvh] flex flex-col z-[70]">
+            <div className="p-6 pb-2 pr-14 shrink-0">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Avisos</DialogTitle>
+                <DialogDescription className="text-xs leading-relaxed">
+                  Os avisos aparecem no sino do app. Se quiser, eles também chegam como notificação no celular, mesmo com o app fechado.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 pb-6 space-y-5">
+              <div className="rounded-2xl bg-white dark:bg-[#211E4A] p-4 flex items-center gap-3">
+                <span className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><Smartphone size={18} /></span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Receber também no celular</p>
+                  <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">
+                    {pushSupport === 'supported'
+                      ? (pushEnabled ? 'Ligado neste aparelho' : 'Vale só para este aparelho')
+                      : pushSupport === 'needs-install'
+                        ? 'No iPhone, instale o app na tela inicial para ligar'
+                        : 'Este navegador não permite notificações'}
+                  </p>
+                </div>
+                {pushSupport === 'supported' && (
+                  <ToggleSwitch checked={pushEnabled} onChange={(v) => { if (!pushBusy) togglePush(v); }} />
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">QUAIS AVISOS</p>
+                <div className="rounded-2xl bg-white dark:bg-[#211E4A] divide-y divide-slate-100 dark:divide-white/5">
+                  {([
+                    ['shared', 'Compartilhamentos', 'Alguém associou uma movimentação a você', Users],
+                    ['payments', 'Pagamentos', '"Já paguei" e pagamento não reconhecido', CheckCircle2],
+                    ['due', 'Vencimentos', 'Um dia antes de uma despesa vencer', Clock],
+                    ['cards', 'Faturas', 'Três dias antes do vencimento da fatura', CreditCard],
+                    ['budget', 'Orçamentos', 'Ao chegar em 80% e 100% do orçamento', PieChartIcon]
+                  ] as const).map(([key, title, description, Icon]) => (
+                    <label key={key} className="flex items-center gap-3 px-4 py-3 cursor-pointer">
+                      <Icon size={18} className="text-primary shrink-0" />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{title}</span>
+                        <span className="block text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">{description}</span>
+                      </span>
+                      <ToggleSwitch checked={notificationPrefs[key] !== false} onChange={(v) => setNotificationPref(key, v)} />
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] leading-relaxed ml-1">
+                  Desligar um aviso tira ele do sino e do celular. Compartilhamentos e pagamentos continuam no sino, porque podem pedir uma resposta sua; desligados, só deixam de chegar no celular.
+                </p>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         <ImageCropper src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />
 
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
@@ -5407,38 +5465,14 @@ export default function App() {
                 <AccountSection label="Aplicativo">
                   <AccountRow
                     icon={<Bell size={18} />}
-                    title="Notificações no celular"
-                    description={pushSupport === 'supported'
-                      ? (pushEnabled ? 'Ativadas neste aparelho' : 'Receba avisos de pagamentos e compartilhamentos mesmo com o app fechado')
-                      : pushSupport === 'needs-install'
-                        ? 'No iPhone, instale o app na tela inicial para ativar'
-                        : 'Este navegador não suporta notificações'}
-                    right={pushSupport === 'supported'
-                      ? <ToggleSwitch checked={pushEnabled} onChange={(v) => { if (!pushBusy) togglePush(v); }} />
-                      : <></>}
+                    title="Avisos"
+                    description={(() => {
+                      const off = (['shared', 'payments', 'due', 'cards', 'budget'] as const).filter(k => notificationPrefs[k] === false).length;
+                      const which = off === 0 ? 'Todos os avisos ligados' : `${5 - off} de 5 avisos ligados`;
+                      return `${which} · ${pushEnabled ? 'também no celular' : 'só no app'}`;
+                    })()}
+                    onClick={() => setIsAvisosOpen(true)}
                   />
-                </AccountSection>
-
-                <AccountSection label="Quais avisos receber">
-                  {([
-                    ['shared', 'Compartilhamentos', 'Quando alguém associar uma movimentação a você', Users],
-                    ['payments', 'Pagamentos', 'Avisos de "já paguei" e de pagamento não reconhecido', CheckCircle2],
-                    ['due', 'Vencimentos', 'Um dia antes de uma despesa vencer', Clock],
-                    ['cards', 'Faturas', 'Três dias antes do vencimento da fatura', CreditCard],
-                    ['budget', 'Orçamentos', 'Ao chegar em 80% e 100% do orçamento de uma categoria', PieChartIcon]
-                  ] as const).map(([key, title, description, Icon]) => (
-                    <React.Fragment key={key}>
-                      <AccountRow
-                        icon={<Icon size={18} />}
-                        title={title}
-                        description={description}
-                        right={<ToggleSwitch checked={notificationPrefs[key] !== false} onChange={(v) => setNotificationPref(key, v)} />}
-                      />
-                    </React.Fragment>
-                  ))}
-                </AccountSection>
-
-                <AccountSection label="Aparência">
                   <AccountRow
                     icon={darkMode ? <Moon size={18} /> : <Sun size={18} />}
                     title="Modo escuro"
