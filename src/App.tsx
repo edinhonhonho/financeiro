@@ -1629,17 +1629,13 @@ export default function App() {
       format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM')
     );
 
-    // Previstas primeiro, depois por data (mais recente em cima).
-    const all: Transaction[] = [...monthTransactions].sort((a, b) => {
-      const rank = (t: Transaction) => (t.status === 'planned' ? 0 : 1);
-      return rank(a) - rank(b) || new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
+    const all: Transaction[] = [...monthTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const aPagar: Transaction[] = monthTransactions
       .filter(t => t.type !== 'income' && t.status === 'planned')
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const aReceber: Transaction[] = monthTransactions
       .filter(t => t.type === 'income' && t.status === 'planned')
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return { all, aPagar, aReceber };
   }, [transactions, cards, people, currentDate]);
@@ -1803,10 +1799,10 @@ export default function App() {
 
   const handlePeopleCarouselScroll = () => {
     const el = peopleCarouselRef.current;
-    if (!el || people.length === 0) return;
+    if (!el || sortedPeople.length === 0) return;
     const index = Math.round(el.scrollLeft / PEOPLE_CAROUSEL_ITEM_WIDTH);
-    const clamped = Math.max(0, Math.min(people.length - 1, index));
-    const person = people[clamped];
+    const clamped = Math.max(0, Math.min(sortedPeople.length - 1, index));
+    const person = sortedPeople[clamped];
     if (person && person.id !== selectedPersonId) setSelectedPersonId(person.id);
   };
 
@@ -1814,7 +1810,7 @@ export default function App() {
   // carrossel direto ao card da pessoa selecionada.
   useEffect(() => {
     if (activeTab !== 'pessoas') return;
-    return scrollCarouselToIndex(() => peopleCarouselRef.current, people.findIndex(p => p.id === selectedPersonId));
+    return scrollCarouselToIndex(() => peopleCarouselRef.current, sortedPeople.findIndex(p => p.id === selectedPersonId));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -1824,6 +1820,14 @@ export default function App() {
   useEffect(() => {
     if (activeTab === 'pessoas') setSelectedChargeDate(currentDate);
   }, [activeTab, currentDate]);
+
+  // Quem mais te deve primeiro ... quem você mais deve por último.
+  const sortPeopleByBalance = (list: Person[], month: Date) =>
+    list
+      .map(p => ({ p, balance: getPersonMonthlyCharges(p.id, month).balance }))
+      .sort((a, b) => b.balance - a.balance)
+      .map(x => x.p);
+  const sortedPeople = sortPeopleByBalance(people, selectedChargeDate);
 
   const personChargeHistory = useMemo(() => {
     const activePerson = people.find(p => p.id === selectedPersonId) || people[0];
@@ -5360,8 +5364,8 @@ export default function App() {
                           <span className={cn("size-5 rounded-md border flex items-center justify-center shrink-0 transition-colors", on ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300 dark:border-white/20")}>
                             {on && <Check className="size-3.5" />}
                           </span>
-                          <span className={cn("flex-1 text-xs font-normal text-slate-600 dark:text-[#C5C1E5] truncate", !on && "opacity-50 line-through")}>{t.description.split(' · ')[0]}</span>
-                          <span className={cn("text-xs font-medium text-slate-700 dark:text-[#EDEAF9] tabular-nums shrink-0", !on && "opacity-50")}>{brl(t.amount)}</span>
+                          <span className={cn("flex-1 text-xs font-normal text-slate-600 dark:text-[#C5C1E5] truncate", !on && "text-slate-300 dark:text-[#6E6A99]")}>{t.description.split(' · ')[0]}</span>
+                          <span className={cn("text-xs font-medium text-slate-700 dark:text-[#EDEAF9] tabular-nums shrink-0", !on && "text-slate-300 dark:text-[#6E6A99]")}>{brl(t.amount)}</span>
                         </button>
                       );
                     })}
@@ -5880,7 +5884,7 @@ export default function App() {
                       <span className={thumbLabel}>Adicionar</span>
                     </button>
                   );
-                  const visiblePeople = people.filter(p => p.visible !== false);
+                  const visiblePeople = sortPeopleByBalance(people.filter(p => p.visible !== false), currentDate);
                   return (
                     <>
                       <div className="lg:col-span-6 lg:order-6 lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
@@ -5895,11 +5899,17 @@ export default function App() {
                               onClick={() => { setSelectedPersonId(p.id); setActiveTab('pessoas'); }}
                               className="flex flex-col items-center gap-1.5 shrink-0"
                             >
-                              <span className={cn("w-12 h-12 rounded-full overflow-hidden shadow-soft", debt > 0 && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background")}>
-                                <img src={p.image || `https://picsum.photos/seed/${p.name}/100/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              <span className="relative">
+                                <span className={cn("block w-12 h-12 rounded-full overflow-hidden shadow-soft", debt > 0 && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background")}>
+                                  <img src={p.image || `https://picsum.photos/seed/${p.name}/100/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                </span>
+                                {debt > 0 && (
+                                  <span className="absolute left-1/2 -translate-x-1/2 -bottom-2 whitespace-nowrap rounded-full bg-rose-500 text-white text-[9px] font-medium leading-none px-1.5 py-[3px] tabular-nums shadow-soft">
+                                    R$ {debt.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                  </span>
+                                )}
                               </span>
-                              <span className={thumbLabel}>{p.name.split(' ')[0]}</span>
-                              {debt > 0 && <span className="text-[10px] font-medium text-rose-500 dark:text-rose-400 tabular-nums -mt-1">R$ {debt.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
+                              <span className={cn(thumbLabel, debt > 0 && "mt-1")}>{p.name.split(' ')[0]}</span>
                             </button>
                             );
                           })}
@@ -7215,7 +7225,7 @@ export default function App() {
                       {...carouselDrag}
                       className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-6 px-6 pt-1 pb-10 -mb-8 cursor-grab lg:grid lg:grid-cols-2 lg:gap-3 lg:overflow-visible lg:snap-none lg:mx-0 lg:px-0 lg:pt-0 lg:pb-0 lg:mb-0 lg:cursor-default"
                     >
-                      {people.map(person => {
+                      {sortedPeople.map(person => {
                         const monthCharges = getPersonMonthlyCharges(person.id, selectedChargeDate);
                         const identityLine = personLinkSelected && editingPerson?.id === person.id
                           ? `@${personLinkSelected.username}`
@@ -7294,7 +7304,7 @@ export default function App() {
 
                     {people.length > 1 && (
                       <div className="flex items-center justify-center gap-1.5 -mt-3 lg:hidden">
-                        {people.map(person => (
+                        {sortedPeople.map(person => (
                           <div
                             key={person.id}
                             className={cn(
@@ -7471,6 +7481,7 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        <p className="mt-10 text-center text-[10px] font-normal text-slate-300 dark:text-[#5E5A8A] select-none">Feito com carinho, por Edinho.</p>
       </main>
 
       {/* Pessoas Management Modal */}
