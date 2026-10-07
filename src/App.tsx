@@ -1821,11 +1821,11 @@ export default function App() {
     if (activeTab === 'pessoas') setSelectedChargeDate(currentDate);
   }, [activeTab, currentDate]);
 
-  // Quem mais te deve primeiro ... quem você mais deve por último.
+  // Quem mais te deve primeiro ... quem você mais deve; saldo zerado por último.
   const sortPeopleByBalance = (list: Person[], month: Date) =>
     list
       .map(p => ({ p, balance: getPersonMonthlyCharges(p.id, month).balance }))
-      .sort((a, b) => b.balance - a.balance)
+      .sort((a, b) => (a.balance === 0 ? 1 : 0) - (b.balance === 0 ? 1 : 0) || b.balance - a.balance)
       .map(x => x.p);
   const sortedPeople = sortPeopleByBalance(people, selectedChargeDate);
 
@@ -5900,11 +5900,11 @@ export default function App() {
                               className="flex flex-col items-center gap-1.5 shrink-0"
                             >
                               <span className="relative">
-                                <span className={cn("block w-12 h-12 rounded-full overflow-hidden shadow-soft", debt > 0 && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background", debt < 0 && "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background")}>
+                                <span className={cn("block w-12 h-12 rounded-full overflow-hidden shadow-soft", debt > 0 && "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background", debt < 0 && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background")}>
                                   <img src={p.image || `https://picsum.photos/seed/${p.name}/100/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 </span>
                                 {debt !== 0 && (
-                                  <span className={cn("absolute left-1/2 -translate-x-1/2 -bottom-2 whitespace-nowrap rounded-full text-white text-[9px] font-medium leading-none px-1.5 py-[3px] tabular-nums shadow-soft", debt > 0 ? "bg-rose-500" : "bg-emerald-500")}>
+                                  <span className={cn("absolute left-1/2 -translate-x-1/2 -bottom-2 whitespace-nowrap rounded-full text-white text-[9px] font-medium leading-none px-1.5 py-[3px] tabular-nums shadow-soft", debt > 0 ? "bg-emerald-500" : "bg-rose-500")}>
                                     {debt < 0 ? '-' : ''}R$ {Math.abs(debt).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                   </span>
                                 )}
