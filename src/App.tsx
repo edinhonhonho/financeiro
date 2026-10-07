@@ -266,6 +266,12 @@ const getNthBusinessDay = (year: number, monthIndex: number, n: number): Date =>
   return date;
 };
 
+const nextMonthChargeDate = (txDate?: string): string => {
+  const base = txDate ? parseISO(txDate) : new Date();
+  const d = getNthBusinessDay(base.getFullYear(), base.getMonth() + 1, 5);
+  return format(d, 'yyyy-MM-dd');
+};
+
 const months = [
   { value: '01', label: 'Janeiro' },
   { value: '02', label: 'Fevereiro' },
@@ -576,10 +582,16 @@ export default function App() {
   const [pushBusy, setPushBusy] = useState(false);
   const pushSupport = getPushSupport();
   const [settleConfirm, setSettleConfirm] = useState<{ person: Person; month: Date; charges: ReturnType<typeof getPersonMonthlyCharges> } | null>(null);
+  // Movimentações desmarcadas no modal de quitação (ficam pendentes).
+  const [settleExcluded, setSettleExcluded] = useState<string[]>([]);
+  useEffect(() => { setSettleExcluded([]); }, [settleConfirm]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingCard, setIsSubmittingCard] = useState(false);
   const [isDeletingTransaction, setIsDeletingTransaction] = useState(false);
   const [linkedIncomeDate, setLinkedIncomeDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  // "Cobrar no próximo mês": a cobrança da pessoa cai no 5º dia útil do mês
+  // seguinte à despesa (data editável em linkedIncomeDate).
+  const [chargeNextMonth, setChargeNextMonth] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
@@ -726,8 +738,8 @@ export default function App() {
   };
   // Marca como pagas todas as pendências do mês com a pessoa (o que ela me deve
   // e o que eu devo a ela), zerando o saldo.
-  const settlePersonMonth = async (charges: ReturnType<typeof getPersonMonthlyCharges>) => {
-    const toSettle = [...charges.pending, ...charges.payablePending].filter(t => !t.id.startsWith('person-bill-'));
+  const settlePersonMonth = async (charges: ReturnType<typeof getPersonMonthlyCharges>, excludedIds: string[] = []) => {
+    const toSettle = [...charges.pending, ...charges.payablePending].filter(t => !t.id.startsWith('person-bill-') && !excludedIds.includes(t.id));
     if (toSettle.length === 0) return;
     if (!navigator.onLine) { showAlert('Sem internet', 'Quitar o mês precisa de conexão.'); return; }
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -1617,7 +1629,11 @@ export default function App() {
       format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM')
     );
 
-    const all: Transaction[] = [...monthTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    // Previstas primeiro, depois por data (mais recente em cima).
+    const all: Transaction[] = [...monthTransactions].sort((a, b) => {
+      const rank = (t: Transaction) => (t.status === 'planned' ? 0 : 1);
+      return rank(a) - rank(b) || new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
     const aPagar: Transaction[] = monthTransactions
       .filter(t => t.type !== 'income' && t.status === 'planned')
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -2736,6 +2752,7 @@ export default function App() {
     }
     const existingLinked = transactions.find(x => x.linkedTransactionId === t.id);
     setLinkedIncomeDate(existingLinked?.date || t.date || format(new Date(), 'yyyy-MM-dd'));
+    setChargeNextMonth(!!existingLinked?.date && !!t.date && existingLinked.date.slice(0, 7) > t.date.slice(0, 7));
     setQuickAssignQuery('');
     setEditingShareId(null);
     setAssignmentMode('single');
@@ -2819,6 +2836,7 @@ export default function App() {
     setGlobalSplitType('parts');
     setForcedSeriesMode(null);
     setLinkedIncomeDate(format(new Date(), 'yyyy-MM-dd'));
+    setChargeNextMonth(false);
     setRecurrenceDateMode('fixed');
     setRecurrenceBusinessDay(5);
     let initialType: TransactionType = 'expense';
@@ -3800,7 +3818,7 @@ export default function App() {
       date: v,
       ...(isRecurrent && v ? { recurrenceEndDate: format(addMonths(parseISO(v), recurrenceCount - 1), 'yyyy-MM') } : {})
     }));
-    setLinkedIncomeDate(v);
+    setLinkedIncomeDate(chargeNextMonth ? nextMonthChargeDate(v) : v);
   };
 
   const repeatKind: 0 | 1 | 2 = isInstallment ? 2 : isRecurrent ? 1 : 0;
@@ -4651,10 +4669,7 @@ export default function App() {
                     <DateField
                       className="h-14 rounded-2xl text-sm bg-slate-50 dark:bg-[#2A2755]"
                       value={newTransaction.date || ''}
-                      onChange={(v) => {
-                        setTxDate(v);
-                        setLinkedIncomeDate(v);
-                      }}
+                      onChange={(v) => setTxDate(v)}
                     />
                   </div>
                   <div className="space-y-2">
@@ -4721,6 +4736,31 @@ export default function App() {
             {registrarStep === 2 && (
               <div className="space-y-6 pt-4">
               {peopleSection}
+
+                {newTransaction.type === 'expense' && !newTransaction.cardId && personSplits.length > 0 && (
+                  <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-[#37336A]">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm font-medium text-slate-600 dark:text-[#C5C1E5]">Cobrar no próximo mês</Label>
+                      <ToggleSwitch
+                        checked={chargeNextMonth}
+                        onChange={(checked) => {
+                          setChargeNextMonth(checked);
+                          setLinkedIncomeDate(checked ? nextMonthChargeDate(newTransaction.date as string) : (newTransaction.date as string) || format(new Date(), 'yyyy-MM-dd'));
+                        }}
+                      />
+                    </div>
+                    {chargeNextMonth && (
+                      <div className="space-y-2">
+                        <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Data da cobrança (5º dia útil)</Label>
+                        <DateField
+                          className="h-12 rounded-[14px] bg-slate-50 dark:bg-[#2A2755] text-sm"
+                          value={linkedIncomeDate}
+                          onChange={(v) => setLinkedIncomeDate(v)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {newTransaction.type !== 'card_purchase' && !newTransaction.cardId && (
                   <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-[#37336A]">
@@ -5011,7 +5051,7 @@ export default function App() {
                     <DateField
                       className="h-12 rounded-[14px] bg-white dark:bg-[#211E4A] text-sm px-5 shadow-sm"
                       value={newTransaction.date || ''}
-                      onChange={(v) => { setTxDate(v); setLinkedIncomeDate(v); }}
+                      onChange={(v) => setTxDate(v)}
                     />
                   </div>
                   <div className="space-y-2">
@@ -5104,6 +5144,27 @@ export default function App() {
                 </button>
               ) : <span />}
               <div className="flex items-center gap-2">
+                {newTransaction.type === 'expense' && !newTransaction.cardId && personSplits.length > 0 && (
+                  <div className="flex items-center gap-3 mr-3">
+                    {chargeNextMonth && (
+                      <DateField
+                        className="h-10 rounded-[12px] bg-slate-50 dark:bg-[#2A2755] text-sm w-40"
+                        value={linkedIncomeDate}
+                        onChange={(v) => setLinkedIncomeDate(v)}
+                      />
+                    )}
+                    <label className="flex items-center gap-2.5 text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
+                      Cobrar no próximo mês
+                      <ToggleSwitch
+                        checked={chargeNextMonth}
+                        onChange={(checked) => {
+                          setChargeNextMonth(checked);
+                          setLinkedIncomeDate(checked ? nextMonthChargeDate(newTransaction.date as string) : (newTransaction.date as string) || format(new Date(), 'yyyy-MM-dd'));
+                        }}
+                      />
+                    </label>
+                  </div>
+                )}
                 {newTransaction.type !== 'card_purchase' && !newTransaction.cardId && (
                   <label className="flex items-center gap-2.5 mr-3 text-sm font-medium text-slate-600 dark:text-[#C5C1E5] cursor-pointer">
                     {newTransaction.type === 'income' ? 'Já recebido' : 'Já pago'}
@@ -5273,7 +5334,7 @@ export default function App() {
         </Dialog>
 
         <Dialog open={!!settleConfirm} onOpenChange={(open) => { if (!open) setSettleConfirm(null); }}>
-          <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] max-h-[85dvh] flex flex-col">
+          <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] h-[85dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col">
             {settleConfirm && (() => {
               const { person, month, charges } = settleConfirm;
               const firstName = person.name.split(' ')[0];
@@ -5282,23 +5343,32 @@ export default function App() {
               const toPay = charges.payablePending.filter(t => !t.id.startsWith('shared-'));
               const toSignal = [...charges.pending, ...charges.payablePending].filter(t => t.id.startsWith('shared-') && t.type !== 'income');
               const sum = (list: Transaction[]) => list.reduce((acc, t) => acc + t.amount, 0);
+              const included = (list: Transaction[]) => list.filter(t => !settleExcluded.includes(t.id));
+              const toggleExcluded = (id: string) => setSettleExcluded(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
               const group = (title: string, hint: string, list: Transaction[], tone: string) => list.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">{title}</p>
-                    <p className={cn("text-sm font-medium tabular-nums", tone)}>{brl(sum(list))}</p>
+                    <p className={cn("text-sm font-medium tabular-nums", tone)}>{brl(sum(included(list)))}</p>
                   </div>
                   <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] -mt-1">{hint}</p>
                   <div className="rounded-2xl bg-white dark:bg-[#211E4A] divide-y divide-slate-100 dark:divide-white/5">
-                    {list.map(t => (
-                      <div key={t.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                        <span className="text-xs font-normal text-slate-600 dark:text-[#C5C1E5] truncate">{t.description.split(' · ')[0]}</span>
-                        <span className="text-xs font-medium text-slate-700 dark:text-[#EDEAF9] tabular-nums shrink-0">{brl(t.amount)}</span>
-                      </div>
-                    ))}
+                    {list.map(t => {
+                      const on = !settleExcluded.includes(t.id);
+                      return (
+                        <button type="button" key={t.id} onClick={() => toggleExcluded(t.id)} className="w-full flex items-center gap-3 px-4 py-2.5 text-left">
+                          <span className={cn("size-5 rounded-md border flex items-center justify-center shrink-0 transition-colors", on ? "bg-emerald-500 border-emerald-500 text-white" : "border-slate-300 dark:border-white/20")}>
+                            {on && <Check className="size-3.5" />}
+                          </span>
+                          <span className={cn("flex-1 text-xs font-normal text-slate-600 dark:text-[#C5C1E5] truncate", !on && "opacity-50 line-through")}>{t.description.split(' · ')[0]}</span>
+                          <span className={cn("text-xs font-medium text-slate-700 dark:text-[#EDEAF9] tabular-nums shrink-0", !on && "opacity-50")}>{brl(t.amount)}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               );
+              const nothingSelected = included([...toReceive, ...toPay, ...toSignal]).length === 0;
               return (
                 <>
                   <div className="p-6 pb-3 pr-14 shrink-0">
@@ -5320,8 +5390,9 @@ export default function App() {
                     </button>
                     <button
                       type="button"
-                      onClick={async () => { const c = settleConfirm.charges; setSettleConfirm(null); await settlePersonMonth(c); }}
-                      className="flex-1 h-12 rounded-full bg-emerald-500 text-white font-medium text-sm active:scale-95 transition-all"
+                      disabled={nothingSelected}
+                      onClick={async () => { const c = settleConfirm.charges; const ex = settleExcluded; setSettleConfirm(null); await settlePersonMonth(c, ex); }}
+                      className="flex-1 h-12 rounded-full bg-emerald-500 text-white font-medium text-sm active:scale-95 transition-all disabled:opacity-50"
                     >
                       Quitar mês
                     </button>
@@ -5815,19 +5886,23 @@ export default function App() {
                       <div className="lg:col-span-6 lg:order-6 lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
                         <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight mb-3">Pessoas</p>
                         <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1">
-                          {visiblePeople.map(p => (
+                          {visiblePeople.map(p => {
+                            const debt = getPersonMonthlyCharges(p.id, currentDate).balance;
+                            return (
                             <button
                               key={p.id}
                               type="button"
                               onClick={() => { setSelectedPersonId(p.id); setActiveTab('pessoas'); }}
                               className="flex flex-col items-center gap-1.5 shrink-0"
                             >
-                              <span className="w-12 h-12 rounded-full overflow-hidden shadow-soft">
+                              <span className={cn("w-12 h-12 rounded-full overflow-hidden shadow-soft", debt > 0 && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background")}>
                                 <img src={p.image || `https://picsum.photos/seed/${p.name}/100/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                               </span>
                               <span className={thumbLabel}>{p.name.split(' ')[0]}</span>
+                              {debt > 0 && <span className="text-[10px] font-medium text-rose-500 dark:text-rose-400 tabular-nums -mt-1">R$ {debt.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>}
                             </button>
-                          ))}
+                            );
+                          })}
                           {addButton(() => { setActiveTab('pessoas'); handleCancelEditPerson(); setShowPersonForm(true); }, 'Adicionar pessoa')}
                         </div>
                       </div>
@@ -6015,13 +6090,8 @@ export default function App() {
                         </div>
                       );
                     })()}
-                  </CardContent>
-                </ShadcnCard>
-              </div>
-
-              {/* Orçamentos do mês */}
-              <div className="lg:col-span-8 lg:order-4">
-                <div className="flex items-center justify-between mb-4 ml-2">
+                    <div className="mt-5 pt-5 border-t border-slate-100 dark:border-white/5">
+                <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Orçamentos</h3>
                   <button type="button" onClick={() => setIsCategoriasOpen(true)} className="text-xs font-medium text-primary">
                     {budgetProgress.length > 0 ? 'Editar' : 'Definir'}
@@ -6031,13 +6101,13 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setIsCategoriasOpen(true)}
-                    className="w-full bg-card rounded-[1.5rem] shadow-soft p-5 text-left flex items-center gap-4"
+                    className="w-full bg-slate-50 dark:bg-[#2A2755] rounded-2xl p-4 text-left flex items-center gap-4"
                   >
                     <span className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0"><PieChartIcon size={20} /></span>
                     <span className="text-sm font-normal text-slate-500 dark:text-[#A8A4CC]">Defina quanto quer gastar por mês em cada categoria e acompanhe aqui.</span>
                   </button>
                 ) : (
-                  <div className="bg-card rounded-[1.5rem] shadow-soft p-5 grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4">
                     {budgetProgress.map(({ category, spent, budget, pct }) => {
                       const tone = pct >= 1 ? 'bg-rose-500' : pct >= 0.8 ? 'bg-amber-500' : 'bg-primary';
                       const left = budget - spent;
@@ -6061,69 +6131,11 @@ export default function App() {
                     })}
                   </div>
                 )}
-              </div>
-
-              <div className="lg:col-span-4 lg:order-5">
-                <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4 ml-2">Devedores do mês</h3>
-                {(() => {
-                  const debtors = people
-                    .map(p => ({ person: p, charges: getPersonMonthlyCharges(p.id, currentDate) }))
-                    .filter(d => d.charges.balance > 0)
-                    .sort((a, b) => b.charges.balance - a.charges.balance);
-                  if (debtors.length === 0) {
-                    return (
-                      <div className="bg-card rounded-[1.75rem] shadow-soft p-10 text-center">
-                        <p className="text-xs font-normal text-slate-300 dark:text-[#7E7AAA]">Ninguém deve nada neste mês. 🎉</p>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div className="space-y-2">
-                      {debtors.map(({ person, charges }) => (
-                        <button
-                          key={person.id}
-                          onClick={() => { setSelectedPersonId(person.id); setActiveTab('pessoas'); }}
-                          className="w-full flex items-center gap-3 bg-card rounded-full pl-2 pr-4 py-2 shadow-soft transition-transform active:scale-[0.99] text-left"
-                        >
-                          <img src={person.image || `https://picsum.photos/seed/${person.name}/100/100`} alt="" className="w-11 h-11 rounded-full object-cover shrink-0" />
-                          <span className="flex-1 min-w-0 font-medium text-slate-700 dark:text-[#EDEAF9] text-sm truncate tracking-tight">{person.name}</span>
-                          <span className="font-heading font-medium text-rose-400 text-base tracking-tighter shrink-0">R$ {charges.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                          <div
-                            className="w-9 h-9 rounded-full bg-emerald-400 text-white flex items-center justify-center shrink-0"
-                            onClick={(e) => { e.stopPropagation(); shareChargeOnWhatsApp(person, charges); }}
-                          >
-                            <MessageCircle size={14} strokeWidth={2.5} />
-                          </div>
-                        </button>
-                      ))}
                     </div>
-                  );
-                })()}
+                  </CardContent>
+                </ShadcnCard>
               </div>
 
-              <div className="lg:col-span-12 lg:order-7">
-                <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-4 ml-2">Lançamentos recentes</h3>
-                <div className="space-y-2">
-                    {((groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'] || []).map(t => {
-                      const person = people.find(p => p.id === t.payerPayee);
-                      const card = cards.find(c => c.id === t.cardId);
-                      return (
-                        <div key={t.id}>
-                          <TransactionItem
-                            transaction={t}
-                            personName={person?.name}
-                            cardName={card?.name}
-                            onClick={() => handleTransactionClick(t)}
-                            onQuickConfirm={() => handleQuickConfirm(t)}
-                          />
-                        </div>
-                      );
-                    })}
-                    {(!(groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'] || (groupedTransactions as Record<string, Transaction[]>)['Lançamentos Recentes'].length === 0) && (
-                      <p className="p-10 text-center text-xs font-normal text-slate-300 dark:text-[#7E7AAA] bg-card rounded-3xl">Nenhum lançamento ainda.</p>
-                    )}
-                  </div>
-              </div>
             </motion.div>
           )}
           {(activeTab === 'receitas' || activeTab === 'despesas') && (
