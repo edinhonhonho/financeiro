@@ -541,6 +541,14 @@ export default function App() {
   const [showCardForm, setShowCardForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  // Painel lateral (desktop) recolhível; lembra a escolha.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('financeiro:sidebarCollapsed') === '1'; } catch { return false; }
+  });
+  const toggleSidebar = () => setSidebarCollapsed(v => {
+    try { localStorage.setItem('financeiro:sidebarCollapsed', v ? '0' : '1'); } catch { /* ignore */ }
+    return !v;
+  });
   const [pickerMonth, setPickerMonth] = useState(format(new Date(), 'MM'));
   const [pickerYear, setPickerYear] = useState(format(new Date(), 'yyyy'));
   const [isRegistrarOpen, setIsRegistrarOpen] = useState(false);
@@ -4122,6 +4130,7 @@ export default function App() {
 
   // Vai direto para o <body>: dentro das abas (que animam com transform) um
   // `position: fixed` passa a ser relativo à aba e muda de altura conforme a página.
+  const isDesktopNow = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
   const floatingMonthPicker = createPortal(
   <div className="fixed bottom-24 right-6 md:bottom-12 md:right-32 z-30 flex items-center gap-0.5 bg-white dark:bg-[#211E4A] rounded-full p-1.5 border border-slate-200/70 dark:border-white/10 shadow-[0_1px_2px_rgba(60,50,120,0.08),0_4px_12px_-4px_rgba(60,50,120,0.18)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.25),0_4px_12px_-4px_rgba(0,0,0,0.4)]">
     <button
@@ -4132,17 +4141,53 @@ export default function App() {
     >
       <ChevronLeft size={16} strokeWidth={3} />
     </button>
-    <button
-      type="button"
-      onClick={() => {
-        setPickerMonth(format(currentDate, 'MM'));
-        setPickerYear(format(currentDate, 'yyyy'));
-        setIsMonthPickerOpen(true);
-      }}
-      className="px-1.5 text-[11px] font-medium text-slate-700 dark:text-[#EDEAF9] capitalize whitespace-nowrap"
-    >
-      {format(currentDate, 'MMM yyyy', { locale: ptBR })}
-    </button>
+    <Popover open={isMonthPickerOpen && isDesktopNow} onOpenChange={(open) => {
+      if (open) { setPickerMonth(format(currentDate, 'MM')); setPickerYear(format(currentDate, 'yyyy')); }
+      setIsMonthPickerOpen(open);
+    }}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            onClick={() => {
+              if (isDesktopNow) return;
+              setPickerMonth(format(currentDate, 'MM'));
+              setPickerYear(format(currentDate, 'yyyy'));
+              setIsMonthPickerOpen(true);
+            }}
+            className="px-1.5 text-[11px] font-medium text-slate-700 dark:text-[#EDEAF9] capitalize whitespace-nowrap"
+          >
+            {format(currentDate, 'MMM yyyy', { locale: ptBR })}
+          </button>
+        }
+      />
+      <PopoverContent side="top" align="center" sideOffset={14} className="w-72 p-4 gap-3 rounded-[1.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] ring-1 ring-slate-200/70 dark:ring-white/10">
+        <div className="flex items-center justify-between">
+          <button type="button" onClick={() => setPickerYear(String(Number(pickerYear) - 1))} className="w-8 h-8 rounded-full flex items-center justify-center text-primary hover:bg-primary/10" aria-label="Ano anterior">
+            <ChevronLeft size={16} strokeWidth={3} />
+          </button>
+          <span className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3] tabular-nums">{pickerYear}</span>
+          <button type="button" onClick={() => setPickerYear(String(Number(pickerYear) + 1))} className="w-8 h-8 rounded-full flex items-center justify-center text-primary hover:bg-primary/10" aria-label="Próximo ano">
+            <ChevronRight size={16} strokeWidth={3} />
+          </button>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {months.map(m => {
+            const selected = m.value === format(currentDate, 'MM') && pickerYear === format(currentDate, 'yyyy');
+            return (
+              <button
+                key={m.value}
+                type="button"
+                onClick={() => { setCurrentDate(new Date(Number(pickerYear), Number(m.value) - 1, 1)); setIsMonthPickerOpen(false); }}
+                className={cn("h-10 rounded-xl text-xs font-medium transition-colors", selected ? "bg-primary text-white" : "text-slate-600 dark:text-[#C5C1E5] hover:bg-primary/10")}
+              >
+                {m.label.slice(0, 3)}
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
     <button
       type="button"
       onClick={nextMonth}
@@ -4318,8 +4363,8 @@ export default function App() {
   // Cabeçalho mobile compartilhado (foto + "Oi, Nome!" + calendário + notificações),
   // igual em toda página — dispensa qualquer controle de mês flutuante à parte.
   const mobileTopHeader = (
-    <div className="flex items-center justify-between">
-      <button onClick={() => setIsProfileOpen(true)} className="flex items-center gap-3 min-w-0">
+    <div className="flex items-center justify-between md:justify-end">
+      <button onClick={() => setIsProfileOpen(true)} className="flex items-center gap-3 min-w-0 md:hidden">
         <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium shrink-0 overflow-hidden">
           {userProfile?.photoURL ? (
             <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -4332,19 +4377,6 @@ export default function App() {
         </p>
       </button>
       <div className="flex items-center gap-2 shrink-0">
-        <button
-          type="button"
-          onClick={() => {
-            setPickerMonth(format(currentDate, 'MM'));
-            setPickerYear(format(currentDate, 'yyyy'));
-            setIsMonthPickerOpen(true);
-          }}
-          className="hidden md:flex items-center h-11 pl-3.5 pr-4 gap-2 rounded-full bg-card shadow-soft text-sm font-medium text-slate-700 dark:text-[#EDEAF9] whitespace-nowrap"
-          aria-label="Selecionar mês"
-        >
-          <CalendarIcon size={16} className="text-primary" />
-          <span>{monthLabel(currentDate)}</span>
-        </button>
         <button
           type="button"
           onClick={toggleHideValues}
@@ -4399,7 +4431,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen font-sans text-foreground selection:bg-primary/20 md:pl-80">
+    <div className={cn("min-h-screen font-sans text-foreground selection:bg-primary/20 transition-[padding] duration-300", sidebarCollapsed ? "md:pl-28" : "md:pl-80")}>
       {/* Onboarding / Nickname Modal */}
       <Dialog open={isNicknameModalOpen} onOpenChange={setIsNicknameModalOpen}>
         <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] flex flex-col">
@@ -4513,7 +4545,7 @@ export default function App() {
       </Dialog>
 
       {/* Month/Year Picker */}
-      <Dialog open={isMonthPickerOpen} onOpenChange={setIsMonthPickerOpen}>
+      <Dialog open={isMonthPickerOpen && !isDesktopNow} onOpenChange={setIsMonthPickerOpen}>
         <DialogContent className="max-w-none sm:max-w-sm rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A]">
           <div className="p-7 space-y-5">
             <DialogHeader>
@@ -5469,6 +5501,7 @@ export default function App() {
 
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
           <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-[min(920px,92vw)] md:max-w-none md:h-[min(640px,88vh)] md:rounded-[1.75rem] md:shadow-deep md:flex-row">
+            <div className="flex flex-col flex-1 min-h-0 h-full md:flex-row">
             <div className="px-6 pt-6 pb-2 shrink-0 md:w-72 md:p-8 md:border-r md:border-slate-200/70 dark:md:border-white/10 md:flex md:flex-col">
               <DialogHeader className="sr-only">
                 <DialogTitle>Minha conta</DialogTitle>
@@ -5573,8 +5606,8 @@ export default function App() {
                   />
                 </AccountSection>
 
-                <p className="text-[10px] font-normal text-slate-300 dark:text-[#7E7AAA] text-center">Feito com carinho, por edinho</p>
               </div>
+            </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -5714,32 +5747,45 @@ export default function App() {
       </Dialog>
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden md:flex flex-col fixed left-4 top-4 bottom-4 w-72 bg-card rounded-[3rem] shadow-bubbly p-8 z-50">
-    <div className="flex items-center gap-4 mb-12 px-2 transition-transform hover:scale-105 duration-500">
-      <img src="/icon-192.png" alt="" className="w-14 h-14 rounded-2xl object-cover shadow-bubbly shrink-0" />
-      <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Financeiro</h1>
-    </div>
+      <aside className={cn("hidden md:flex flex-col fixed left-4 top-4 bottom-4 bg-card rounded-[3rem] shadow-bubbly z-50 transition-[width,padding] duration-300", sidebarCollapsed ? "w-20 p-3" : "w-72 p-8")}>
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="absolute -right-3 top-10 w-7 h-7 rounded-full bg-card border border-slate-200/70 dark:border-white/10 shadow-soft flex items-center justify-center text-slate-500 dark:text-[#C5C1E5] hover:text-primary z-10"
+          aria-label={sidebarCollapsed ? 'Expandir painel lateral' : 'Recolher painel lateral'}
+          title={sidebarCollapsed ? 'Expandir painel' : 'Recolher painel'}
+        >
+          {sidebarCollapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronLeft size={14} strokeWidth={3} />}
+        </button>
+        <div className={cn("flex items-center mb-12 transition-transform hover:scale-105 duration-500", sidebarCollapsed ? "justify-center mt-4" : "gap-4 px-2")}>
+          <img src="/icon-192.png" alt="" className={cn("rounded-2xl object-cover shadow-bubbly shrink-0", sidebarCollapsed ? "w-12 h-12" : "w-14 h-14")} />
+          {!sidebarCollapsed && <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Financeiro</h1>}
+        </div>
 
-      <nav className="space-y-2 flex-1">
+        <nav className="space-y-2 flex-1">
           <NavItem
+            collapsed={sidebarCollapsed}
             active={activeTab === 'visao-geral'}
             onClick={() => { setActiveTab('visao-geral'); setSelectedCard(null); }}
             icon={<LayoutDashboard size={20} />}
             label="Resumo"
           />
           <NavItem
+            collapsed={sidebarCollapsed}
             active={activeTab === 'receitas' || activeTab === 'despesas'}
             onClick={() => { setActiveTab('despesas'); setSelectedCard(null); }}
             icon={<ArrowUpDown size={20} />}
             label="Movimentações"
           />
           <NavItem
+            collapsed={sidebarCollapsed}
             active={activeTab === 'cartoes'}
             onClick={() => setActiveTab('cartoes')}
             icon={<CreditCard size={20} />}
             label="Cartões"
           />
           <NavItem
+            collapsed={sidebarCollapsed}
             active={activeTab === 'pessoas'}
             onClick={() => setActiveTab('pessoas')}
             icon={<Users size={20} />}
@@ -5748,7 +5794,7 @@ export default function App() {
         </nav>
 
         <div className="mt-auto pt-6 flex flex-col gap-2">
-          <button className="w-full flex items-center gap-3 p-2 rounded-[1.75rem] hover:bg-slate-50 dark:hover:bg-[#2A2755] transition-colors group" onClick={() => setIsProfileOpen(true)}>
+          <button className={cn("w-full flex items-center gap-3 p-2 rounded-[1.75rem] hover:bg-slate-50 dark:hover:bg-[#2A2755] transition-colors group", sidebarCollapsed && "justify-center")} onClick={() => setIsProfileOpen(true)} title="Minha conta">
             <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg shrink-0 overflow-hidden">
               {userProfile?.photoURL ? (
                 <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -5756,10 +5802,13 @@ export default function App() {
                 (userProfile?.nickname || user?.email || 'U').charAt(0).toUpperCase()
               )}
             </div>
-            <div className="flex-1 overflow-hidden text-left">
-              <p className="text-sm font-medium text-slate-800 dark:text-[#EDE9E3] truncate tracking-tight">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
-              <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] truncate tracking-tight">{user?.email}</p>
-            </div>
+            {!sidebarCollapsed && (
+              <div className="flex-1 overflow-hidden text-left">
+                <p className="text-lg text-slate-500 dark:text-[#A8A4CC] font-normal truncate tracking-tight">
+                  Oi, <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{userProfile?.nickname || user?.email?.split('@')[0] || 'de novo'}</span>!
+                </p>
+              </div>
+            )}
           </button>
         </div>
       </aside>
@@ -5886,10 +5935,10 @@ export default function App() {
                   );
                   const visiblePeople = sortPeopleByBalance(people.filter(p => p.visible !== false), currentDate);
                   return (
-                    <>
-                      <div className="lg:col-span-6 lg:order-6 lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
+                    <div className="space-y-8 lg:space-y-6 lg:col-span-4 lg:order-5">
+                      <div className="lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
                         <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight mb-3">Pessoas</p>
-                        <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1">
+                        <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1 lg:flex-wrap lg:overflow-visible lg:gap-x-4 lg:gap-y-5">
                           {visiblePeople.map(p => {
                             const debt = getPersonMonthlyCharges(p.id, currentDate).balance;
                             return (
@@ -5917,9 +5966,9 @@ export default function App() {
                         </div>
                       </div>
 
-                      <div className="lg:col-span-6 lg:order-6 lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
+                      <div className="lg:bg-card lg:rounded-[1.5rem] lg:shadow-soft lg:p-5">
                         <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight mb-3">Cartões</p>
-                        <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1">
+                        <div className="flex items-start gap-3 overflow-x-auto scrollbar-hide pb-1 lg:flex-wrap lg:overflow-visible lg:gap-x-4 lg:gap-y-5">
                           {cards.map(c => (
                             <button
                               key={c.id}
@@ -5953,7 +6002,7 @@ export default function App() {
                           }, 'Adicionar cartão')}
                         </div>
                       </div>
-                    </>
+                    </div>
                   );
                 })()}
               </div>
@@ -5982,7 +6031,7 @@ export default function App() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-6 lg:col-span-8 lg:grid-cols-2 lg:order-4">
+              <div className="grid grid-cols-1 gap-6 lg:col-span-8 lg:order-4">
                 <ShadcnCard className="border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#211E4A] py-0 gap-0">
                   <CardContent className="px-5 py-4">
                     {(() => {
@@ -6045,7 +6094,8 @@ export default function App() {
                 </ShadcnCard>
 
                 <ShadcnCard className="border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#211E4A] py-0 gap-0">
-                  <CardContent className="px-5 py-4">
+                  <CardContent className="px-5 py-4 lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
+                    <div>
                     <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Principais categorias</h3>
                     {chartData.length === 0 ? (
                       <p className="text-xs font-normal text-slate-300 dark:text-[#7E7AAA] py-16 text-center">Sem despesas neste mês.</p>
@@ -6100,7 +6150,8 @@ export default function App() {
                         </div>
                       );
                     })()}
-                    <div className="mt-5 pt-5 border-t border-slate-100 dark:border-white/5">
+                    </div>
+                    <div className="mt-5 pt-5 border-t border-slate-100 dark:border-white/5 lg:mt-0 lg:pt-0 lg:border-t-0 lg:border-l lg:pl-8">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9]">Orçamentos</h3>
                   <button type="button" onClick={() => setIsCategoriasOpen(true)} className="text-xs font-medium text-primary">
@@ -6191,6 +6242,7 @@ export default function App() {
                   </button>
                 </div>
 
+                <div className="space-y-5 md:space-y-0 md:flex md:items-center md:gap-3">
                 {movTab === 'movimentacoes' && (
                   <div className="flex bg-slate-100 dark:bg-[#312D62] p-1 rounded-full shadow-inner w-fit">
                     <button
@@ -6223,7 +6275,7 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="relative">
+                <div className="relative md:flex-1 md:max-w-sm">
                   <Search size={16} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7E7AAA]" />
                   <Input
                     placeholder="Buscar movimentações"
@@ -6241,6 +6293,7 @@ export default function App() {
                       <X size={14} strokeWidth={2.5} />
                     </button>
                   )}
+                </div>
                 </div>
               </div>
 
@@ -7236,17 +7289,17 @@ export default function App() {
                               onClick={() => setSelectedPersonId(person.id)}
                               role="button"
                               tabIndex={0}
-                              className="rounded-[1.5rem] h-[230px] lg:h-[190px] p-4 relative overflow-hidden flex flex-col shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
+                              className="rounded-[1.5rem] h-[230px] lg:h-auto lg:aspect-square p-4 relative overflow-hidden flex flex-col shadow-bubbly group cursor-pointer active:scale-[0.98] transition-transform"
                               style={{ backgroundColor: getPersonColor(person) }}
                             >
                               <svg className="absolute -right-4 -bottom-6 w-32 h-16 opacity-20" viewBox="0 0 160 60" fill="none">
                                 <path d="M0 30 Q 20 10 40 30 T 80 30 T 120 30 T 160 30" stroke="white" strokeWidth="6" strokeLinecap="round" />
                               </svg>
-                              <div className="flex items-center justify-between relative z-10 gap-2">
+                              <div className="flex items-center justify-between relative z-10 gap-2 lg:absolute lg:top-3 lg:right-3">
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); handleEditPersonClick(person); setShowPersonForm(true); }}
-                                  className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0"
+                                  className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
                                   aria-label="Editar pessoa"
                                 >
                                   <Pencil size={14} strokeWidth={2.5} />
@@ -7260,10 +7313,10 @@ export default function App() {
                                     person.name.charAt(0).toUpperCase()
                                   )}
                                 </div>
-                                <span className="text-white font-medium text-sm drop-shadow-sm truncate max-w-full">{person.name}</span>
-                                {identityLine && <p className="text-white/80 text-[11px] truncate max-w-full">{identityLine}</p>}
+                                <span className="text-white font-medium text-sm lg:text-base drop-shadow-sm truncate max-w-full">{person.name}</span>
+                                {identityLine && <p className="text-white/80 text-[11px] truncate max-w-full lg:hidden">{identityLine}</p>}
                               </div>
-                              <div className="relative z-10 space-y-1.5">
+                              <div className="relative z-10 space-y-1.5 lg:hidden">
                                 <p className="text-white/70 text-[10px] tracking-wider capitalize">Em aberto · {format(selectedChargeDate, 'MMM yyyy', { locale: ptBR })}</p>
                                 {monthCharges.pendingTotal === 0 && monthCharges.payablePendingTotal === 0 ? (
                                   <p className="text-white text-xs font-medium">Nada pendente</p>
@@ -7292,7 +7345,7 @@ export default function App() {
                         <button
                           type="button"
                           onClick={() => { handleCancelEditPerson(); setShowPersonForm(true); }}
-                          className="w-full h-[230px] lg:h-[190px] rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-[#423D78] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#9D99BC] hover:border-primary hover:text-primary transition-all"
+                          className="w-full h-[230px] lg:h-auto lg:aspect-square rounded-[1.5rem] border-2 border-dashed border-slate-200 dark:border-[#423D78] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#9D99BC] hover:border-primary hover:text-primary transition-all"
                         >
                           <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#312D62] flex items-center justify-center">
                             <Plus size={20} strokeWidth={2.5} />
@@ -7989,12 +8042,14 @@ export default function App() {
   );
 }
 
-function NavItem({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
+function NavItem({ active, onClick, icon, label, collapsed = false }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, collapsed?: boolean }) {
   return (
     <button 
       onClick={onClick}
+      title={collapsed ? label : undefined}
       className={cn(
-        "w-full flex items-center gap-3 px-6 py-4 rounded-[1.75rem] transition-all duration-500 group relative overflow-hidden",
+        "w-full flex items-center gap-3 py-4 rounded-[1.75rem] transition-all duration-500 group relative overflow-hidden",
+        collapsed ? "justify-center px-0" : "px-6",
         active 
           ? "bg-primary text-white font-normal shadow-soft" 
           : "text-slate-400 dark:text-[#9D99BC] hover:bg-slate-50 dark:hover:bg-[#2A2755] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
@@ -8010,8 +8065,8 @@ function NavItem({ active, onClick, icon, label }: { active: boolean, onClick: (
       <div className={cn("relative z-10 transition-transform duration-500 flex items-center justify-center", active ? "scale-110" : "group-hover:scale-110")}>
         {React.cloneElement(icon as React.ReactElement, { strokeWidth: active ? 3 : 2.5 })}
       </div>
-      <span className={cn("relative z-10 text-sm transition-all tracking-tight", active ? "font-normal" : "font-medium")}>{label}</span>
-      {active && (
+      {!collapsed && <span className={cn("relative z-10 text-sm transition-all tracking-tight", active ? "font-normal" : "font-medium")}>{label}</span>}
+      {active && !collapsed && (
         <motion.div 
           layoutId="active-indicator" 
           className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-white/80 dark:bg-[#211E4A]/80 shadow-[0_0_8px_rgba(255,255,255,0.6)]" 
