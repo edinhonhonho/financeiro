@@ -5900,16 +5900,16 @@ export default function App() {
                               className="flex flex-col items-center gap-1.5 shrink-0"
                             >
                               <span className="relative">
-                                <span className={cn("block w-12 h-12 rounded-full overflow-hidden shadow-soft", debt > 0 && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background")}>
+                                <span className={cn("block w-12 h-12 rounded-full overflow-hidden shadow-soft", debt > 0 && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background", debt < 0 && "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background")}>
                                   <img src={p.image || `https://picsum.photos/seed/${p.name}/100/100`} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                                 </span>
-                                {debt > 0 && (
-                                  <span className="absolute left-1/2 -translate-x-1/2 -bottom-2 whitespace-nowrap rounded-full bg-rose-500 text-white text-[9px] font-medium leading-none px-1.5 py-[3px] tabular-nums shadow-soft">
-                                    R$ {debt.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                {debt !== 0 && (
+                                  <span className={cn("absolute left-1/2 -translate-x-1/2 -bottom-2 whitespace-nowrap rounded-full text-white text-[9px] font-medium leading-none px-1.5 py-[3px] tabular-nums shadow-soft", debt > 0 ? "bg-rose-500" : "bg-emerald-500")}>
+                                    {debt < 0 ? '-' : ''}R$ {Math.abs(debt).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                                   </span>
                                 )}
                               </span>
-                              <span className={cn(thumbLabel, debt > 0 && "mt-1")}>{p.name.split(' ')[0]}</span>
+                              <span className={cn(thumbLabel, debt !== 0 && "mt-1")}>{p.name.split(' ')[0]}</span>
                             </button>
                             );
                           })}
