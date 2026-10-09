@@ -25,6 +25,8 @@ import {
   Trash2,
   Download,
   LayoutDashboard,
+  PanelLeftClose,
+  PanelLeftOpen,
   Database,
   Repeat,
   Eye,
@@ -106,7 +108,7 @@ import {
   YAxis,
   ReferenceLine,
 } from 'recharts';
-import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth, getDaysInMonth, startOfDay, formatDistanceToNowStrict } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, isWithinInterval, addMonths, subMonths, isAfter, addDays, differenceInCalendarDays, differenceInMonths, isSameMonth, getDaysInMonth, startOfDay, formatDistanceToNowStrict, parse, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Papa from 'papaparse';
 
@@ -354,23 +356,44 @@ function DateField({
 }) {
   const [open, setOpen] = useState(false);
   const selected = value ? parseISO(value) : undefined;
+  const formatted = selected && isValid(selected) ? format(selected, 'dd/MM/yyyy') : '';
+  const [text, setText] = useState(formatted);
+  useEffect(() => { setText(formatted); }, [formatted]);
+
+  const handleType = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    const masked = digits.length > 4 ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`
+      : digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+    setText(masked);
+    if (digits.length === 8) {
+      const parsed = parse(masked, 'dd/MM/yyyy', new Date());
+      if (isValid(parsed)) onChange(format(parsed, 'yyyy-MM-dd'));
+    }
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={
-        <button
-          type="button"
-          className={cn(
-            "h-11 rounded-lg border-none bg-slate-50 dark:bg-[#2A2755] focus:bg-white dark:focus:bg-[#211E4A] font-normal text-sm px-4 flex items-center gap-2 text-left w-full transition-all",
-            className
-          )}
-        >
-          <CalendarIcon size={15} className="text-slate-400 dark:text-[#9D99BC] shrink-0" />
-          <span className={cn(!selected && "text-slate-400 dark:text-[#9D99BC] font-medium")}>
-            {selected ? format(selected, 'dd/MM/yyyy') : placeholder}
-          </span>
-        </button>
-      } />
+      <div
+        className={cn(
+          "h-11 rounded-lg border-none bg-slate-50 dark:bg-[#2A2755] focus-within:bg-white dark:focus-within:bg-[#211E4A] font-normal text-sm px-4 flex items-center gap-2 text-left w-full transition-all",
+          className
+        )}
+      >
+        <PopoverTrigger render={
+          <button type="button" className="shrink-0 flex items-center" aria-label="Abrir calendário">
+            <CalendarIcon size={15} className="text-slate-400 dark:text-[#9D99BC]" />
+          </button>
+        } />
+        <input
+          type="text"
+          inputMode="numeric"
+          value={text}
+          placeholder="dd/mm/aaaa"
+          onChange={(e) => handleType(e.target.value)}
+          onBlur={() => setText(formatted)}
+          className="flex-1 min-w-0 bg-transparent outline-none placeholder:text-slate-400 dark:placeholder:text-[#9D99BC] placeholder:font-medium"
+        />
+      </div>
       <PopoverContent className="w-auto p-2 rounded-2xl border-none shadow-deep bg-white dark:bg-[#211E4A] z-[80]">
         <Calendar
           mode="single"
@@ -4362,8 +4385,31 @@ export default function App() {
 
   // Cabeçalho mobile compartilhado (foto + "Oi, Nome!" + calendário + notificações),
   // igual em toda página — dispensa qualquer controle de mês flutuante à parte.
+  const notificationsPopoverBody = (
+    <>
+            <div className="px-6 pt-5 pb-3 shrink-0 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-lg font-heading font-medium tracking-tight text-slate-800 dark:text-[#EDE9E3]">Notificações</p>
+                <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">Avisos de quem associa movimentações a você</p>
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0 mt-1">
+                {notifications.some(n => !n.read) && (
+                  <button type="button" onClick={markAllNotificationsRead} className="text-xs font-medium text-primary">
+                    Marcar todas como lidas
+                  </button>
+                )}
+                {clearableNotifications.length > 0 && (
+                  <button type="button" onClick={clearNotifications} className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] hover:text-rose-500 flex items-center gap-1">
+                    <Trash2 size={12} /> Limpar
+                  </button>
+                )}
+              </div>
+            </div>
+            {notificationsListBody}
+    </>
+  );
   const mobileTopHeader = (
-    <div className="flex items-center justify-between md:justify-end">
+    <div className="flex items-center justify-between md:hidden">
       <button onClick={() => setIsProfileOpen(true)} className="flex items-center gap-3 min-w-0 md:hidden">
         <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium shrink-0 overflow-hidden">
           {userProfile?.photoURL ? (
@@ -4386,52 +4432,25 @@ export default function App() {
         >
           {hideValues ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
-        <Popover open={isNotificationsOpen && isDesktopView} onOpenChange={setIsNotificationsOpen}>
-          <PopoverTrigger
-            render={
-              <button
-                type="button"
-                onClick={() => { if (!isDesktopView) setIsNotificationsOpen(true); }}
-                className="relative w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
-                aria-label="Notificações"
-              >
-                <Bell size={18} />
-                {notifications.some(n => !n.read) && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-400 text-white text-[10px] font-medium flex items-center justify-center">
-                    {notifications.filter(n => !n.read).length}
-                  </span>
-                )}
-              </button>
-            }
-          />
-          <PopoverContent align="end" sideOffset={10} className="w-[420px] max-h-[min(640px,80vh)] p-0 gap-0 rounded-[1.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] ring-1 ring-slate-200/70 dark:ring-white/10 overflow-hidden flex flex-col">
-            <div className="px-6 pt-5 pb-3 shrink-0 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-lg font-heading font-medium tracking-tight text-slate-800 dark:text-[#EDE9E3]">Notificações</p>
-                <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">Avisos de quem associa movimentações a você</p>
-              </div>
-              <div className="flex flex-col items-end gap-1 shrink-0 mt-1">
-                {notifications.some(n => !n.read) && (
-                  <button type="button" onClick={markAllNotificationsRead} className="text-xs font-medium text-primary">
-                    Marcar todas como lidas
-                  </button>
-                )}
-                {clearableNotifications.length > 0 && (
-                  <button type="button" onClick={clearNotifications} className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] hover:text-rose-500 flex items-center gap-1">
-                    <Trash2 size={12} /> Limpar
-                  </button>
-                )}
-              </div>
-            </div>
-            {notificationsListBody}
-          </PopoverContent>
-        </Popover>
+        <button
+          type="button"
+          onClick={() => setIsNotificationsOpen(true)}
+          className="relative w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]"
+          aria-label="Notificações"
+        >
+          <Bell size={18} />
+          {notifications.some(n => !n.read) && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-400 text-white text-[10px] font-medium flex items-center justify-center">
+              {notifications.filter(n => !n.read).length}
+            </span>
+          )}
+        </button>
       </div>
     </div>
   );
 
   return (
-    <div className={cn("min-h-screen font-sans text-foreground selection:bg-primary/20 transition-[padding] duration-300", sidebarCollapsed ? "md:pl-28" : "md:pl-80")}>
+    <div className={cn("min-h-screen font-sans text-foreground selection:bg-primary/20 transition-[padding] duration-300", sidebarCollapsed ? "md:pl-28" : "md:pl-72")}>
       {/* Onboarding / Nickname Modal */}
       <Dialog open={isNicknameModalOpen} onOpenChange={setIsNicknameModalOpen}>
         <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] flex flex-col">
@@ -5500,7 +5519,7 @@ export default function App() {
         <ImageCropper src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />
 
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-          <DialogContent className="max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-[min(920px,92vw)] md:max-w-none md:h-[min(640px,88vh)] md:rounded-[1.75rem] md:shadow-deep md:flex-row">
+          <DialogContent className="max-w-none sm:max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-[min(920px,92vw)] md:max-w-none md:h-[min(640px,88vh)] md:rounded-[1.75rem] md:shadow-deep md:flex-row">
             <div className="flex flex-col flex-1 min-h-0 h-full md:flex-row">
             <div className="px-6 pt-6 pb-2 shrink-0 md:w-72 md:p-8 md:border-r md:border-slate-200/70 dark:md:border-white/10 md:flex md:flex-col">
               <DialogHeader className="sr-only">
@@ -5747,27 +5766,18 @@ export default function App() {
       </Dialog>
 
       {/* Sidebar - Desktop */}
-      <aside className={cn("hidden md:flex flex-col fixed left-4 top-4 bottom-4 bg-card rounded-[3rem] shadow-bubbly z-50 transition-[width,padding] duration-300", sidebarCollapsed ? "w-20 p-3" : "w-72 p-8")}>
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          className="absolute -right-3 top-10 w-7 h-7 rounded-full bg-card border border-slate-200/70 dark:border-white/10 shadow-soft flex items-center justify-center text-slate-500 dark:text-[#C5C1E5] hover:text-primary z-10"
-          aria-label={sidebarCollapsed ? 'Expandir painel lateral' : 'Recolher painel lateral'}
-          title={sidebarCollapsed ? 'Expandir painel' : 'Recolher painel'}
-        >
-          {sidebarCollapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronLeft size={14} strokeWidth={3} />}
-        </button>
-        <div className={cn("flex items-center mb-12 transition-transform hover:scale-105 duration-500", sidebarCollapsed ? "justify-center mt-4" : "gap-4 px-2")}>
-          <img src="/icon-192.png" alt="" className={cn("rounded-2xl object-cover shadow-bubbly shrink-0", sidebarCollapsed ? "w-12 h-12" : "w-14 h-14")} />
-          {!sidebarCollapsed && <h1 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Financeiro</h1>}
+      <aside className={cn("hidden md:flex flex-col fixed left-4 top-4 bottom-4 bg-card rounded-[2.5rem] shadow-bubbly z-50 transition-[width,padding] duration-300", sidebarCollapsed ? "w-20 p-3" : "w-60 p-5")}>
+        <div className={cn("flex items-center transition-transform hover:scale-105 duration-500", sidebarCollapsed ? "justify-center mb-8" : "gap-3 px-1 mb-8")}>
+          <img src="/icon-192.png" alt="" className={cn("rounded-2xl object-cover shadow-bubbly shrink-0", sidebarCollapsed ? "w-14 h-14" : "w-12 h-12")} />
+          {!sidebarCollapsed && <h1 className="text-xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Financeiro</h1>}
         </div>
 
-        <nav className="space-y-2 flex-1">
+        <nav className="space-y-1.5 flex-1">
           <NavItem
             collapsed={sidebarCollapsed}
             active={activeTab === 'visao-geral'}
             onClick={() => { setActiveTab('visao-geral'); setSelectedCard(null); }}
-            icon={<LayoutDashboard size={20} />}
+            icon={<Home size={20} />}
             label="Resumo"
           />
           <NavItem
@@ -5793,8 +5803,43 @@ export default function App() {
           />
         </nav>
 
-        <div className="mt-auto pt-6 flex flex-col gap-2">
-          <button className={cn("w-full flex items-center gap-3 p-2 rounded-[1.75rem] hover:bg-slate-50 dark:hover:bg-[#2A2755] transition-colors group", sidebarCollapsed && "justify-center")} onClick={() => setIsProfileOpen(true)} title="Minha conta">
+        <div className="mt-auto pt-4 flex flex-col gap-1">
+          {(() => {
+            const sideBtn = "w-full flex items-center gap-3 h-10 rounded-full text-slate-500 dark:text-[#A8A4CC] hover:bg-slate-50 dark:hover:bg-[#2A2755] hover:text-slate-700 dark:hover:text-[#EDEAF9] transition-colors text-xs font-medium " + (sidebarCollapsed ? "justify-center" : "px-4");
+            const unread = notifications.filter(n => !n.read).length;
+            return (
+              <>
+                <Popover open={isNotificationsOpen && isDesktopView} onOpenChange={setIsNotificationsOpen}>
+                  <PopoverTrigger
+                    render={
+                      <button type="button" className={cn(sideBtn, "relative")} aria-label="Notificações" title="Notificações">
+                        <span className="relative shrink-0">
+                          <Bell size={18} />
+                          {unread > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-400 text-white text-[9px] font-medium flex items-center justify-center">{unread}</span>
+                          )}
+                        </span>
+                        {!sidebarCollapsed && <span>Notificações</span>}
+                      </button>
+                    }
+                  />
+                  <PopoverContent side="right" align="end" sideOffset={16} className="w-[420px] max-h-[min(640px,80vh)] p-0 gap-0 rounded-[1.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] ring-1 ring-slate-200/70 dark:ring-white/10 overflow-hidden flex flex-col">
+                    {notificationsPopoverBody}
+                  </PopoverContent>
+                </Popover>
+                <button type="button" onClick={toggleHideValues} className={sideBtn} aria-label={hideValues ? 'Mostrar valores' : 'Esconder valores'} title={hideValues ? 'Mostrar valores' : 'Esconder valores'}>
+                  {hideValues ? <EyeOff size={18} className="shrink-0" /> : <Eye size={18} className="shrink-0" />}
+                  {!sidebarCollapsed && <span>{hideValues ? 'Mostrar valores' : 'Ocultar valores'}</span>}
+                </button>
+                <button type="button" onClick={toggleSidebar} className={sideBtn} aria-label={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'} title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}>
+                  {sidebarCollapsed ? <PanelLeftOpen size={18} className="shrink-0" /> : <PanelLeftClose size={18} className="shrink-0" />}
+                  {!sidebarCollapsed && <span>Recolher menu</span>}
+                </button>
+              </>
+            );
+          })()}
+          <div className="h-px bg-slate-100 dark:bg-white/10 my-2" />
+          <button className={cn("w-full flex items-center gap-3 p-1.5 rounded-[1.75rem] hover:bg-slate-50 dark:hover:bg-[#2A2755] transition-colors group", sidebarCollapsed && "justify-center")} onClick={() => setIsProfileOpen(true)} title="Minha conta">
             <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg shrink-0 overflow-hidden">
               {userProfile?.photoURL ? (
                 <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -5804,12 +5849,15 @@ export default function App() {
             </div>
             {!sidebarCollapsed && (
               <div className="flex-1 overflow-hidden text-left">
-                <p className="text-lg text-slate-500 dark:text-[#A8A4CC] font-normal truncate tracking-tight">
+                <p className="text-base text-slate-500 dark:text-[#A8A4CC] font-normal truncate tracking-tight">
                   Oi, <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{userProfile?.nickname || user?.email?.split('@')[0] || 'de novo'}</span>!
                 </p>
               </div>
             )}
           </button>
+          {!sidebarCollapsed && (
+            <p className="mt-2 text-center text-[10px] font-normal text-slate-300 dark:text-[#5E5A8A] select-none">Feito com carinho, por Edinho.</p>
+          )}
         </div>
       </aside>
 
@@ -5865,7 +5913,7 @@ export default function App() {
 
               {/* Hero de saldo — no computador vira a faixa de cima do painel */}
               <div className="space-y-5 lg:space-y-0 lg:contents">
-                <div className="lg:col-span-12 lg:order-1">{mobileTopHeader}</div>
+                <div className="lg:col-span-12 lg:order-1 md:hidden">{mobileTopHeader}</div>
 
                 <div className="lg:col-span-5 lg:order-2 lg:self-end">
                   <p className="md:hidden text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-tight mb-1">{monthLabel(currentDate)}</p>
@@ -6207,9 +6255,9 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32 lg:pb-0 lg:space-y-0 lg:grid lg:grid-cols-12 lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-6 lg:h-[calc(100dvh-4rem)] lg:overflow-hidden"
             >
-              <div className="space-y-5 lg:col-span-12">
+              <div className="space-y-5 lg:space-y-0 lg:col-span-12 lg:flex lg:flex-wrap lg:items-center lg:gap-x-8 lg:gap-y-3">
                 {mobileTopHeader}
-                <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
+                <h1 className="text-4xl lg:text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
                   Movimentações
                 </h1>
                 <div className="flex items-center gap-5">
@@ -6242,7 +6290,7 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="space-y-5 md:space-y-0 md:flex md:items-center md:gap-3">
+                <div className="space-y-5 md:space-y-0 md:flex md:items-center md:gap-3 lg:ml-auto">
                 {movTab === 'movimentacoes' && (
                   <div className="flex bg-slate-100 dark:bg-[#312D62] p-1 rounded-full shadow-inner w-fit">
                     <button
@@ -6744,6 +6792,7 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32"
             >
+              {!showCardForm && floatingMonthPicker}
               <div className="space-y-5">
                 {mobileTopHeader}
                 {!showCardForm && (
@@ -6878,7 +6927,7 @@ export default function App() {
                             onClick={() => setSelectedCard(card.id)}
                             role="button"
                             tabIndex={0}
-                            className="rounded-[1.75rem] h-44 p-5 relative overflow-hidden flex flex-col justify-between shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
+                            className="rounded-[1.75rem] h-44 lg:h-32 p-5 lg:p-4 relative overflow-hidden flex flex-col justify-between shadow-bubbly cursor-pointer active:scale-[0.98] transition-transform"
                             style={{ backgroundColor: card.color }}
                           >
                             <svg className="absolute -right-3 top-10 w-40 h-16 opacity-20" viewBox="0 0 160 60" fill="none">
@@ -6905,7 +6954,7 @@ export default function App() {
                               </button>
                             </div>
                             <div className="relative z-10 space-y-2">
-                              <p className="text-white/90 font-mono text-lg tracking-widest">•••• •••• •••• ••••</p>
+                              <p className="text-white/90 font-mono text-lg tracking-widest lg:hidden">•••• •••• •••• ••••</p>
                               <div className="flex items-center justify-between">
                                 <span className="text-white/70 text-[10px] tracking-wider">Limite</span>
                                 <span className="text-white text-xs font-medium">R$ {card.limit.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
@@ -6930,7 +6979,7 @@ export default function App() {
                             setNewCardColor('#8A7FF5');
                             setShowCardForm(true);
                           }}
-                          className="w-full h-44 rounded-[1.75rem] border-2 border-dashed border-slate-200 dark:border-[#423D78] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#9D99BC] hover:border-primary hover:text-primary transition-all"
+                          className="w-full h-44 lg:h-24 rounded-[1.75rem] border-2 border-dashed border-slate-200 dark:border-[#423D78] flex flex-col items-center justify-center gap-2 text-slate-400 dark:text-[#9D99BC] hover:border-primary hover:text-primary transition-all"
                         >
                           <div className="w-11 h-11 rounded-full bg-slate-100 dark:bg-[#312D62] flex items-center justify-center">
                             <Plus size={20} strokeWidth={2.5} />
@@ -6973,7 +7022,7 @@ export default function App() {
                                     dataKey="amount"
                                     radius={[8, 8, 8, 8]}
                                     cursor="pointer"
-                                    onClick={(data: any) => setSelectedBillDate(parseISO(`${data.monthKey}-01`))}
+                                    onClick={(data: any) => setCurrentDate(parseISO(`${data.monthKey}-01`))}
                                   >
                                     {cardBillHistory.map(entry => (
                                       <Cell key={entry.monthKey} fill={activeCard.color} fillOpacity={entry.monthKey === selectedMonthKey ? 1 : 0.25} />
@@ -7229,6 +7278,7 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32"
             >
+              {!showPersonForm && floatingMonthPicker}
               <div className="space-y-5">
                 {mobileTopHeader}
                 {!showPersonForm && (
@@ -7313,7 +7363,7 @@ export default function App() {
                                     person.name.charAt(0).toUpperCase()
                                   )}
                                 </div>
-                                <span className="text-white font-medium text-sm lg:text-base drop-shadow-sm truncate max-w-full">{person.name}</span>
+                                <span className="text-white font-medium text-sm lg:text-base drop-shadow-sm truncate lg:whitespace-normal lg:line-clamp-2 lg:text-center lg:leading-tight break-words max-w-full">{person.name}</span>
                                 {identityLine && <p className="text-white/80 text-[11px] truncate max-w-full lg:hidden">{identityLine}</p>}
                               </div>
                               <div className="relative z-10 space-y-1.5 lg:hidden">
@@ -7388,7 +7438,7 @@ export default function App() {
                                     dataKey="amount"
                                     radius={[8, 8, 8, 8]}
                                     cursor="pointer"
-                                    onClick={(data: any) => setSelectedChargeDate(parseISO(`${data.monthKey}-01`))}
+                                    onClick={(data: any) => setCurrentDate(parseISO(`${data.monthKey}-01`))}
                                   >
                                     {personChargeHistory.map(entry => (
                                       <Cell key={entry.monthKey} fill={personColor} fillOpacity={entry.monthKey === selectedMonthKey ? 1 : 0.25} />
@@ -7438,8 +7488,9 @@ export default function App() {
                             };
                             return (
                               <div className="space-y-5">
-                                <div className="bg-card rounded-[1.75rem] shadow-soft p-5 space-y-3">
-                                  <div className="flex items-center justify-between gap-3">
+                                <div className="bg-card rounded-[1.75rem] shadow-soft p-5 space-y-3 lg:space-y-0 lg:flex lg:flex-wrap lg:items-center lg:gap-x-8 lg:gap-y-3 lg:p-4 lg:px-6">
+                                  <div className="space-y-3 lg:space-y-1 lg:flex-1 lg:min-w-[230px]">
+                                  <div className="flex items-center justify-between gap-3 lg:justify-start">
                                     <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest">
                                       Saldo de {format(selectedChargeDate, "MMMM", { locale: ptBR })}
                                     </p>
@@ -7455,7 +7506,7 @@ export default function App() {
                                   </div>
                                   <div>
                                     <p className={cn(
-                                      "text-3xl font-heading font-medium tracking-tighter",
+                                      "text-3xl lg:text-2xl font-heading font-medium tracking-tighter",
                                       charges.balance > 0 ? "text-emerald-500" : charges.balance < 0 ? "text-rose-400" : "text-slate-800 dark:text-[#EDE9E3]"
                                     )}>
                                       {brl(Math.abs(charges.balance))}
@@ -7464,8 +7515,9 @@ export default function App() {
                                       {charges.balance > 0 ? `${firstName} te deve` : charges.balance < 0 ? `Você deve a ${firstName}` : `Você e ${firstName} estão quites`}
                                     </p>
                                   </div>
+                                  </div>
                                   {(charges.pendingTotal > 0 || charges.payablePendingTotal > 0) && (
-                                    <div className="grid grid-cols-2 gap-2 pt-1">
+                                    <div className="grid grid-cols-2 gap-2 pt-1 lg:pt-0 lg:flex-1 lg:min-w-[260px]">
                                       <div className="rounded-2xl bg-emerald-50/70 dark:bg-emerald-500/10 px-3 py-2">
                                         <p className="text-[10px] text-emerald-600/70 dark:text-emerald-400/70">{firstName} te deve</p>
                                         <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">{brl(charges.pendingTotal)}</p>
@@ -7477,7 +7529,7 @@ export default function App() {
                                     </div>
                                   )}
                                   {hasAny && (
-                                    <div className="flex gap-2 pt-1">
+                                    <div className="flex gap-2 pt-1 lg:pt-0 lg:w-[320px] lg:shrink-0">
                                       <button
                                         onClick={() => shareChargeOnWhatsApp(activePerson, charges)}
                                         className="flex-1 h-11 rounded-full bg-primary text-white font-medium text-sm active:scale-95 transition-all"
@@ -7534,7 +7586,7 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
-        <p className="mt-10 text-center text-[10px] font-normal text-slate-300 dark:text-[#5E5A8A] select-none">Feito com carinho, por Edinho.</p>
+        <p className="mt-10 text-center text-[10px] font-normal text-slate-300 dark:text-[#5E5A8A] select-none md:hidden">Feito com carinho, por Edinho.</p>
       </main>
 
       {/* Pessoas Management Modal */}
@@ -8048,8 +8100,8 @@ function NavItem({ active, onClick, icon, label, collapsed = false }: { active: 
       onClick={onClick}
       title={collapsed ? label : undefined}
       className={cn(
-        "w-full flex items-center gap-3 py-4 rounded-[1.75rem] transition-all duration-500 group relative overflow-hidden",
-        collapsed ? "justify-center px-0" : "px-6",
+        "w-full flex items-center gap-3 py-3.5 rounded-[1.75rem] transition-all duration-500 group relative overflow-hidden",
+        collapsed ? "justify-center px-0" : "px-5",
         active 
           ? "bg-primary text-white font-normal shadow-soft" 
           : "text-slate-400 dark:text-[#9D99BC] hover:bg-slate-50 dark:hover:bg-[#2A2755] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
