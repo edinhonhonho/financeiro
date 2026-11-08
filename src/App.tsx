@@ -592,6 +592,9 @@ export default function App() {
   const [movTab, setMovTab] = useState<'movimentacoes' | 'apagar' | 'areceber'>('movimentacoes');
   const [movStatusFilter, setMovStatusFilter] = useState<'all' | 'planned' | 'actual'>('all');
   const [movSearchQuery, setMovSearchQuery] = useState('');
+  // Ordenação de Movimentações: por vencimento (data) ou por valor.
+  const [movSortBy, setMovSortBy] = useState<'date' | 'amount'>('date');
+  const [movSortDir, setMovSortDir] = useState<'desc' | 'asc'>('desc');
   const [cardSearchQuery, setCardSearchQuery] = useState('');
   const [personSearchQuery, setPersonSearchQuery] = useState('');
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
@@ -1742,16 +1745,22 @@ export default function App() {
       format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(currentDate, 'yyyy-MM')
     );
 
-    const all: Transaction[] = [...monthTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const cmp = (a: Transaction, b: Transaction) => {
+      const diff = movSortBy === 'amount'
+        ? a.amount - b.amount
+        : new Date(a.date).getTime() - new Date(b.date).getTime();
+      return movSortDir === 'asc' ? diff : -diff;
+    };
+    const all: Transaction[] = [...monthTransactions].sort(cmp);
     const aPagar: Transaction[] = monthTransactions
       .filter(t => t.type !== 'income' && t.status === 'planned')
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort(cmp);
     const aReceber: Transaction[] = monthTransactions
       .filter(t => t.type === 'income' && t.status === 'planned')
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort(cmp);
 
     return { all, aPagar, aReceber };
-  }, [transactions, cards, people, currentDate]);
+  }, [transactions, cards, people, currentDate, movSortBy, movSortDir]);
 
   // Form State
   const [newTransaction, setNewTransaction] = useState<Partial<Transaction>>({
@@ -2221,11 +2230,13 @@ export default function App() {
       (!onlyCompleted || effectiveStatus(t) === 'actual')
     );
 
-    const categories = Array.from(new Set(currentMonthTransactions.map(t => t.category)));
+    // Sem categoria entra em "Outras".
+    const catOf = (t: Transaction) => (t.category && t.category.trim() ? t.category : 'Outras');
+    const categories = Array.from(new Set(currentMonthTransactions.map(catOf)));
     return categories.map(cat => ({
       name: cat,
       value: currentMonthTransactions
-        .filter(t => t.category === cat && (t.type === 'expense' || t.type === 'card_purchase'))
+        .filter(t => catOf(t) === cat && (t.type === 'expense' || t.type === 'card_purchase'))
         .reduce((acc, t) => acc + t.amount, 0)
     })).filter(d => d.value > 0);
   }, [transactions, currentDate, cards, onlyCompleted]);
@@ -3245,7 +3256,7 @@ export default function App() {
         await api.insertTransactions([{
           id: api.newTransactionId(),
           userId: user.id,
-          description: `Pagamento Fatura ${card?.name || ''}`,
+          description: `Fatura ${card?.name || ''}`.trim(),
           amount: actualAmount,
           date: referenceDate || actualDate, // mês de referência da fatura (bate com getTransactionEffectiveMonth)
           actualDate: actualDate, // dia em que o pagamento realmente aconteceu
@@ -4543,7 +4554,7 @@ export default function App() {
   );
 
   return (
-    <div className={cn("min-h-screen font-sans text-foreground selection:bg-primary/20 transition-[padding] duration-300", sidebarCollapsed ? "md:pl-28" : "md:pl-72")}>
+    <div className={cn("min-h-screen font-sans text-foreground selection:bg-primary/20 transition-[padding] duration-300", sidebarCollapsed ? "md:pl-[72px]" : "md:pl-60")}>
       {/* Onboarding / Nickname Modal */}
       <Dialog open={isNicknameModalOpen} onOpenChange={setIsNicknameModalOpen}>
         <DialogContent className="max-w-none sm:max-w-sm p-0 overflow-hidden rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] flex flex-col">
@@ -4973,7 +4984,7 @@ export default function App() {
 
         {/* Categories Management Modal */}
         <Dialog open={isCategoriasOpen} onOpenChange={setIsCategoriasOpen}>
-          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep flex flex-col overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+          <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 border-none shadow-deep flex flex-col overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none md:top-0 md:bottom-0 md:translate-y-0">
             <div className="p-6 shrink-0">
               <DialogHeader>
                 <DialogTitle className="text-3xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter">Categorias</DialogTitle>
@@ -5509,7 +5520,7 @@ export default function App() {
                   .forEach(t => hits.push({
                     key: `t-${t.id}`,
                     icon: <span className="text-base">{categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}</span>,
-                    title: t.description.split(' · ')[0],
+                    title: t.description.replace(/^Pagamento Fatura\b/, 'Fatura').split(' · ')[0],
                     sub: `${format(parseISO(t.date), 'dd/MM/yyyy')} · ${t.category}${t.status === 'planned' ? ' · previsto' : ''}`,
                     right: `${t.type === 'income' ? '+' : '-'} R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
                     tone: t.type === 'income' ? 'text-emerald-500' : 'text-rose-400',
@@ -5732,7 +5743,7 @@ export default function App() {
         <ImageCropper src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />
 
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-          <DialogContent className="max-w-none sm:max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-[min(920px,92vw)] md:max-w-none md:h-[min(640px,88vh)] md:rounded-[1.75rem] md:shadow-deep md:flex-row">
+          <DialogContent className="max-w-none sm:max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-[min(800px,92vw)] md:max-w-none md:h-[min(620px,88vh)] md:rounded-[1.75rem] md:shadow-deep">
             <div className="flex flex-col flex-1 min-h-0 h-full md:flex-row">
             <div className="px-6 pt-6 pb-2 shrink-0 md:w-72 md:p-8 md:border-r md:border-slate-200/70 dark:md:border-white/10 md:flex md:flex-col">
               <DialogHeader className="sr-only">
@@ -5782,7 +5793,7 @@ export default function App() {
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-6 md:p-8">
-              <div className="max-w-2xl mx-auto w-full space-y-8 md:space-y-6">
+              <div className="w-full space-y-8 md:space-y-6">
 
                 <AccountSection label="Gerenciamento">
                   <AccountRow
@@ -5979,55 +5990,67 @@ export default function App() {
       </Dialog>
 
       {/* Sidebar - Desktop */}
-      <aside className={cn("hidden md:flex flex-col fixed left-4 top-4 bottom-4 bg-card rounded-[2.5rem] shadow-bubbly z-50 transition-[width,padding] duration-300", sidebarCollapsed ? "w-20 p-3" : "w-60 p-5")}>
-        <div className={cn("flex items-center transition-transform hover:scale-105 duration-500", sidebarCollapsed ? "justify-center mb-8" : "gap-3 px-1 mb-8")}>
-          <img src="/icon-192.png" alt="" className={cn("rounded-2xl object-cover shadow-bubbly shrink-0", sidebarCollapsed ? "w-14 h-14" : "w-12 h-12")} />
-          {!sidebarCollapsed && <h1 className="text-xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Financeiro</h1>}
+      <aside className={cn("hidden md:flex flex-col fixed left-0 top-0 bottom-0 bg-card border-r border-slate-200/70 dark:border-white/10 z-50 transition-[width] duration-300", sidebarCollapsed ? "w-[72px] px-3 py-4" : "w-60 px-4 py-5")}>
+        <div className={cn("flex items-center mb-6", sidebarCollapsed ? "flex-col gap-3" : "justify-between gap-2 px-1")}>
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/icon-192.png" alt="" className="w-10 h-10 rounded-xl object-cover shadow-soft shrink-0" />
+            {!sidebarCollapsed && <h1 className="text-lg font-heading font-medium tracking-tight text-slate-800 dark:text-[#EDE9E3] truncate">Financeiro</h1>}
+          </div>
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="w-8 h-8 rounded-lg text-slate-400 dark:text-[#9D99BC] hover:bg-slate-100 dark:hover:bg-[#2A2755] hover:text-slate-600 flex items-center justify-center shrink-0"
+            aria-label={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+            title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
         </div>
 
-        <nav className="space-y-1.5 flex-1">
+        <nav className="space-y-1">
           <NavItem
             collapsed={sidebarCollapsed}
             active={activeTab === 'visao-geral'}
             onClick={() => { setActiveTab('visao-geral'); setSelectedCard(null); }}
-            icon={<Home size={20} />}
+            icon={<Home size={19} />}
             label="Resumo"
           />
           <NavItem
             collapsed={sidebarCollapsed}
             active={activeTab === 'receitas' || activeTab === 'despesas'}
             onClick={() => { setActiveTab('despesas'); setSelectedCard(null); }}
-            icon={<ArrowUpDown size={20} />}
+            icon={<ArrowUpDown size={19} />}
             label="Movimentações"
           />
           <NavItem
             collapsed={sidebarCollapsed}
             active={activeTab === 'cartoes'}
             onClick={() => setActiveTab('cartoes')}
-            icon={<CreditCard size={20} />}
+            icon={<CreditCard size={19} />}
             label="Cartões"
           />
           <NavItem
             collapsed={sidebarCollapsed}
             active={activeTab === 'pessoas'}
             onClick={() => setActiveTab('pessoas')}
-            icon={<Users size={20} />}
+            icon={<Users size={19} />}
             label="Pessoas"
           />
         </nav>
 
-        <div className="mt-auto pt-4 flex flex-col gap-1">
+        <div className="mt-6 pt-4 border-t border-slate-100 dark:border-white/10 space-y-1">
+          {!sidebarCollapsed && <p className="px-3.5 pb-1 text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#7E7AAA]">Atalhos</p>}
           {(() => {
-            const sideBtn = "w-full flex items-center gap-3 h-10 rounded-full text-slate-500 dark:text-[#A8A4CC] hover:bg-slate-50 dark:hover:bg-[#2A2755] hover:text-slate-700 dark:hover:text-[#EDEAF9] transition-colors text-xs font-medium " + (sidebarCollapsed ? "justify-center" : "px-4");
+            const sideBtn = "w-full flex items-center gap-3 h-10 rounded-xl text-slate-500 dark:text-[#A8A4CC] hover:bg-slate-100 dark:hover:bg-[#2A2755] hover:text-slate-700 dark:hover:text-[#EDEAF9] transition-colors text-[13px] font-normal " + (sidebarCollapsed ? "justify-center" : "px-3.5");
             const unread = notifications.filter(n => !n.read).length;
             return (
               <>
                 <button type="button" onClick={() => { setGlobalQuery(''); setGlobalIndex(0); setIsGlobalSearchOpen(true); }} className={sideBtn} aria-label="Buscar" title="Buscar (Ctrl+K ou /)">
-                  <Search size={18} className="shrink-0" />
+                  <Search size={17} className="shrink-0" />
                   {!sidebarCollapsed && <><span className="flex-1 text-left">Buscar</span><kbd className="text-[10px] font-normal text-slate-400 dark:text-[#7E7AAA] border border-slate-200/70 dark:border-white/10 rounded px-1.5 py-0.5">Ctrl K</kbd></>}
                 </button>
                 <button type="button" onClick={() => setIsBatchOpen(true)} className={sideBtn} aria-label="Lançar em lote" title="Lançar vários de uma vez">
-                  <Table2 size={18} className="shrink-0" />
+                  <Table2 size={17} className="shrink-0" />
                   {!sidebarCollapsed && <span>Lançar em lote</span>}
                 </button>
                 <Popover open={isNotificationsOpen && isDesktopView} onOpenChange={setIsNotificationsOpen}>
@@ -6035,7 +6058,7 @@ export default function App() {
                     render={
                       <button type="button" className={cn(sideBtn, "relative")} aria-label="Notificações" title="Notificações">
                         <span className="relative shrink-0">
-                          <Bell size={18} />
+                          <Bell size={17} />
                           {unread > 0 && (
                             <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-rose-400 text-white text-[9px] font-medium flex items-center justify-center">{unread}</span>
                           )}
@@ -6049,19 +6072,17 @@ export default function App() {
                   </PopoverContent>
                 </Popover>
                 <button type="button" onClick={toggleHideValues} className={sideBtn} aria-label={hideValues ? 'Mostrar valores' : 'Esconder valores'} title={hideValues ? 'Mostrar valores' : 'Esconder valores'}>
-                  {hideValues ? <EyeOff size={18} className="shrink-0" /> : <Eye size={18} className="shrink-0" />}
+                  {hideValues ? <EyeOff size={17} className="shrink-0" /> : <Eye size={17} className="shrink-0" />}
                   {!sidebarCollapsed && <span>{hideValues ? 'Mostrar valores' : 'Ocultar valores'}</span>}
-                </button>
-                <button type="button" onClick={toggleSidebar} className={sideBtn} aria-label={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'} title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}>
-                  {sidebarCollapsed ? <PanelLeftOpen size={18} className="shrink-0" /> : <PanelLeftClose size={18} className="shrink-0" />}
-                  {!sidebarCollapsed && <span>Recolher menu</span>}
                 </button>
               </>
             );
           })()}
-          <div className="h-px bg-slate-100 dark:bg-white/10 my-2" />
-          <button className={cn("w-full flex items-center gap-3 p-1.5 rounded-[1.75rem] hover:bg-slate-50 dark:hover:bg-[#2A2755] transition-colors group", sidebarCollapsed && "justify-center")} onClick={() => setIsProfileOpen(true)} title="Minha conta">
-            <div className="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-white font-medium text-lg shrink-0 overflow-hidden">
+        </div>
+
+        <div className="mt-auto pt-4">
+          <button className={cn("w-full flex items-center gap-3 p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-[#2A2755] transition-colors", sidebarCollapsed && "justify-center")} onClick={() => setIsProfileOpen(true)} title="Minha conta">
+            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white font-medium text-sm shrink-0 overflow-hidden">
               {userProfile?.photoURL ? (
                 <img src={userProfile.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
@@ -6069,11 +6090,9 @@ export default function App() {
               )}
             </div>
             {!sidebarCollapsed && (
-              <div className="flex-1 overflow-hidden text-left">
-                <p className="text-base text-slate-500 dark:text-[#A8A4CC] font-normal truncate tracking-tight">
-                  Oi, <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{userProfile?.nickname || user?.email?.split('@')[0] || 'de novo'}</span>!
-                </p>
-              </div>
+              <p className="flex-1 min-w-0 text-left text-sm text-slate-500 dark:text-[#A8A4CC] font-normal truncate">
+                Oi, <span className="font-medium text-slate-800 dark:text-[#EDE9E3]">{userProfile?.nickname || user?.email?.split('@')[0] || 'de novo'}</span>!
+              </p>
             )}
           </button>
           {!sidebarCollapsed && (
@@ -6083,7 +6102,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 pt-4 md:p-10 md:pt-8 max-w-7xl mx-auto w-full pb-48 md:pb-32 lg:pb-8 text-slate-400 dark:text-[#9D99BC]">
+      <main className="flex-1 p-6 pt-4 md:p-10 md:pt-8 max-w-[1600px] w-full pb-48 md:pb-32 lg:pb-8 text-slate-400 dark:text-[#9D99BC]">
         <AnimatePresence mode="wait">
           {activeTab === 'visao-geral' && (
             <motion.div
@@ -6365,7 +6384,7 @@ export default function App() {
                 <ShadcnCard className="border-none shadow-soft rounded-[1.5rem] bg-white dark:bg-[#211E4A] py-0 gap-0">
                   <CardContent className="px-5 py-4 lg:grid lg:grid-cols-2 lg:gap-8 lg:items-start">
                     <div>
-                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Principais categorias</h3>
+                    <h3 className="text-sm font-medium text-slate-700 dark:text-[#EDEAF9] mb-3">Principais categorias de despesas</h3>
                     {chartData.length === 0 ? (
                       <p className="text-xs font-normal text-slate-300 dark:text-[#7E7AAA] py-16 text-center">Sem despesas neste mês.</p>
                     ) : (() => {
@@ -6380,7 +6399,7 @@ export default function App() {
                           const cat = categories.find(cc => cc.name === c.name);
                           return { name: c.name, value: c.value, icon: cat?.icon || DEFAULT_CATEGORY_ICON, color: cat?.color || COLORS[idx % COLORS.length] };
                         }),
-                        ...(restValue > 0 ? [{ name: `Outras ${sorted.length - 4}`, value: restValue, icon: '•••', color: '#B9B4D0' }] : [])
+                        ...(restValue > 0 ? [{ name: `Demais (${sorted.length - 4})`, value: restValue, icon: '•••', color: '#B9B4D0' }] : [])
                       ];
                       const max = groups[0]?.value || 1;
                       const pct = (v: number) => Math.round((v / total) * 100);
@@ -6389,7 +6408,7 @@ export default function App() {
                         <div className="space-y-4">
                           <div>
                             <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">{brl(total)}</p>
-                            <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">em {sorted.length} {sorted.length === 1 ? 'categoria' : 'categorias'}</p>
+                            <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">em despesas do mês · {sorted.length} {sorted.length === 1 ? 'categoria' : 'categorias'}</p>
                           </div>
                           <div className="flex h-2.5 gap-[2px] rounded-full overflow-hidden" role="img" aria-label={groups.map(g => `${g.name} ${pct(g.value)}%`).join(', ')}>
                             {groups.map(g => (
@@ -6563,6 +6582,29 @@ export default function App() {
                     </button>
                   )}
                 </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex bg-slate-100 dark:bg-[#312D62] p-1 rounded-full shadow-inner" role="group" aria-label="Ordenar por">
+                    {([['date', 'Vencimento'], ['amount', 'Valor']] as const).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setMovSortBy(key)}
+                        className={cn("px-3.5 py-2 rounded-full text-xs font-medium transition-all", movSortBy === key ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC]")}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMovSortDir(d => d === 'desc' ? 'asc' : 'desc')}
+                    className="h-9 w-9 rounded-full bg-slate-100 dark:bg-[#312D62] text-primary flex items-center justify-center"
+                    aria-label={movSortDir === 'desc' ? 'Ordem decrescente' : 'Ordem crescente'}
+                    title={movSortBy === 'date' ? (movSortDir === 'desc' ? 'Mais recentes primeiro' : 'Mais antigos primeiro') : (movSortDir === 'desc' ? 'Maiores primeiro' : 'Menores primeiro')}
+                  >
+                    {movSortDir === 'desc' ? <ArrowDown size={15} strokeWidth={2.5} /> : <ArrowUp size={15} strokeWidth={2.5} />}
+                  </button>
+                </div>
                 </div>
               </div>
 
@@ -6734,24 +6776,45 @@ export default function App() {
                         const filtered = movimentacoesLists.all
                           .filter(t => movStatusFilter === 'all' ? true : t.status === movStatusFilter)
                           .filter(t => matchesQuery(movSearchQuery, t.description, t.category));
-                        return filtered.length === 0 ? (
-                          <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA] text-center py-12">Nenhuma movimentação neste mês.</p>
-                        ) : (
-                          filtered.map(t => {
-                            const person = people.find(p => p.id === t.payerPayee);
-                            const card = cards.find(c => c.id === t.cardId);
-                            return (
-                              <div key={t.id}>
-                                <TransactionItem
-                                  transaction={t}
-                                  sharedWith={sharedWithOf(t)}
-                                  cardName={card?.name}
-                                  onClick={() => handleTransactionClick(t)}
-                                  onQuickConfirm={() => handleQuickConfirm(t)}
-                                />
+                        const renderRow = (t: Transaction) => {
+                          const card = cards.find(c => c.id === t.cardId);
+                          return (
+                            <div key={t.id}>
+                              <TransactionItem
+                                transaction={t}
+                                sharedWith={sharedWithOf(t)}
+                                cardName={card?.name}
+                                cardColor={card?.color}
+                                onClick={() => handleTransactionClick(t)}
+                                onQuickConfirm={() => handleQuickConfirm(t)}
+                              />
+                            </div>
+                          );
+                        };
+                        if (filtered.length === 0) {
+                          return <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA] text-center py-12">Nenhuma movimentação neste mês.</p>;
+                        }
+                        // Em cima o que ainda está previsto; embaixo o que já foi pago/recebido.
+                        const planned = filtered.filter(t => t.status === 'planned');
+                        const done = filtered.filter(t => t.status !== 'planned');
+                        const heading = (label: string, count: number) => (
+                          <p className="text-[11px] font-medium text-slate-400 dark:text-[#9D99BC] tracking-wider ml-2 pt-1">{label} · {count}</p>
+                        );
+                        return (
+                          <div className="space-y-6">
+                            {planned.length > 0 && (
+                              <div className="space-y-2">
+                                {heading('Previstas', planned.length)}
+                                {planned.map(renderRow)}
                               </div>
-                            );
-                          })
+                            )}
+                            {done.length > 0 && (
+                              <div className="space-y-2">
+                                {heading('Pagas e recebidas', done.length)}
+                                {done.map(renderRow)}
+                              </div>
+                            )}
+                          </div>
                         );
                       })()}
                     </div>
@@ -6919,6 +6982,7 @@ export default function App() {
                               transaction={t}
                               sharedWith={sharedWithOf(t)}
                               cardName={card?.name}
+                              cardColor={card?.color}
                               onClick={() => handleTransactionClick(t)}
                               onQuickConfirm={() => handleQuickConfirm(t)}
                               hideDate={groupMode === 'date'}
@@ -7020,7 +7084,7 @@ export default function App() {
                   <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Cartões</h1>
                 )}
                 {!showCardForm && cards.length > 0 && (
-                  <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compras da fatura" className="lg:max-w-sm" />
+                  <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compras da fatura" className="lg:hidden" />
                 )}
               </div>
 
@@ -7318,6 +7382,9 @@ export default function App() {
                                       </p>
                                     )}
                                   </div>
+                                  {cardBillItems.length > 0 && (
+                                    <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compras da fatura" className="hidden lg:block lg:max-w-sm" />
+                                  )}
                                   {cardBillItems.length === 0 ? (
                                     <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
                                       <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA]">Nenhuma compra nesta fatura.</p>
@@ -7445,6 +7512,7 @@ export default function App() {
                               transaction={t}
                               sharedWith={sharedWithOf(t)}
                               cardName={card?.name}
+                              cardColor={card?.color}
                               onClick={() => handleTransactionClick(t)}
                               onQuickConfirm={() => handleQuickConfirm(t)}
                               hideDate={groupMode === 'date'}
@@ -7535,7 +7603,7 @@ export default function App() {
                   <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Pessoas</h1>
                 )}
                 {!showPersonForm && people.length > 0 && (
-                  <SearchBar value={personSearchQuery} onChange={setPersonSearchQuery} placeholder="Buscar lançamentos com a pessoa" className="lg:max-w-sm" />
+                  <SearchBar value={personSearchQuery} onChange={setPersonSearchQuery} placeholder="Buscar lançamentos com a pessoa" className="lg:hidden" />
                 )}
               </div>
 
@@ -7598,11 +7666,11 @@ export default function App() {
                               <svg className="absolute -right-4 -bottom-6 w-32 h-16 opacity-20" viewBox="0 0 160 60" fill="none">
                                 <path d="M0 30 Q 20 10 40 30 T 80 30 T 120 30 T 160 30" stroke="white" strokeWidth="6" strokeLinecap="round" />
                               </svg>
-                              <div className="flex items-center justify-between relative z-10 gap-2 lg:absolute lg:top-3 lg:right-3">
+                              <div className="flex items-center justify-between relative z-10 gap-2 lg:absolute lg:top-2.5 lg:right-2.5 lg:z-20">
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); handleEditPersonClick(person); setShowPersonForm(true); }}
-                                  className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
+                                  className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white shrink-0 lg:bg-black/20 lg:opacity-80 lg:hover:opacity-100 lg:hover:bg-black/30 transition-all"
                                   aria-label="Editar pessoa"
                                 >
                                   <Pencil size={14} strokeWidth={2.5} />
@@ -7802,6 +7870,10 @@ export default function App() {
                                   )}
                                 </div>
 
+                                {hasAny && (
+                                  <SearchBar value={personSearchQuery} onChange={setPersonSearchQuery} placeholder="Buscar lançamentos com a pessoa" className="hidden lg:block lg:max-w-sm" />
+                                )}
+
                                 {!hasAny && (
                                   <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
                                     <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA]">Nada com {firstName} neste mês.</p>
@@ -7845,7 +7917,7 @@ export default function App() {
 
       {/* Pessoas Management Modal */}
       <Dialog open={isPessoasOpen} onOpenChange={(open) => { setIsPessoasOpen(open); if (!open) handleCancelEditPerson(); }}>
-        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none overflow-hidden flex flex-col p-0 border-none shadow-deep z-[60] bg-[#F6F4FD] dark:bg-[#17153A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none">
+        <DialogContent className="max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none overflow-hidden flex flex-col p-0 border-none shadow-deep z-[60] bg-[#F6F4FD] dark:bg-[#17153A] sm:top-0 sm:bottom-0 sm:right-0 sm:left-auto sm:translate-x-0 sm:w-full sm:max-w-md sm:h-screen sm:rounded-l-[1.75rem] sm:rounded-r-none md:top-0 md:bottom-0 md:translate-y-0">
           <div className="p-8 bg-white dark:bg-[#211E4A] flex flex-col h-full overflow-hidden">
             <DialogHeader className="shrink-0 mb-6">
               <DialogTitle className="text-3xl font-heading font-normal text-slate-800 dark:text-[#EDE9E3] tracking-tighter">Pessoas</DialogTitle>
@@ -8349,6 +8421,7 @@ export default function App() {
 }
 
 type BatchRow = { type: 'expense' | 'income'; description: string; amount: string; date: string; category: string; cardId: string; paid: boolean };
+type BatchField = 'description' | 'amount' | 'date';
 
 function BatchEntryDialog({
   open,
@@ -8363,18 +8436,25 @@ function BatchEntryDialog({
   cards: Card[];
   onSave: (rows: Array<{ type: TransactionType; description: string; amount: number; date: string; category: string; status: 'planned' | 'actual'; cardId: string | null; actualDate: string | null }>) => Promise<boolean>;
 }) {
+  const ROWS = 12;
   const today = format(new Date(), 'yyyy-MM-dd');
   const blank = (prev?: BatchRow): BatchRow => ({ type: prev?.type ?? 'expense', description: '', amount: '', date: prev?.date ?? today, category: prev?.category ?? '', cardId: prev?.cardId ?? '', paid: prev?.paid ?? true });
-  const [rows, setRows] = useState<BatchRow[]>(() => Array.from({ length: 8 }, () => blank()));
+  const [rows, setRows] = useState<BatchRow[]>(() => Array.from({ length: ROWS }, () => blank()));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [invalid, setInvalid] = useState<Record<number, BatchField[]>>({});
+  const tableRef = React.useRef<HTMLTableElement>(null);
 
   useEffect(() => {
-    if (open) { setRows(Array.from({ length: 8 }, () => blank())); setError(''); }
+    if (open) { setRows(Array.from({ length: ROWS }, () => blank())); setError(''); setInvalid({}); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const update = (i: number, patch: Partial<BatchRow>) => setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+  const update = (i: number, patch: Partial<BatchRow>) => {
+    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+    if (invalid[i]) setInvalid(prev => { const n = { ...prev }; delete n[i]; return n; });
+  };
+  const applyAll = (patch: Partial<BatchRow>) => setRows(prev => prev.map(r => ({ ...r, ...patch })));
   const isFilled = (r: BatchRow) => r.description.trim() !== '' || r.amount.trim() !== '';
   const parseDate = (raw: string) => {
     const v = raw.trim();
@@ -8392,6 +8472,7 @@ function BatchEntryDialog({
     const n = parseFloat(normalized);
     return isNaN(n) ? 0 : Math.abs(n);
   };
+  const brl = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // Colar linhas de uma planilha: Descrição ⇥ Valor ⇥ Data ⇥ Categoria.
   const handlePaste = (i: number, e: React.ClipboardEvent<HTMLInputElement>) => {
@@ -8412,21 +8493,39 @@ function BatchEntryDialog({
     });
   };
 
+  // Enter desce para a mesma coluna da linha seguinte (como numa planilha).
+  const focusCell = (row: number, col: string) => {
+    requestAnimationFrame(() => {
+      tableRef.current?.querySelector<HTMLElement>(`[data-cell="${row}:${col}"]`)?.focus();
+    });
+  };
+  const onCellEnter = (e: React.KeyboardEvent, i: number, col: string) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (i === rows.length - 1) setRows(prev => [...prev, blank(prev[prev.length - 1])]);
+    focusCell(i + 1, col);
+  };
+
   const filled = rows.filter(isFilled);
-  const total = filled.reduce((acc, r) => acc + (r.type === 'income' ? 1 : -1) * parseAmount(r.amount), 0);
+  const signed = (r: BatchRow) => (r.type === 'income' ? 1 : -1) * parseAmount(r.amount);
+  const incomeTotal = filled.filter(r => r.type === 'income').reduce((acc, r) => acc + parseAmount(r.amount), 0);
+  const expenseTotal = filled.filter(r => r.type === 'expense').reduce((acc, r) => acc + parseAmount(r.amount), 0);
+  const total = filled.reduce((acc, r) => acc + signed(r), 0);
 
   const save = async () => {
     setError('');
     const out: Parameters<typeof onSave>[0] = [];
+    const bad: Record<number, BatchField[]> = {};
     for (let i = 0; i < rows.length; i++) {
       const r = rows[i];
       if (!isFilled(r)) continue;
       const amount = parseAmount(r.amount);
       const date = parseDate(r.date);
-      if (!r.description.trim() || amount <= 0 || !date) {
-        setError(`Linha ${i + 1}: preencha descrição, valor e data.`);
-        return;
-      }
+      const missing: BatchField[] = [];
+      if (!r.description.trim()) missing.push('description');
+      if (amount <= 0) missing.push('amount');
+      if (!date) missing.push('date');
+      if (missing.length) { bad[i] = missing; continue; }
       const onCard = r.type === 'expense' && !!r.cardId;
       const paid = !onCard && r.paid;
       out.push({
@@ -8434,89 +8533,145 @@ function BatchEntryDialog({
         description: r.description.trim(),
         amount,
         date,
-        category: r.category || (onCard ? 'Outros' : 'Outros'),
+        category: r.category || 'Outras',
         status: paid ? 'actual' : 'planned',
         cardId: onCard ? r.cardId : null,
         actualDate: paid ? date : null
       });
     }
+    if (Object.keys(bad).length > 0) {
+      setInvalid(bad);
+      const first = Number(Object.keys(bad)[0]);
+      setError(`${Object.keys(bad).length === 1 ? `Linha ${first + 1} incompleta` : `${Object.keys(bad).length} linhas incompletas`}: preencha descrição, valor e data (destacados em vermelho).`);
+      focusCell(first, bad[first][0]);
+      return;
+    }
     if (out.length === 0) { setError('Preencha ao menos uma linha.'); return; }
+    setInvalid({});
     setSaving(true);
     const ok = await onSave(out);
     setSaving(false);
     if (ok) onOpenChange(false);
   };
 
-  const cell = "w-full h-9 bg-transparent px-2 text-sm font-normal text-slate-700 dark:text-[#EDEAF9] outline-none focus:bg-primary/5 rounded";
+  const cell = "w-full h-9 bg-transparent px-2.5 text-sm font-normal text-slate-700 dark:text-[#EDEAF9] outline-none rounded-md border border-transparent hover:border-slate-200 dark:hover:border-white/10 focus:border-primary focus:bg-white dark:focus:bg-[#17153A] focus:ring-2 focus:ring-primary/15 placeholder:text-slate-300 dark:placeholder:text-[#6A6594]";
+  const bad = (i: number, f: BatchField) => invalid[i]?.includes(f) ? "border-rose-400 bg-rose-50/60 dark:bg-rose-500/10" : "";
+  const th = "px-1.5 py-2.5 text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] bg-slate-50 dark:bg-[#2A2755] sticky top-0 z-10";
+  const bulk = "h-8 rounded-lg bg-white dark:bg-[#211E4A] border border-slate-200/70 dark:border-white/10 px-2 text-xs font-normal text-slate-600 dark:text-[#C5C1E5] outline-none focus:border-primary";
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-none sm:max-w-none sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 w-[min(1100px,94vw)] h-[min(720px,90vh)] rounded-[1.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] flex flex-col">
-        <div className="px-6 pt-5 pb-3 pr-14 shrink-0">
+      <DialogContent className="max-w-none sm:max-w-none md:w-[min(1180px,95vw)] md:h-[min(760px,92vh)] rounded-[1.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] flex flex-col">
+        <div className="px-7 pt-6 pb-4 pr-16 shrink-0">
           <DialogHeader>
             <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Lançar em lote</DialogTitle>
             <DialogDescription className="text-xs leading-relaxed">
-              Preencha a tabela e salve tudo de uma vez. Dá para colar linhas de uma planilha (descrição, valor, data, categoria) na coluna Descrição. Linhas em branco são ignoradas.
+              Preencha como uma planilha e salve tudo de uma vez. <kbd className="font-sans">Enter</kbd> desce para a próxima linha; cole linhas de uma planilha (descrição, valor, data, categoria) na coluna Descrição.
             </DialogDescription>
           </DialogHeader>
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="text-[11px] font-medium text-slate-400 dark:text-[#9D99BC]">Aplicar a todas as linhas:</span>
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-[#A8A4CC]">Data
+              <input className={cn(bulk, "w-28")} placeholder="dd/mm/aaaa" onBlur={(e) => { const d = parseDate(e.target.value); if (d) { applyAll({ date: d }); e.target.value = ''; } }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+            </label>
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-[#A8A4CC]">Categoria
+              <select className={cn(bulk, "w-40")} value="" onChange={(e) => e.target.value && applyAll({ category: e.target.value })}>
+                <option value="">Escolher…</option>
+                {categories.map(c => <option key={c.id} value={c.name}>{c.icon} {c.name}</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-[#A8A4CC]">Cartão
+              <select className={cn(bulk, "w-36")} value="" onChange={(e) => { if (e.target.value === '__none') applyAll({ cardId: '' }); else if (e.target.value) setRows(prev => prev.map(r => r.type === 'expense' ? { ...r, cardId: e.target.value } : r)); }}>
+                <option value="">Escolher…</option>
+                <option value="__none">Conta (sem cartão)</option>
+                {cards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </label>
+          </div>
         </div>
-        <div className="flex-1 min-h-0 overflow-auto px-6">
-          <table className="w-full text-left border-separate border-spacing-0 bg-white dark:bg-[#211E4A] rounded-xl overflow-hidden">
-            <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-[#2A2755]">
-              <tr className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">
-                <th className="px-3 py-2 w-8">#</th>
-                <th className="px-1 py-2 w-28">Tipo</th>
-                <th className="px-1 py-2">Descrição</th>
-                <th className="px-1 py-2 w-32">Valor</th>
-                <th className="px-1 py-2 w-36">Data</th>
-                <th className="px-1 py-2 w-44">Categoria</th>
-                <th className="px-1 py-2 w-40">Cartão</th>
-                <th className="px-1 py-2 w-16 text-center">Pago</th>
-                <th className="w-8" />
+        <div className="flex-1 min-h-0 overflow-auto px-7">
+          <table ref={tableRef} className="w-full text-left border-separate border-spacing-0 bg-white dark:bg-[#211E4A] rounded-xl shadow-soft">
+            <thead>
+              <tr>
+                <th className={cn(th, "w-9 text-center rounded-tl-xl")}>#</th>
+                <th className={cn(th, "w-[128px]")}>TIPO</th>
+                <th className={th}>DESCRIÇÃO</th>
+                <th className={cn(th, "w-[120px]")}>VALOR (R$)</th>
+                <th className={cn(th, "w-[124px]")}>DATA</th>
+                <th className={cn(th, "w-[180px]")}>CATEGORIA</th>
+                <th className={cn(th, "w-[150px]")}>CARTÃO</th>
+                <th className={cn(th, "w-[88px] text-center")}>PAGO</th>
+                <th className={cn(th, "w-9 rounded-tr-xl")} />
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => {
                 const onCard = r.type === 'expense' && !!r.cardId;
+                const rowFilled = isFilled(r);
                 return (
-                  <tr key={i} className="border-t border-slate-100 dark:border-white/5 [&>td]:border-t [&>td]:border-slate-100 dark:[&>td]:border-white/5">
-                    <td className="px-3 text-[11px] text-slate-300 dark:text-[#6A6594] tabular-nums">{i + 1}</td>
-                    <td className="px-1">
-                      <select className={cell} value={r.type} onChange={(e) => update(i, { type: e.target.value as 'expense' | 'income', cardId: e.target.value === 'income' ? '' : r.cardId })}>
+                  <tr key={i} className={cn("group [&>td]:border-t [&>td]:border-slate-100 dark:[&>td]:border-white/5", rowFilled ? "bg-primary/[0.03]" : "")}>
+                    <td className="text-center text-[11px] text-slate-300 dark:text-[#6A6594] tabular-nums">{i + 1}</td>
+                    <td className="px-1.5 py-1">
+                      <select
+                        data-cell={`${i}:type`}
+                        className={cn(cell, "font-medium", r.type === 'income' ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400")}
+                        value={r.type}
+                        onChange={(e) => update(i, { type: e.target.value as 'expense' | 'income', cardId: e.target.value === 'income' ? '' : r.cardId })}
+                      >
                         <option value="expense">Despesa</option>
                         <option value="income">Receita</option>
                       </select>
                     </td>
-                    <td className="px-1">
+                    <td className="px-1.5 py-1">
                       <input
-                        className={cell}
+                        data-cell={`${i}:description`}
+                        className={cn(cell, bad(i, 'description'))}
                         value={r.description}
                         placeholder="Ex: Mercado"
                         onChange={(e) => update(i, { description: e.target.value })}
                         onPaste={(e) => handlePaste(i, e)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && i === rows.length - 1) { e.preventDefault(); setRows(prev => [...prev, blank(prev[prev.length - 1])]); }
-                        }}
+                        onKeyDown={(e) => onCellEnter(e, i, 'description')}
                       />
                     </td>
-                    <td className="px-1"><input className={cn(cell, "tabular-nums")} inputMode="decimal" value={r.amount} placeholder="0,00" onChange={(e) => update(i, { amount: e.target.value })} /></td>
-                    <td className="px-1"><input className={cell} value={/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? format(parseISO(r.date), 'dd/MM/yyyy') : r.date} placeholder="dd/mm/aaaa" onChange={(e) => update(i, { date: e.target.value })} onBlur={() => { const d = parseDate(r.date); if (d) update(i, { date: d }); }} /></td>
-                    <td className="px-1">
-                      <select className={cell} value={r.category} onChange={(e) => update(i, { category: e.target.value })}>
-                        <option value="">—</option>
+                    <td className="px-1.5 py-1">
+                      <input
+                        data-cell={`${i}:amount`}
+                        className={cn(cell, "tabular-nums text-right", bad(i, 'amount'))}
+                        inputMode="decimal"
+                        value={r.amount}
+                        placeholder="0,00"
+                        onChange={(e) => update(i, { amount: e.target.value })}
+                        onBlur={() => { const v = parseAmount(r.amount); if (v > 0) update(i, { amount: brl(v) }); }}
+                        onKeyDown={(e) => onCellEnter(e, i, 'amount')}
+                      />
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <input
+                        data-cell={`${i}:date`}
+                        className={cn(cell, bad(i, 'date'))}
+                        value={/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? format(parseISO(r.date), 'dd/MM/yyyy') : r.date}
+                        placeholder="dd/mm/aaaa"
+                        onChange={(e) => update(i, { date: e.target.value })}
+                        onBlur={() => { const d = parseDate(r.date); if (d) update(i, { date: d }); }}
+                        onKeyDown={(e) => onCellEnter(e, i, 'date')}
+                      />
+                    </td>
+                    <td className="px-1.5 py-1">
+                      <select data-cell={`${i}:category`} className={cell} value={r.category} onChange={(e) => update(i, { category: e.target.value })}>
+                        <option value="">Outras</option>
                         {categories.map(c => <option key={c.id} value={c.name}>{c.icon} {c.name}</option>)}
                       </select>
                     </td>
-                    <td className="px-1">
-                      <select className={cell} value={r.cardId} disabled={r.type === 'income'} onChange={(e) => update(i, { cardId: e.target.value })}>
+                    <td className="px-1.5 py-1">
+                      <select data-cell={`${i}:card`} className={cn(cell, r.type === 'income' && "opacity-40")} value={r.cardId} disabled={r.type === 'income'} onChange={(e) => update(i, { cardId: e.target.value })}>
                         <option value="">Conta</option>
                         {cards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </td>
-                    <td className="px-1 text-center">
-                      <input type="checkbox" className="size-4 accent-[var(--color-primary,#8A7FF5)]" checked={!onCard && r.paid} disabled={onCard} onChange={(e) => update(i, { paid: e.target.checked })} />
+                    <td className="text-center">
+                      <input type="checkbox" className="size-4 accent-primary cursor-pointer disabled:opacity-30" checked={!onCard && r.paid} disabled={onCard} onChange={(e) => update(i, { paid: e.target.checked })} title={onCard ? 'Compra no cartão: pago junto com a fatura' : undefined} />
                     </td>
-                    <td className="px-1">
-                      <button type="button" onClick={() => setRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev)} className="w-7 h-7 rounded-full text-slate-300 dark:text-[#6A6594] hover:text-rose-500 flex items-center justify-center" aria-label="Remover linha">
+                    <td className="text-center">
+                      <button type="button" onClick={() => setRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev)} className="w-7 h-7 rounded-full text-slate-300 dark:text-[#6A6594] opacity-0 group-hover:opacity-100 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 flex items-center justify-center transition-opacity" aria-label="Remover linha">
                         <X size={14} />
                       </button>
                     </td>
@@ -8525,22 +8680,25 @@ function BatchEntryDialog({
               })}
             </tbody>
           </table>
-          <button type="button" onClick={() => setRows(prev => [...prev, blank(prev[prev.length - 1])])} className="mt-3 mb-4 text-xs font-medium text-primary">+ Adicionar linha</button>
+          <button type="button" onClick={() => setRows(prev => [...prev, ...Array.from({ length: 5 }, () => blank(prev[prev.length - 1]))])} className="mt-3 mb-5 text-xs font-medium text-primary hover:underline">+ Adicionar 5 linhas</button>
         </div>
-        <div className="shrink-0 px-6 py-4 border-t border-slate-200/70 dark:border-white/10 flex items-center justify-between gap-4">
-          <div className="min-w-0">
+        <div className="shrink-0 px-7 py-4 border-t border-slate-200/70 dark:border-white/10 flex items-center justify-between gap-4 bg-[#F6F4FD] dark:bg-[#17153A]">
+          <div className="min-w-0 text-xs font-normal">
             {error ? (
-              <p className="text-xs font-normal text-rose-500">{error}</p>
+              <p className="text-rose-500">{error}</p>
             ) : (
-              <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">
-                {filled.length} {filled.length === 1 ? 'linha preenchida' : 'linhas preenchidas'} · saldo do lote {total < 0 ? '-' : ''}R$ {Math.abs(total).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <p className="text-slate-400 dark:text-[#9D99BC] flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span><strong className="font-medium text-slate-600 dark:text-[#C5C1E5]">{filled.length}</strong> {filled.length === 1 ? 'linha' : 'linhas'}</span>
+                <span>Receitas <strong className="font-medium text-emerald-600 dark:text-emerald-400 tabular-nums">R$ {brl(incomeTotal)}</strong></span>
+                <span>Despesas <strong className="font-medium text-rose-500 dark:text-rose-400 tabular-nums">R$ {brl(expenseTotal)}</strong></span>
+                <span>Saldo <strong className={cn("font-medium tabular-nums", total >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500 dark:text-rose-400")}>{total < 0 ? '-' : ''}R$ {brl(Math.abs(total))}</strong></span>
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button type="button" onClick={() => onOpenChange(false)} className="h-11 px-5 rounded-full text-sm font-medium text-slate-500 dark:text-[#C5C1E5] hover:bg-slate-100 dark:hover:bg-[#2A2755]">Cancelar</button>
             <Button onClick={save} disabled={saving || filled.length === 0} className="h-11 px-8 rounded-full font-medium text-sm bg-primary text-white hover:bg-primary/90 disabled:opacity-40">
-              {saving ? 'Salvando…' : `Salvar ${filled.length > 0 ? filled.length : ''} ${filled.length === 1 ? 'lançamento' : 'lançamentos'}`}
+              {saving ? 'Salvando…' : filled.length > 0 ? `Salvar ${filled.length} ${filled.length === 1 ? 'lançamento' : 'lançamentos'}` : 'Salvar lançamentos'}
             </Button>
           </div>
         </div>
@@ -8551,34 +8709,20 @@ function BatchEntryDialog({
 
 function NavItem({ active, onClick, icon, label, collapsed = false }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, collapsed?: boolean }) {
   return (
-    <button 
+    <button
       onClick={onClick}
       title={collapsed ? label : undefined}
       className={cn(
-        "w-full flex items-center gap-3 py-3.5 rounded-[1.75rem] transition-all duration-500 group relative overflow-hidden",
-        collapsed ? "justify-center px-0" : "px-5",
-        active 
-          ? "bg-primary text-white font-normal shadow-soft" 
-          : "text-slate-400 dark:text-[#9D99BC] hover:bg-slate-50 dark:hover:bg-[#2A2755] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+        "relative w-full flex items-center gap-3 h-11 rounded-xl text-sm transition-colors",
+        collapsed ? "justify-center" : "px-3.5",
+        active
+          ? "bg-primary/10 text-primary font-medium"
+          : "text-slate-500 dark:text-[#A8A4CC] font-normal hover:bg-slate-100 dark:hover:bg-[#2A2755] hover:text-slate-700 dark:hover:text-[#EDEAF9]"
       )}
     >
-      {active && (
-        <motion.div 
-          layoutId="nav-bg"
-          className="absolute inset-0 bg-primary z-0"
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        />
-      )}
-      <div className={cn("relative z-10 transition-transform duration-500 flex items-center justify-center", active ? "scale-110" : "group-hover:scale-110")}>
-        {React.cloneElement(icon as React.ReactElement, { strokeWidth: active ? 3 : 2.5 })}
-      </div>
-      {!collapsed && <span className={cn("relative z-10 text-sm transition-all tracking-tight", active ? "font-normal" : "font-medium")}>{label}</span>}
-      {active && !collapsed && (
-        <motion.div 
-          layoutId="active-indicator" 
-          className="relative z-10 ml-auto w-1.5 h-1.5 rounded-full bg-white/80 dark:bg-[#211E4A]/80 shadow-[0_0_8px_rgba(255,255,255,0.6)]" 
-        />
-      )}
+      {active && <span className="absolute left-0 top-2.5 bottom-2.5 w-1 rounded-r-full bg-primary" />}
+      <span className="shrink-0 flex items-center justify-center">{icon}</span>
+      {!collapsed && <span className="tracking-tight">{label}</span>}
     </button>
   );
 }
@@ -8696,6 +8840,7 @@ function TransactionItem({
   transaction,
   personName,
   cardName,
+  cardColor,
   onClick,
   onQuickConfirm,
   hideDate = false,
@@ -8708,6 +8853,7 @@ function TransactionItem({
   personName?: string,
   sharedWith?: Array<{ name: string; image?: string }>,
   cardName?: string,
+  cardColor?: string,
   onClick?: () => void,
   onQuickConfirm?: () => void,
   hideDate?: boolean,
@@ -8795,11 +8941,14 @@ function TransactionItem({
               ) : personName && (
                 <span className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">· {personName}</span>
               )}
-              {cardName && (
-                <span className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">· {cardName}</span>
-              )}
-              {transaction.linkedToCard && (
-                <span className="text-[10px] font-medium text-indigo-500 dark:text-indigo-400 shrink-0">· vinculado</span>
+              {(cardName || transaction.linkedToCard) && (
+                <span
+                  className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-[#2A2755] shrink-0"
+                  title={[transaction.linkedToCard ? 'Receita vinculada à despesa' : '', cardName ? `Cartão ${cardName}` : ''].filter(Boolean).join(' · ')}
+                >
+                  {transaction.linkedToCard && <span className="text-[11px] leading-none">🔗</span>}
+                  {cardName && <CreditCard size={12} strokeWidth={2.5} style={{ color: cardColor || undefined }} className={cn(!cardColor && "text-slate-400")} />}
+                </span>
               )}
               {transaction.pendingSync && (
                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0 bg-slate-500/15 text-slate-500 dark:text-[#A8A4CC]">
@@ -8818,7 +8967,7 @@ function TransactionItem({
                 </span>
               )}
             </div>
-            <p className="text-base font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{transaction.description}</p>
+            <p className="text-base font-medium text-slate-800 dark:text-[#EDEAF9] tracking-tight truncate mt-0.5">{transaction.description.replace(/^Pagamento Fatura\b/, 'Fatura')}</p>
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
