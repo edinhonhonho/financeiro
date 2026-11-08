@@ -58,7 +58,7 @@ function DialogContent({
         )}
         {...props}
       >
-        <div className="relative flex flex-col h-full">
+        <div className="relative flex flex-col h-full max-h-[inherit] min-h-0">
           {showCloseButton && (
             <DialogPrimitive.Close
               data-slot="dialog-close"

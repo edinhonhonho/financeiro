@@ -26,6 +26,7 @@ import {
   Download,
   LayoutDashboard,
   PanelLeftClose,
+  Table2,
   PanelLeftOpen,
   Database,
   Repeat,
@@ -411,6 +412,37 @@ function DateField({
   );
 }
 
+/** Texto sem acentos e em minúsculas — buscas não podem depender de acentuação. */
+const normalizeText = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const matchesQuery = (query: string, ...fields: Array<string | undefined | null>) => {
+  const q = normalizeText(query.trim());
+  return !q || fields.some(f => !!f && normalizeText(f).includes(q));
+};
+
+function SearchBar({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder: string; className?: string }) {
+  return (
+    <div className={cn("relative", className)}>
+      <Search size={16} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7E7AAA]" />
+      <Input
+        placeholder={placeholder}
+        className="h-11 rounded-full border-none bg-slate-50 dark:bg-[#2A2755] font-normal text-sm pl-11 pr-11 shadow-sm"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange('')}
+          className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 dark:text-[#9D99BC] hover:text-slate-600 dark:hover:text-[#C5C1E5]"
+          aria-label="Limpar busca"
+        >
+          <X size={14} strokeWidth={2.5} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: (value: boolean) => void }) {
   return (
     <button
@@ -560,6 +592,8 @@ export default function App() {
   const [movTab, setMovTab] = useState<'movimentacoes' | 'apagar' | 'areceber'>('movimentacoes');
   const [movStatusFilter, setMovStatusFilter] = useState<'all' | 'planned' | 'actual'>('all');
   const [movSearchQuery, setMovSearchQuery] = useState('');
+  const [cardSearchQuery, setCardSearchQuery] = useState('');
+  const [personSearchQuery, setPersonSearchQuery] = useState('');
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [showCardForm, setShowCardForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -568,6 +602,27 @@ export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try { return localStorage.getItem('financeiro:sidebarCollapsed') === '1'; } catch { return false; }
   });
+  // Busca global (Ctrl+K ou "/") e lançamento em lote — só no computador.
+  const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const [globalQuery, setGlobalQuery] = useState('');
+  const [globalIndex, setGlobalIndex] = useState(0);
+  const [isBatchOpen, setIsBatchOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!window.matchMedia('(min-width: 768px)').matches) return;
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+      const isK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+      if (isK || (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey)) {
+        e.preventDefault();
+        setGlobalQuery('');
+        setGlobalIndex(0);
+        setIsGlobalSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const toggleSidebar = () => setSidebarCollapsed(v => {
     try { localStorage.setItem('financeiro:sidebarCollapsed', v ? '0' : '1'); } catch { /* ignore */ }
     return !v;
@@ -765,7 +820,7 @@ export default function App() {
   const shareChargeOnWhatsApp = (person: Person, charges: ReturnType<typeof getPersonMonthlyCharges>) => {
     const text = generateChargeMessage(person, charges, currentDate);
     const phone = phoneToWhatsapp(person.phone);
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+    window.open(`https://api.whatsapp.com/send?${phone ? `phone=${phone}&` : ''}text=${encodeURIComponent(text.normalize('NFC'))}`, '_blank');
   };
   // Marca como pagas todas as pendências do mês com a pessoa (o que ela me deve
   // e o que eu devo a ela), zerando o saldo.
@@ -883,8 +938,12 @@ export default function App() {
     const queued = offline.getQueue(userId).filter(r => !known.has(r.id)).map(r => ({ ...r, pendingSync: true }));
     return [...list, ...queued];
   };
+  // Só a carga mais recente vale: uma resposta antiga (iniciada antes de um
+  // lançamento novo) não pode sobrescrever a lista já atualizada.
+  const loadSeqRef = useRef(0);
   const loadTransactions = React.useCallback(async () => {
     if (!user) return;
+    const seq = ++loadSeqRef.current;
     try {
       const data = await api.fetchTransactions(user.id);
       let mirrors: Transaction[] = [];
@@ -929,6 +988,7 @@ export default function App() {
       } catch (sharedErr) {
         console.warn('Compartilhamento indisponível:', sharedErr);
       }
+      if (seq !== loadSeqRef.current) return;
       const all = [...data, ...mirrors];
       offline.saveCache(user.id, 'transactions', all);
       setTransactions(withQueuedRows(user.id, all));
@@ -1465,14 +1525,19 @@ export default function App() {
    */
   const computePersonBill = (person: Person, month: Date): Transaction => {
     const monthStr = format(month, 'yyyy-MM');
-    const amount = transactions
-      .filter(t => isBundledIntoPersonBill(t) && t.payerPayee === person.id && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr)
+    const inMonth = (t: Transaction) => t.payerPayee === person.id && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr;
+    const receivable = transactions
+      .filter(t => isBundledIntoPersonBill(t) && t.type === 'income' && inMonth(t))
       .reduce((acc, t) => acc + t.amount, 0);
+    const payable = transactions
+      .filter(t => isBundledIntoPersonBill(t) && t.type !== 'income' && inMonth(t))
+      .reduce((acc, t) => acc + t.amount, 0);
+    const net = receivable - payable;
     return {
       id: `person-bill-${person.id}`,
-      type: 'income',
-      description: `A receber de ${person.name}`,
-      amount,
+      type: net >= 0 ? 'income' : 'expense',
+      description: net >= 0 ? `A receber de ${person.name}` : `A pagar a ${person.name}`,
+      amount: Math.abs(net),
       date: format(endOfMonth(month), 'yyyy-MM-dd'),
       category: 'Reembolso',
       status: 'planned',
@@ -1482,10 +1547,27 @@ export default function App() {
     };
   };
 
-  /** Receita pendente de uma pessoa (reembolso ou receita associada a ela) — é o que "A receber de {pessoa}" agrupa. */
-  const isBundledIntoPersonBill = (t: Transaction) =>
-    t.type === 'income' && t.status === 'planned' && !t.id.startsWith('shared-') &&
-    !!t.payerPayee && t.payerPayee !== 'geral' && t.payerPayee !== 'multi';
+  /**
+   * Pendências de uma pessoa que "A receber de / A pagar a {pessoa}" agrupa:
+   * receitas de reembolso dela e as despesas que devo a ela (inclusive as que
+   * ela vinculou a mim, "shared-…"), pra não aparecerem de novo soltas na lista.
+   */
+  const isBundledIntoPersonBill = (t: Transaction) => {
+    if (t.status !== 'planned' || !t.payerPayee || t.payerPayee === 'geral' || t.payerPayee === 'multi') return false;
+    if (t.type === 'income') return !t.id.startsWith('shared-');
+    return t.type === 'expense' && t.owedByPerson === false;
+  };
+
+  /** Pessoas com quem uma movimentação foi dividida/associada (pra pílula 🤝 + fotos). */
+  const sharedWithOf = (t: Transaction) => {
+    const ids = t.assignments && t.assignments.length > 0
+      ? t.assignments.map(a => a.personId)
+      : (t.payerPayee && t.payerPayee !== 'geral' && t.payerPayee !== 'multi' ? [t.payerPayee] : []);
+    return ids
+      .map(id => people.find(pp => pp.id === id))
+      .filter((pp): pp is Person => !!pp)
+      .map(pp => ({ name: pp.name, image: pp.image }));
+  };
 
   // Grouping logic
   const groupedTransactions = useMemo(() => {
@@ -1930,13 +2012,13 @@ export default function App() {
 
   /** Sem busca: só as pessoas mais frequentes (+ quem já está selecionado, mesmo se não for frequente). Buscando: filtra todo mundo pelo nome. */
   const personSearchResults = useMemo(() => {
-    const query = quickAssignQuery.trim().toLowerCase();
+    const query = quickAssignQuery.trim();
     if (!query) {
       const top = frequentPeople.slice(0, FREQUENT_PEOPLE_COUNT);
       const selectedExtra = frequentPeople.filter(p => !top.some(t => t.id === p.id) && personSplits.some(s => s.personId === p.id));
       return [...top, ...selectedExtra];
     }
-    return frequentPeople.filter(p => p.name.toLowerCase().includes(query));
+    return frequentPeople.filter(p => matchesQuery(query, p.name));
   }, [frequentPeople, quickAssignQuery, personSplits]);
 
   /** Atribui alguém a um lançamento buscando por @usuário; se a pessoa ainda não existir, cadastra na hora. */
@@ -2651,6 +2733,11 @@ export default function App() {
 
         try {
           await api.insertTransactions(rows);
+          // Aparece na hora, sem esperar a recarga completa.
+          setTransactions(prev => {
+            const known = new Set(prev.map(t => t.id));
+            return [...prev, ...rows.filter(r => !known.has(r.id))];
+          });
         } catch (err) {
           if (!offline.isNetworkError(err)) throw err;
           // Sem internet: guarda no aparelho e envia quando a conexão voltar.
@@ -2767,7 +2854,12 @@ export default function App() {
     }
   };
 
-  const handleEditClick = (t: Transaction) => {
+  const handleEditClick = (clicked: Transaction) => {
+    // Receita vinculada (reembolso) se edita na despesa que a originou.
+    const parent = clicked.linkedToCard && clicked.linkedTransactionId
+      ? transactions.find(x => x.id === clicked.linkedTransactionId)
+      : undefined;
+    const t = parent ?? clicked;
     setRegistrarStep(0);
     setEditingTransaction(t);
     setNewTransaction(t);
@@ -2833,6 +2925,7 @@ export default function App() {
     if (t.id.startsWith('bill-')) {
       setSelectedCard(t.cardId ?? null);
       setActiveTab('cartoes');
+      setTimeout(() => document.getElementById('fatura-detalhes')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
       return;
     }
     if (t.id.startsWith('shared-')) {
@@ -3173,7 +3266,7 @@ export default function App() {
         const month = referenceDate ? parseISO(referenceDate) : currentDate;
         const monthStr = format(month, 'yyyy-MM');
         const idsToConfirm = transactions
-          .filter(t => isBundledIntoPersonBill(t) && t.payerPayee === personId && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr)
+          .filter(t => isBundledIntoPersonBill(t) && !t.id.startsWith('shared-') && t.payerPayee === personId && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === monthStr)
           .map(t => t.id);
         await Promise.all(idsToConfirm.map(txId => api.updateTransaction(txId, { status: 'actual', actualDate })));
       } else {
@@ -4536,8 +4629,11 @@ export default function App() {
                   if (confirmingTransaction) {
                     if (confirmingTransaction.id.startsWith('bill-')) {
                       setSelectedCard(confirmingTransaction.cardId || null);
+                      setCurrentDate(startOfMonth(parseISO(confirmingTransaction.date)));
                       setActiveTab('cartoes');
                       setConfirmingTransaction(null);
+                      // Já na aba Cartões nada muda de tela: leva até a lista da fatura.
+                      setTimeout(() => document.getElementById('fatura-detalhes')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
                     } else {
                       handleEditClick(confirmingTransaction);
                       setConfirmingTransaction(null);
@@ -5388,6 +5484,123 @@ export default function App() {
           </DialogContent>
         </Dialog>
 
+        <Dialog open={isGlobalSearchOpen} onOpenChange={setIsGlobalSearchOpen}>
+          <DialogContent showCloseButton={false} className="max-w-none sm:max-w-xl sm:top-[12vh] sm:bottom-auto rounded-[1.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] max-h-[70vh] flex flex-col">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Buscar</DialogTitle>
+              <DialogDescription>Procure movimentações, pessoas e cartões</DialogDescription>
+            </DialogHeader>
+            {(() => {
+              type Hit = { key: string; icon: React.ReactNode; title: string; sub: string; right?: string; tone?: string; run: () => void };
+              const q = globalQuery;
+              const hits: Hit[] = [];
+              if (q.trim()) {
+                people.filter(pp => matchesQuery(q, pp.name)).slice(0, 4).forEach(pp => hits.push({
+                  key: `p-${pp.id}`, icon: pp.image ? <img src={pp.image} alt="" className="w-7 h-7 rounded-full object-cover" /> : <Users size={16} />,
+                  title: pp.name, sub: 'Pessoa', run: () => { setSelectedPersonId(pp.id); setActiveTab('pessoas'); }
+                }));
+                cards.filter(c => matchesQuery(q, c.name)).slice(0, 4).forEach(c => hits.push({
+                  key: `c-${c.id}`, icon: <CreditCard size={16} />, title: c.name, sub: 'Cartão', run: () => { setSelectedCard(c.id); setActiveTab('cartoes'); }
+                }));
+                [...transactions]
+                  .filter(t => matchesQuery(q, t.description, t.category, people.find(pp => pp.id === t.payerPayee)?.name, cards.find(c => c.id === t.cardId)?.name))
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 30)
+                  .forEach(t => hits.push({
+                    key: `t-${t.id}`,
+                    icon: <span className="text-base">{categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}</span>,
+                    title: t.description.split(' · ')[0],
+                    sub: `${format(parseISO(t.date), 'dd/MM/yyyy')} · ${t.category}${t.status === 'planned' ? ' · previsto' : ''}`,
+                    right: `${t.type === 'income' ? '+' : '-'} R$ ${t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                    tone: t.type === 'income' ? 'text-emerald-500' : 'text-rose-400',
+                    run: () => { setCurrentDate(startOfMonth(getTransactionEffectiveMonth(t))); handleTransactionClick(t); }
+                  }));
+              }
+              const active = Math.min(globalIndex, Math.max(hits.length - 1, 0));
+              const pick = (h?: Hit) => { if (!h) return; setIsGlobalSearchOpen(false); h.run(); };
+              return (
+                <>
+                  <div className="p-4 pb-2 shrink-0">
+                    <div className="relative">
+                      <Search size={16} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7E7AAA]" />
+                      <Input
+                        autoFocus
+                        placeholder="Buscar movimentação, pessoa ou cartão…"
+                        className="h-12 rounded-full border-none bg-white dark:bg-[#211E4A] font-normal text-sm pl-11 shadow-sm"
+                        value={globalQuery}
+                        onChange={(e) => { setGlobalQuery(e.target.value); setGlobalIndex(0); }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowDown') { e.preventDefault(); setGlobalIndex(Math.min(active + 1, hits.length - 1)); }
+                          else if (e.key === 'ArrowUp') { e.preventDefault(); setGlobalIndex(Math.max(active - 1, 0)); }
+                          else if (e.key === 'Enter') { e.preventDefault(); pick(hits[active]); }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-3">
+                    {!q.trim() ? (
+                      <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] text-center py-8">Digite para procurar. Setas para navegar, Enter para abrir.</p>
+                    ) : hits.length === 0 ? (
+                      <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] text-center py-8">Nada encontrado.</p>
+                    ) : hits.map((h, i) => (
+                      <button
+                        key={h.key}
+                        type="button"
+                        onMouseEnter={() => setGlobalIndex(i)}
+                        onClick={() => pick(h)}
+                        className={cn("w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors", i === active ? "bg-primary/10" : "hover:bg-slate-50 dark:hover:bg-[#2A2755]")}
+                      >
+                        <span className="w-8 h-8 rounded-full bg-white dark:bg-[#211E4A] flex items-center justify-center shrink-0 overflow-hidden text-slate-500 dark:text-[#C5C1E5]">{h.icon}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-sm font-medium text-slate-800 dark:text-[#EDEAF9] truncate">{h.title}</span>
+                          <span className="block text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">{h.sub}</span>
+                        </span>
+                        {h.right && <span className={cn("text-sm font-medium tabular-nums shrink-0", h.tone)}>{h.right}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+
+        <BatchEntryDialog
+          open={isBatchOpen}
+          onOpenChange={setIsBatchOpen}
+          categories={categories}
+          cards={cards}
+          onSave={async (rows) => {
+            if (!user || !requireOnline('Lançar em lote')) return false;
+            try {
+              const full = rows.map(r => ({
+                ...r,
+                id: api.newTransactionId(),
+                userId: user.id,
+                recurrence: 'none' as RecurrenceType,
+                recurrenceEndDate: null,
+                installments: null,
+                payerPayee: 'geral',
+                assignments: [],
+                linkedToCard: false,
+                linkedTransactionId: null,
+                seriesId: null,
+                owedByPerson: r.type === 'income' ? true : null
+              })) as Array<Transaction & { userId: string }>;
+              await api.insertTransactions(full);
+              setTransactions(prev => {
+                const known = new Set(prev.map(t => t.id));
+                return [...prev, ...full.filter(f => !known.has(f.id))];
+              });
+              await loadTransactions();
+              return true;
+            } catch (err) {
+              showAlert('Não foi possível salvar o lote', extractErrorMessage(err));
+              return false;
+            }
+          }}
+        />
+
         <Dialog open={!!settleConfirm} onOpenChange={(open) => { if (!open) setSettleConfirm(null); }}>
           <DialogContent className="max-w-none sm:max-w-md rounded-t-[2.5rem] rounded-b-none md:rounded-[2.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] h-[85dvh] sm:h-auto sm:max-h-[88dvh] flex flex-col">
             {settleConfirm && (() => {
@@ -5407,7 +5620,7 @@ export default function App() {
                     <p className={cn("text-sm font-medium tabular-nums", tone)}>{brl(sum(included(list)))}</p>
                   </div>
                   <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] -mt-1">{hint}</p>
-                  <div className="rounded-2xl bg-white dark:bg-[#211E4A] divide-y divide-slate-100 dark:divide-white/5">
+                  <div className="rounded-lg bg-white dark:bg-[#211E4A] divide-y divide-slate-100 dark:divide-white/5 overflow-hidden">
                     {list.map(t => {
                       const on = !settleExcluded.includes(t.id);
                       return (
@@ -5809,6 +6022,14 @@ export default function App() {
             const unread = notifications.filter(n => !n.read).length;
             return (
               <>
+                <button type="button" onClick={() => { setGlobalQuery(''); setGlobalIndex(0); setIsGlobalSearchOpen(true); }} className={sideBtn} aria-label="Buscar" title="Buscar (Ctrl+K ou /)">
+                  <Search size={18} className="shrink-0" />
+                  {!sidebarCollapsed && <><span className="flex-1 text-left">Buscar</span><kbd className="text-[10px] font-normal text-slate-400 dark:text-[#7E7AAA] border border-slate-200/70 dark:border-white/10 rounded px-1.5 py-0.5">Ctrl K</kbd></>}
+                </button>
+                <button type="button" onClick={() => setIsBatchOpen(true)} className={sideBtn} aria-label="Lançar em lote" title="Lançar vários de uma vez">
+                  <Table2 size={18} className="shrink-0" />
+                  {!sidebarCollapsed && <span>Lançar em lote</span>}
+                </button>
                 <Popover open={isNotificationsOpen && isDesktopView} onOpenChange={setIsNotificationsOpen}>
                   <PopoverTrigger
                     render={
@@ -6255,7 +6476,7 @@ export default function App() {
               exit={{ opacity: 0, x: -10 }}
               className="space-y-6 pb-32 lg:pb-0 lg:space-y-0 lg:grid lg:grid-cols-12 lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-6 lg:h-[calc(100dvh-4rem)] lg:overflow-hidden"
             >
-              <div className="space-y-5 lg:space-y-0 lg:col-span-12 lg:flex lg:flex-wrap lg:items-center lg:gap-x-8 lg:gap-y-3">
+              <div className="space-y-5 lg:space-y-0 lg:col-span-12 lg:p-1 lg:flex lg:flex-wrap lg:items-center lg:gap-x-8 lg:gap-y-3">
                 {mobileTopHeader}
                 <h1 className="text-4xl lg:text-3xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
                   Movimentações
@@ -6512,7 +6733,7 @@ export default function App() {
                       {(() => {
                         const filtered = movimentacoesLists.all
                           .filter(t => movStatusFilter === 'all' ? true : t.status === movStatusFilter)
-                          .filter(t => t.description.toLowerCase().includes(movSearchQuery.trim().toLowerCase()));
+                          .filter(t => matchesQuery(movSearchQuery, t.description, t.category));
                         return filtered.length === 0 ? (
                           <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA] text-center py-12">Nenhuma movimentação neste mês.</p>
                         ) : (
@@ -6523,7 +6744,7 @@ export default function App() {
                               <div key={t.id}>
                                 <TransactionItem
                                   transaction={t}
-                                  personName={person?.name}
+                                  sharedWith={sharedWithOf(t)}
                                   cardName={card?.name}
                                   onClick={() => handleTransactionClick(t)}
                                   onQuickConfirm={() => handleQuickConfirm(t)}
@@ -6540,7 +6761,7 @@ export default function App() {
                 {(movTab === 'apagar' || movTab === 'areceber') && (() => {
                   const isPay = movTab === 'apagar';
                   const list = (isPay ? movimentacoesLists.aPagar : movimentacoesLists.aReceber)
-                    .filter(t => t.description.toLowerCase().includes(movSearchQuery.trim().toLowerCase()))
+                    .filter(t => matchesQuery(movSearchQuery, t.description, t.category))
                     .slice()
                     .sort((a, b) => a.date.localeCompare(b.date));
                   const today = startOfDay(new Date());
@@ -6696,7 +6917,7 @@ export default function App() {
                           <div key={t.id}>
                             <TransactionItem
                               transaction={t}
-                              personName={person?.name}
+                              sharedWith={sharedWithOf(t)}
                               cardName={card?.name}
                               onClick={() => handleTransactionClick(t)}
                               onQuickConfirm={() => handleQuickConfirm(t)}
@@ -6797,6 +7018,9 @@ export default function App() {
                 {mobileTopHeader}
                 {!showCardForm && (
                   <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Cartões</h1>
+                )}
+                {!showCardForm && cards.length > 0 && (
+                  <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compras da fatura" className="lg:max-w-sm" />
                 )}
               </div>
 
@@ -7033,67 +7257,93 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between ml-2 gap-3">
-                              <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest shrink-0">
-                                Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
-                              </p>
-                              <button
-                                type="button"
-                                disabled={billPaid || cardBillItems.length === 0}
-                                onClick={() => {
-                                  const bill = computeCardBill(activeCard, selectedBillDate);
-                                  setConfirmingTransaction(bill);
-                                  setConfirmAmount(billTotal);
-                                  setConfirmDate(format(new Date(), 'yyyy-MM-dd'));
-                                }}
-                                className={cn(
-                                  "flex items-center gap-1.5 text-[11px] font-medium pl-2.5 pr-3 py-1.5 rounded-full shrink-0 transition-all",
-                                  billPaid
-                                    ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                    : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 active:scale-95"
-                                )}
-                              >
-                                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", billPaid ? "bg-emerald-500" : "bg-amber-500")} />
-                                {billPaid ? 'Paga' : 'Em aberto'}
-                              </button>
-                            </div>
-                            <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3] ml-2">
-                              R$ {billTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                            {cardBillItems.length === 0 ? (
-                              <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
-                                <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA]">Nenhuma compra nesta fatura.</p>
-                              </div>
-                            ) : (
-                              <>
-                                <div className="space-y-2">
-                                  {cardBillItems.map(t => (
-                                    <div key={t.id}>
-                                      <TransactionItem
-                                        transaction={t}
-                                        onClick={() => handleTransactionClick(t)}
-                                        hideStatus
-                                        categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
-                                      />
+                          <div className="space-y-3" id="fatura-detalhes">
+                            {(() => {
+                              const startPay = () => {
+                                const bill = computeCardBill(activeCard, selectedBillDate);
+                                setConfirmingTransaction(bill);
+                                setConfirmAmount(billTotal);
+                                setConfirmDate(format(new Date(), 'yyyy-MM-dd'));
+                              };
+                              const brl = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                              const paidAmount = transactions
+                                .filter(t => isBillPaymentRow(t) && t.status === 'actual' && t.cardId === activeCard.id && format(parseISO(t.date), 'yyyy-MM') === selectedMonthKey)
+                                .reduce((acc, t) => acc + t.amount, 0);
+                              const diff = Math.round((paidAmount - billTotal) * 100) / 100;
+                              const visibleItems = cardBillItems.filter(t => matchesQuery(cardSearchQuery, t.description, t.category));
+                              return (
+                                <>
+                                  <div className="flex items-center justify-between ml-2 gap-3">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <p className="text-xs font-medium text-slate-400 dark:text-[#9D99BC] tracking-widest shrink-0">
+                                        Fatura de {format(selectedBillDate, "MMMM", { locale: ptBR })}
+                                      </p>
+                                      <span className={cn(
+                                        "flex items-center gap-1.5 text-[11px] font-medium pl-2.5 pr-3 py-1.5 rounded-full shrink-0",
+                                        billPaid
+                                          ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                          : "bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                      )}>
+                                        <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", billPaid ? "bg-emerald-500" : "bg-amber-500")} />
+                                        {billPaid ? 'Paga' : 'Em aberto'}
+                                      </span>
                                     </div>
-                                  ))}
-                                </div>
-                                {!billPaid && (
-                                  <button
-                                    onClick={() => {
-                                      const bill = computeCardBill(activeCard, selectedBillDate);
-                                      setConfirmingTransaction(bill);
-                                      setConfirmAmount(billTotal);
-                                      setConfirmDate(format(new Date(), 'yyyy-MM-dd'));
-                                    }}
-                                    className="w-full h-12 rounded-full bg-primary text-white font-medium text-sm active:scale-95 transition-all"
-                                  >
-                                    Pagar fatura
-                                  </button>
-                                )}
-                              </>
-                            )}
+                                    {!billPaid && cardBillItems.length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={startPay}
+                                        className="h-9 px-5 rounded-full bg-primary text-white font-medium text-xs active:scale-95 transition-all shrink-0"
+                                      >
+                                        Pagar fatura
+                                      </button>
+                                    )}
+                                  </div>
+                                  <div className="ml-2">
+                                    <p className="text-2xl font-heading font-medium tracking-tighter text-slate-800 dark:text-[#EDE9E3]">
+                                      {brl(billPaid && paidAmount > 0 ? paidAmount : billTotal)}
+                                    </p>
+                                    {billPaid && paidAmount > 0 && (
+                                      <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] mt-0.5">
+                                        Valor pago · compras registradas: {brl(billTotal)}
+                                      </p>
+                                    )}
+                                    {billPaid && diff > 0.005 && (
+                                      <p className="text-xs font-normal text-amber-600 dark:text-amber-400 mt-1.5 leading-relaxed">
+                                        {brl(diff)} a mais que as compras registradas: são gastos que não foram informados no aplicativo.
+                                      </p>
+                                    )}
+                                    {billPaid && diff < -0.005 && (
+                                      <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] mt-1.5 leading-relaxed">
+                                        Pago {brl(-diff)} a menos que a soma das compras registradas.
+                                      </p>
+                                    )}
+                                  </div>
+                                  {cardBillItems.length === 0 ? (
+                                    <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
+                                      <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA]">Nenhuma compra nesta fatura.</p>
+                                    </div>
+                                  ) : visibleItems.length === 0 ? (
+                                    <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
+                                      <p className="text-sm font-normal text-slate-300 dark:text-[#7E7AAA]">Nenhuma compra encontrada.</p>
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {visibleItems.map(t => (
+                                        <div key={t.id}>
+                                          <TransactionItem
+                                            transaction={t}
+                                            onClick={() => handleTransactionClick(t)}
+                                            hideStatus
+                                            sharedWith={sharedWithOf(t)}
+                                            categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
+                                          />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </>
                       );
@@ -7193,7 +7443,7 @@ export default function App() {
                           <div key={t.id}>
                             <TransactionItem
                               transaction={t}
-                              personName={person?.name}
+                              sharedWith={sharedWithOf(t)}
                               cardName={card?.name}
                               onClick={() => handleTransactionClick(t)}
                               onQuickConfirm={() => handleQuickConfirm(t)}
@@ -7284,6 +7534,9 @@ export default function App() {
                 {!showPersonForm && (
                   <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Pessoas</h1>
                 )}
+                {!showPersonForm && people.length > 0 && (
+                  <SearchBar value={personSearchQuery} onChange={setPersonSearchQuery} placeholder="Buscar lançamentos com a pessoa" className="lg:max-w-sm" />
+                )}
               </div>
 
               <div className="space-y-6">
@@ -7320,7 +7573,7 @@ export default function App() {
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-10 lg:items-start">
+                  <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-10 lg:items-start">
                   <div className="space-y-6 lg:sticky lg:top-8 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:scrollbar-hide lg:p-2.5">
                     <div
                       ref={peopleCarouselRef}
@@ -7355,8 +7608,8 @@ export default function App() {
                                   <Pencil size={14} strokeWidth={2.5} />
                                 </button>
                               </div>
-                              <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 min-h-0">
-                                <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-white font-medium text-2xl shrink-0 overflow-hidden">
+                              <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-2 lg:gap-1.5 min-h-0 w-full min-w-0 text-center">
+                                <div className="w-20 h-20 lg:w-14 lg:h-14 rounded-full bg-white/20 flex items-center justify-center text-white font-medium text-2xl lg:text-xl shrink-0 overflow-hidden">
                                   {person.image ? (
                                     <img src={person.image} alt="" className="w-full h-full object-cover" />
                                   ) : (
@@ -7456,7 +7709,8 @@ export default function App() {
                             const hasPending = charges.pending.length > 0 || charges.payablePending.length > 0;
                             // Pendentes primeiro (são o que forma o saldo); os já quitados
                             // ficam embaixo, marcados e esmaecidos.
-                            const renderList = (list: typeof charges.items, owedToMe: boolean) => {
+                            const renderList = (fullList: typeof charges.items, owedToMe: boolean) => {
+                              const list = fullList.filter(t => matchesQuery(personSearchQuery, t.description, t.category));
                               const pendingList = list.filter(t => t.status !== 'actual');
                               const doneList = list.filter(t => t.status === 'actual');
                               const row = (t: typeof list[number]) => (
@@ -8094,6 +8348,207 @@ export default function App() {
   );
 }
 
+type BatchRow = { type: 'expense' | 'income'; description: string; amount: string; date: string; category: string; cardId: string; paid: boolean };
+
+function BatchEntryDialog({
+  open,
+  onOpenChange,
+  categories,
+  cards,
+  onSave
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  categories: Category[];
+  cards: Card[];
+  onSave: (rows: Array<{ type: TransactionType; description: string; amount: number; date: string; category: string; status: 'planned' | 'actual'; cardId: string | null; actualDate: string | null }>) => Promise<boolean>;
+}) {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const blank = (prev?: BatchRow): BatchRow => ({ type: prev?.type ?? 'expense', description: '', amount: '', date: prev?.date ?? today, category: prev?.category ?? '', cardId: prev?.cardId ?? '', paid: prev?.paid ?? true });
+  const [rows, setRows] = useState<BatchRow[]>(() => Array.from({ length: 8 }, () => blank()));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (open) { setRows(Array.from({ length: 8 }, () => blank())); setError(''); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const update = (i: number, patch: Partial<BatchRow>) => setRows(prev => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
+  const isFilled = (r: BatchRow) => r.description.trim() !== '' || r.amount.trim() !== '';
+  const parseDate = (raw: string) => {
+    const v = raw.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    const m = v.match(/^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?$/);
+    if (!m) return '';
+    const year = m[3] ? (m[3].length === 2 ? `20${m[3]}` : m[3]) : String(new Date().getFullYear());
+    const d = new Date(Number(year), Number(m[2]) - 1, Number(m[1]));
+    return isNaN(d.getTime()) ? '' : format(d, 'yyyy-MM-dd');
+  };
+  const parseAmount = (raw: string) => {
+    const v = raw.replace(/[^\d,.-]/g, '');
+    if (!v) return 0;
+    const normalized = v.includes(',') ? v.replace(/\./g, '').replace(',', '.') : v;
+    const n = parseFloat(normalized);
+    return isNaN(n) ? 0 : Math.abs(n);
+  };
+
+  // Colar linhas de uma planilha: Descrição ⇥ Valor ⇥ Data ⇥ Categoria.
+  const handlePaste = (i: number, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData('text');
+    if (!text.includes('\t') && !text.includes('\n')) return;
+    e.preventDefault();
+    const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+    setRows(prev => {
+      const next = [...prev];
+      lines.forEach((line, k) => {
+        const [description = '', amount = '', date = '', category = ''] = line.split('\t');
+        const idx = i + k;
+        while (next.length <= idx) next.push(blank(next[next.length - 1]));
+        const cat = categories.find(c => normalizeText(c.name) === normalizeText(category.trim()))?.name ?? next[idx].category;
+        next[idx] = { ...next[idx], description: description.trim(), amount: amount.trim(), date: parseDate(date) || next[idx].date, category: cat };
+      });
+      return next;
+    });
+  };
+
+  const filled = rows.filter(isFilled);
+  const total = filled.reduce((acc, r) => acc + (r.type === 'income' ? 1 : -1) * parseAmount(r.amount), 0);
+
+  const save = async () => {
+    setError('');
+    const out: Parameters<typeof onSave>[0] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!isFilled(r)) continue;
+      const amount = parseAmount(r.amount);
+      const date = parseDate(r.date);
+      if (!r.description.trim() || amount <= 0 || !date) {
+        setError(`Linha ${i + 1}: preencha descrição, valor e data.`);
+        return;
+      }
+      const onCard = r.type === 'expense' && !!r.cardId;
+      const paid = !onCard && r.paid;
+      out.push({
+        type: onCard ? 'card_purchase' : r.type,
+        description: r.description.trim(),
+        amount,
+        date,
+        category: r.category || (onCard ? 'Outros' : 'Outros'),
+        status: paid ? 'actual' : 'planned',
+        cardId: onCard ? r.cardId : null,
+        actualDate: paid ? date : null
+      });
+    }
+    if (out.length === 0) { setError('Preencha ao menos uma linha.'); return; }
+    setSaving(true);
+    const ok = await onSave(out);
+    setSaving(false);
+    if (ok) onOpenChange(false);
+  };
+
+  const cell = "w-full h-9 bg-transparent px-2 text-sm font-normal text-slate-700 dark:text-[#EDEAF9] outline-none focus:bg-primary/5 rounded";
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-none sm:max-w-none sm:top-1/2 sm:bottom-auto sm:-translate-y-1/2 w-[min(1100px,94vw)] h-[min(720px,90vh)] rounded-[1.5rem] border-none shadow-deep p-0 overflow-hidden bg-[#F6F4FD] dark:bg-[#17153A] flex flex-col">
+        <div className="px-6 pt-5 pb-3 pr-14 shrink-0">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Lançar em lote</DialogTitle>
+            <DialogDescription className="text-xs leading-relaxed">
+              Preencha a tabela e salve tudo de uma vez. Dá para colar linhas de uma planilha (descrição, valor, data, categoria) na coluna Descrição. Linhas em branco são ignoradas.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+        <div className="flex-1 min-h-0 overflow-auto px-6">
+          <table className="w-full text-left border-separate border-spacing-0 bg-white dark:bg-[#211E4A] rounded-xl overflow-hidden">
+            <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-[#2A2755]">
+              <tr className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">
+                <th className="px-3 py-2 w-8">#</th>
+                <th className="px-1 py-2 w-28">Tipo</th>
+                <th className="px-1 py-2">Descrição</th>
+                <th className="px-1 py-2 w-32">Valor</th>
+                <th className="px-1 py-2 w-36">Data</th>
+                <th className="px-1 py-2 w-44">Categoria</th>
+                <th className="px-1 py-2 w-40">Cartão</th>
+                <th className="px-1 py-2 w-16 text-center">Pago</th>
+                <th className="w-8" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const onCard = r.type === 'expense' && !!r.cardId;
+                return (
+                  <tr key={i} className="border-t border-slate-100 dark:border-white/5 [&>td]:border-t [&>td]:border-slate-100 dark:[&>td]:border-white/5">
+                    <td className="px-3 text-[11px] text-slate-300 dark:text-[#6A6594] tabular-nums">{i + 1}</td>
+                    <td className="px-1">
+                      <select className={cell} value={r.type} onChange={(e) => update(i, { type: e.target.value as 'expense' | 'income', cardId: e.target.value === 'income' ? '' : r.cardId })}>
+                        <option value="expense">Despesa</option>
+                        <option value="income">Receita</option>
+                      </select>
+                    </td>
+                    <td className="px-1">
+                      <input
+                        className={cell}
+                        value={r.description}
+                        placeholder="Ex: Mercado"
+                        onChange={(e) => update(i, { description: e.target.value })}
+                        onPaste={(e) => handlePaste(i, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && i === rows.length - 1) { e.preventDefault(); setRows(prev => [...prev, blank(prev[prev.length - 1])]); }
+                        }}
+                      />
+                    </td>
+                    <td className="px-1"><input className={cn(cell, "tabular-nums")} inputMode="decimal" value={r.amount} placeholder="0,00" onChange={(e) => update(i, { amount: e.target.value })} /></td>
+                    <td className="px-1"><input className={cell} value={/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? format(parseISO(r.date), 'dd/MM/yyyy') : r.date} placeholder="dd/mm/aaaa" onChange={(e) => update(i, { date: e.target.value })} onBlur={() => { const d = parseDate(r.date); if (d) update(i, { date: d }); }} /></td>
+                    <td className="px-1">
+                      <select className={cell} value={r.category} onChange={(e) => update(i, { category: e.target.value })}>
+                        <option value="">—</option>
+                        {categories.map(c => <option key={c.id} value={c.name}>{c.icon} {c.name}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-1">
+                      <select className={cell} value={r.cardId} disabled={r.type === 'income'} onChange={(e) => update(i, { cardId: e.target.value })}>
+                        <option value="">Conta</option>
+                        {cards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-1 text-center">
+                      <input type="checkbox" className="size-4 accent-[var(--color-primary,#8A7FF5)]" checked={!onCard && r.paid} disabled={onCard} onChange={(e) => update(i, { paid: e.target.checked })} />
+                    </td>
+                    <td className="px-1">
+                      <button type="button" onClick={() => setRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev)} className="w-7 h-7 rounded-full text-slate-300 dark:text-[#6A6594] hover:text-rose-500 flex items-center justify-center" aria-label="Remover linha">
+                        <X size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <button type="button" onClick={() => setRows(prev => [...prev, blank(prev[prev.length - 1])])} className="mt-3 mb-4 text-xs font-medium text-primary">+ Adicionar linha</button>
+        </div>
+        <div className="shrink-0 px-6 py-4 border-t border-slate-200/70 dark:border-white/10 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            {error ? (
+              <p className="text-xs font-normal text-rose-500">{error}</p>
+            ) : (
+              <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC]">
+                {filled.length} {filled.length === 1 ? 'linha preenchida' : 'linhas preenchidas'} · saldo do lote {total < 0 ? '-' : ''}R$ {Math.abs(total).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => onOpenChange(false)} className="h-11 px-5 rounded-full text-sm font-medium text-slate-500 dark:text-[#C5C1E5] hover:bg-slate-100 dark:hover:bg-[#2A2755]">Cancelar</button>
+            <Button onClick={save} disabled={saving || filled.length === 0} className="h-11 px-8 rounded-full font-medium text-sm bg-primary text-white hover:bg-primary/90 disabled:opacity-40">
+              {saving ? 'Salvando…' : `Salvar ${filled.length > 0 ? filled.length : ''} ${filled.length === 1 ? 'lançamento' : 'lançamentos'}`}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function NavItem({ active, onClick, icon, label, collapsed = false }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string, collapsed?: boolean }) {
   return (
     <button 
@@ -8246,10 +8701,12 @@ function TransactionItem({
   hideDate = false,
   hideStatus = false,
   categoryIcon,
-  statusBadge
+  statusBadge,
+  sharedWith
 }: {
   transaction: Transaction,
   personName?: string,
+  sharedWith?: Array<{ name: string; image?: string }>,
   cardName?: string,
   onClick?: () => void,
   onQuickConfirm?: () => void,
@@ -8319,7 +8776,23 @@ function TransactionItem({
                   {transaction.installments.current}/{transaction.installments.total}
                 </span>
               )}
-              {personName && (
+              {sharedWith && sharedWith.length > 0 ? (
+                <span
+                  className="flex items-center gap-1 pl-1.5 pr-0.5 py-0.5 rounded-full bg-primary/10 shrink-0"
+                  title={`Dividido com ${sharedWith.map(p => p.name).join(', ')}`}
+                >
+                  <span className="text-[11px] leading-none">🤝</span>
+                  <span className="flex -space-x-1.5">
+                    {sharedWith.slice(0, 3).map((p, i) => (
+                      p.image ? (
+                        <img key={i} src={p.image} alt="" className="w-4 h-4 rounded-full object-cover ring-1 ring-white dark:ring-[#211E4A]" referrerPolicy="no-referrer" />
+                      ) : (
+                        <span key={i} className="w-4 h-4 rounded-full bg-primary/20 text-primary text-[9px] font-medium flex items-center justify-center ring-1 ring-white dark:ring-[#211E4A]">{p.name.charAt(0).toUpperCase()}</span>
+                      )
+                    ))}
+                  </span>
+                </span>
+              ) : personName && (
                 <span className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC] truncate">· {personName}</span>
               )}
               {cardName && (
