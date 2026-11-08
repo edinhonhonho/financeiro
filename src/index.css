@@ -258,3 +258,31 @@ input::-webkit-inner-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+/* Desktop: barras de rolagem finas, sem fundo (só o "polegar" aparece). */
+@media (min-width: 768px) and (pointer: fine) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(138, 127, 245, 0.35) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+    background: transparent;
+  }
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: rgba(138, 127, 245, 0.3);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(138, 127, 245, 0.55);
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { scrollbar-width: none; }
+}

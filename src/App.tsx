@@ -515,9 +515,9 @@ function AccountRow({
   );
 }
 
-function AccountSection({ label, children }: { label?: string; children: React.ReactNode }) {
+function AccountSection({ label, children, className }: { label?: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="space-y-3">
+    <div className={cn("space-y-3", className)}>
       {label && <p className="text-[10px] font-medium tracking-widest text-slate-400 dark:text-[#9D99BC] ml-1">{label}</p>}
       <div className="bg-white dark:bg-[#211E4A] rounded-[2rem] shadow-soft divide-y divide-slate-100 dark:divide-[#37336A] overflow-hidden">
         {children}
@@ -615,7 +615,15 @@ export default function App() {
       if (!window.matchMedia('(min-width: 768px)').matches) return;
       const el = e.target as HTMLElement | null;
       const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
-      const isK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k';
+      const mod = e.ctrlKey || e.metaKey;
+      // Ctrl+B recolhe/expande o menu; Ctrl+←/→ troca o mês.
+      if (mod && !e.altKey && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleSidebar(); return; }
+      if (mod && !e.altKey && !typing && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        setCurrentDate(d => addMonths(d, e.key === 'ArrowRight' ? 1 : -1));
+        return;
+      }
+      const isK = mod && e.key.toLowerCase() === 'k';
       if (isK || (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey)) {
         e.preventDefault();
         setGlobalQuery('');
@@ -1050,7 +1058,9 @@ export default function App() {
   const loadNotifications = React.useCallback(async () => {
     if (!user) return;
     try {
-      setNotifications(await api.fetchNotifications(user.id));
+      const data = await api.fetchNotifications(user.id);
+      setNotifications(data);
+      offline.saveCache(user.id, 'notifications', data);
     } catch (err) {
       console.warn('Notificações indisponíveis:', err);
     }
@@ -1307,6 +1317,21 @@ export default function App() {
       setUserProfile(null);
       return;
     }
+
+    // Mostra na hora a cópia local (a última que o app viu) e só então atualiza
+    // pela rede — sem tela vazia enquanto os dados chegam.
+    const cachedProfile = offline.readCache<UserProfile>(user.id, 'profile');
+    if (cachedProfile) setUserProfile(prev => prev ?? cachedProfile);
+    const cachedTx = offline.readCache<Transaction[]>(user.id, 'transactions');
+    if (cachedTx) setTransactions(prev => prev.length ? prev : withQueuedRows(user.id, cachedTx));
+    const cachedCards = offline.readCache<Card[]>(user.id, 'cards');
+    if (cachedCards) setCards(prev => prev.length ? prev : cachedCards);
+    const cachedPeople = offline.readCache<Person[]>(user.id, 'people');
+    if (cachedPeople) setPeople(prev => prev.length ? prev : cachedPeople);
+    const cachedCategories = offline.readCache<Category[]>(user.id, 'categories');
+    if (cachedCategories) setCategories(prev => prev.length ? prev : cachedCategories);
+    const cachedNotifications = offline.readCache<AppNotification[]>(user.id, 'notifications');
+    if (cachedNotifications) setNotifications(prev => prev.length ? prev : cachedNotifications);
 
     loadProfile();
     loadTransactions();
@@ -3770,7 +3795,7 @@ export default function App() {
     setPersonLinkQuery('');
     const fullName = [profile.firstName, profile.lastName].filter(Boolean).join(' ');
     setNewPersonName(fullName || profile.nickname || profile.username || '');
-    if (profile.photoURL) setNewPersonImage(profile.photoURL);
+    if (profile.photoURL && !newPersonImage) setNewPersonImage(profile.photoURL);
   };
 
   const personColorPicker = (
@@ -3798,10 +3823,11 @@ export default function App() {
     <div className="space-y-2 relative">
       <Label className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC] ml-1">Usuário no Financeiro</Label>
       {personLinkSelected ? (
+        <>
         <div className="rounded-2xl bg-white dark:bg-[#211E4A] shadow-sm flex items-center gap-3 p-3">
           <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center font-medium overflow-hidden shrink-0">
-            {personLinkSelected.photoURL
-              ? <img src={personLinkSelected.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            {(newPersonImage || personLinkSelected.photoURL)
+              ? <img src={newPersonImage || personLinkSelected.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               : (personLinkSelected.firstName || personLinkSelected.username || '?').charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -3812,6 +3838,26 @@ export default function App() {
             <X size={16} />
           </button>
         </div>
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {personLinkSelected.photoURL && (
+            <button
+              type="button"
+              onClick={() => setNewPersonImage(personLinkSelected.photoURL as string)}
+              className={cn("h-8 px-3 rounded-full text-xs font-medium transition-colors", newPersonImage === personLinkSelected.photoURL ? "bg-primary text-white" : "bg-white dark:bg-[#211E4A] text-slate-600 dark:text-[#C5C1E5] shadow-sm")}
+            >
+              Usar a foto de @{personLinkSelected.username}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className={cn("h-8 px-3 rounded-full text-xs font-medium transition-colors", newPersonImage && newPersonImage !== personLinkSelected.photoURL ? "bg-primary text-white" : "bg-white dark:bg-[#211E4A] text-slate-600 dark:text-[#C5C1E5] shadow-sm")}
+          >
+            Escolher outra foto
+          </button>
+          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+        </div>
+        </>
       ) : (
         <div className="relative">
           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-[#9D99BC] font-medium text-sm pointer-events-none">@</span>
@@ -4264,7 +4310,7 @@ export default function App() {
       type="button"
       onClick={prevMonth}
       className="w-8 h-8 rounded-full flex items-center justify-center text-primary active:scale-90 transition-transform"
-      aria-label="Mês anterior"
+      aria-label="Mês anterior" title="Mês anterior (Ctrl+←)"
     >
       <ChevronLeft size={16} strokeWidth={3} />
     </button>
@@ -4319,7 +4365,7 @@ export default function App() {
       type="button"
       onClick={nextMonth}
       className="w-8 h-8 rounded-full flex items-center justify-center text-primary active:scale-90 transition-transform"
-      aria-label="Próximo mês"
+      aria-label="Próximo mês" title="Próximo mês (Ctrl+→)"
     >
       <ChevronRight size={16} strokeWidth={3} />
     </button>
@@ -5743,19 +5789,19 @@ export default function App() {
         <ImageCropper src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />
 
         <Dialog open={isProfileOpen} onOpenChange={setIsProfileOpen}>
-          <DialogContent className="max-w-none sm:max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-[min(800px,92vw)] md:max-w-none md:h-[min(620px,88vh)] md:rounded-[1.75rem] md:shadow-deep">
-            <div className="flex flex-col flex-1 min-h-0 h-full md:flex-row">
-            <div className="px-6 pt-6 pb-2 shrink-0 md:w-72 md:p-8 md:border-r md:border-slate-200/70 dark:md:border-white/10 md:flex md:flex-col">
+          <DialogContent className="max-w-none sm:max-w-none w-screen h-[100dvh] top-0 bottom-0 left-0 right-0 rounded-none p-0 overflow-hidden border-none shadow-none flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] md:top-1/2 md:bottom-auto md:left-1/2 md:right-auto md:-translate-x-1/2 md:-translate-y-1/2 md:w-[min(880px,92vw)] md:max-w-none md:h-auto md:max-h-[88vh] md:rounded-[1.75rem] md:shadow-deep">
+            <div className="flex flex-col flex-1 min-h-0 h-full">
+            <div className="px-6 pt-6 pb-2 shrink-0 md:px-8 md:pt-7 md:pb-5 md:border-b md:border-slate-200/70 dark:md:border-white/10">
               <DialogHeader className="sr-only">
                 <DialogTitle>Minha conta</DialogTitle>
                 <DialogDescription>{userProfile?.username ? `@${userProfile.username} · ` : ''}{user?.email}</DialogDescription>
               </DialogHeader>
-              <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mb-6 md:text-3xl md:mb-8">Minha conta</h1>
-              <div className="flex items-center gap-4 md:flex-col md:items-start md:gap-3">
+              <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3] mb-6 md:text-2xl md:mb-5">Minha conta</h1>
+              <div className="flex items-center gap-4 md:gap-5">
                 <button
                   type="button"
                   onClick={() => profileImageInputRef.current?.click()}
-                  className="relative w-14 h-14 md:w-24 md:h-24 rounded-full bg-primary flex items-center justify-center text-white font-medium text-xl md:text-3xl shrink-0 overflow-visible"
+                  className="relative w-14 h-14 md:w-16 md:h-16 rounded-full bg-primary flex items-center justify-center text-white font-medium text-xl md:text-2xl shrink-0 overflow-visible"
                   aria-label="Alterar foto de perfil"
                 >
                   <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center">
@@ -5776,7 +5822,7 @@ export default function App() {
                   accept="image/*"
                   onChange={handleProfileImageChange}
                 />
-                <div className="flex-1 min-w-0 md:flex-none md:w-full">
+                <div className="flex-1 min-w-0">
                   <p className="font-medium text-slate-800 dark:text-[#EDE9E3] truncate md:text-lg">{userProfile?.nickname || user?.email?.split('@')[0] || 'Usuário'}</p>
                   <p className="text-xs font-normal text-slate-400 dark:text-[#9D99BC] truncate">
                     {userProfile?.username ? `@${userProfile.username} · ` : ''}{user?.email}
@@ -5784,16 +5830,17 @@ export default function App() {
                 </div>
                 <button
                   onClick={handleOpenAccountEdit}
-                  className="w-11 h-11 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
+                  className="w-11 h-11 md:w-auto md:px-4 md:mr-8 md:gap-2 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shrink-0"
                   aria-label="Editar informações"
                 >
                   <Pencil size={16} strokeWidth={2.5} />
+                  <span className="hidden md:inline text-sm font-medium">Editar perfil</span>
                 </button>
               </div>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-6 md:p-8">
-              <div className="w-full space-y-8 md:space-y-6">
+              <div className="w-full space-y-8 md:space-y-0 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-6 md:items-start">
 
                 <AccountSection label="Gerenciamento">
                   <AccountRow
@@ -5813,7 +5860,7 @@ export default function App() {
                   />
                 </AccountSection>
 
-                <AccountSection label="Aplicativo">
+                <AccountSection label="Aplicativo" className="md:col-start-2 md:row-start-1 md:row-span-3">
                   <AccountRow
                     icon={<Bell size={18} />}
                     title="Avisos"
@@ -6001,7 +6048,7 @@ export default function App() {
             onClick={toggleSidebar}
             className="w-8 h-8 rounded-lg text-slate-400 dark:text-[#9D99BC] hover:bg-slate-100 dark:hover:bg-[#2A2755] hover:text-slate-600 flex items-center justify-center shrink-0"
             aria-label={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
-            title={sidebarCollapsed ? 'Expandir menu' : 'Recolher menu'}
+            title={sidebarCollapsed ? 'Expandir menu (Ctrl+B)' : 'Recolher menu (Ctrl+B)'}
           >
             {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
@@ -6107,9 +6154,10 @@ export default function App() {
           {activeTab === 'visao-geral' && (
             <motion.div
               key="visao-geral"
-              initial={{ opacity: 0, x: 10 }}
+              initial={{ opacity: 0, x: 6 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
               className="space-y-8 pb-32 lg:space-y-0 lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start lg:grid-flow-row-dense"
             >
               <div className="hidden">
@@ -6490,9 +6538,10 @@ export default function App() {
           {(activeTab === 'receitas' || activeTab === 'despesas') && (
             <motion.div 
               key="grouped-list"
-              initial={{ opacity: 0, x: 10 }}
+              initial={{ opacity: 0, x: 6 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
               className="space-y-6 pb-32 lg:pb-0 lg:space-y-0 lg:grid lg:grid-cols-12 lg:grid-rows-[auto_minmax(0,1fr)] lg:gap-x-8 lg:gap-y-6 lg:h-[calc(100dvh-4rem)] lg:overflow-hidden"
             >
               <div className="space-y-5 lg:space-y-0 lg:col-span-12 lg:p-1 lg:flex lg:flex-wrap lg:items-center lg:gap-x-8 lg:gap-y-3">
@@ -7072,9 +7121,10 @@ export default function App() {
           {activeTab === 'cartoes' && (
             <motion.div 
               key="cartoes-list"
-              initial={{ opacity: 0, x: 10 }}
+              initial={{ opacity: 0, x: 6 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
               className="space-y-6 pb-32"
             >
               {!showCardForm && floatingMonthPicker}
@@ -7591,9 +7641,10 @@ export default function App() {
           {activeTab === 'pessoas' && (
             <motion.div
               key="pessoas-list"
-              initial={{ opacity: 0, x: 10 }}
+              initial={{ opacity: 0, x: 6 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -10 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
               className="space-y-6 pb-32"
             >
               {!showPersonForm && floatingMonthPicker}
@@ -7651,9 +7702,6 @@ export default function App() {
                     >
                       {sortedPeople.map(person => {
                         const monthCharges = getPersonMonthlyCharges(person.id, selectedChargeDate);
-                        const identityLine = personLinkSelected && editingPerson?.id === person.id
-                          ? `@${personLinkSelected.username}`
-                          : person.linkedUserId ? '@vinculado' : (person.phone || '');
                         return (
                           <div key={person.id} className={cn("w-[210px] shrink-0 snap-center lg:w-auto rounded-[1.65rem]", (selectedPersonId || people[0]?.id) === person.id && "lg:ring-2 lg:ring-primary lg:ring-offset-4 lg:ring-offset-[#F6F4FD] dark:lg:ring-offset-[#17153A]")}>
                             <div
@@ -7684,29 +7732,12 @@ export default function App() {
                                     person.name.charAt(0).toUpperCase()
                                   )}
                                 </div>
-                                <span className="text-white font-medium text-sm lg:text-base drop-shadow-sm truncate lg:whitespace-normal lg:line-clamp-2 lg:text-center lg:leading-tight break-words max-w-full">{person.name}</span>
-                                {identityLine && <p className="text-white/80 text-[11px] truncate max-w-full lg:hidden">{identityLine}</p>}
+                                <span className="text-white font-medium text-sm lg:text-base drop-shadow-sm line-clamp-2 text-center leading-tight break-words max-w-full">{person.name}</span>
                               </div>
-                              <div className="relative z-10 space-y-1.5 lg:hidden">
-                                <p className="text-white/70 text-[10px] tracking-wider capitalize">Em aberto · {format(selectedChargeDate, 'MMM yyyy', { locale: ptBR })}</p>
-                                {monthCharges.pendingTotal === 0 && monthCharges.payablePendingTotal === 0 ? (
-                                  <p className="text-white text-xs font-medium">Nada pendente</p>
-                                ) : (
-                                  <>
-                                    {monthCharges.pendingTotal > 0 && (
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-white/70 text-[10px] tracking-wider">Te deve</span>
-                                        <span className="text-white text-xs font-medium">R$ {monthCharges.pendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                      </div>
-                                    )}
-                                    {monthCharges.payablePendingTotal > 0 && (
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-white/70 text-[10px] tracking-wider">Você deve</span>
-                                        <span className="text-white text-xs font-medium">R$ {monthCharges.payablePendingTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
+                              <div className="relative z-10 flex justify-center lg:hidden">
+                                <span className="px-3 py-1 rounded-full bg-white/25 text-white text-sm font-medium tabular-nums">
+                                  {monthCharges.balance < 0 ? '-' : ''}R$ {Math.abs(monthCharges.balance).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -8947,7 +8978,12 @@ function TransactionItem({
                   title={[transaction.linkedToCard ? 'Receita vinculada à despesa' : '', cardName ? `Cartão ${cardName}` : ''].filter(Boolean).join(' · ')}
                 >
                   {transaction.linkedToCard && <span className="text-[11px] leading-none">🔗</span>}
-                  {cardName && <CreditCard size={12} strokeWidth={2.5} style={{ color: cardColor || undefined }} className={cn(!cardColor && "text-slate-400")} />}
+                  {cardName && (
+                    <svg width="15" height="11" viewBox="0 0 15 11" aria-hidden="true">
+                      <rect width="15" height="11" rx="2.5" fill={cardColor || '#94A3B8'} />
+                      <rect y="3" width="15" height="2" fill="#fff" fillOpacity="0.6" />
+                    </svg>
+                  )}
                 </span>
               )}
               {transaction.pendingSync && (
