@@ -418,7 +418,7 @@ function DateField({
  * eval. Devolve null se a expressão estiver incompleta ou inválida.
  */
 function evaluateExpression(input: string): number | null {
-  let src = input.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/');
+  let src = input.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
   if (!src) return null;
   // "1.234,56" → milhar com ponto e decimal com vírgula; sem vírgula, o ponto é decimal.
   src = src.includes(',') ? src.replace(/\./g, '').replace(/,/g, '.') : src;
@@ -478,6 +478,7 @@ function AmountCalculator({
   initial,
   onApply,
   triggerClassName,
+  triggerLabel,
   side = 'bottom',
   align = 'end'
 }: {
@@ -486,77 +487,129 @@ function AmountCalculator({
   initial?: number;
   onApply: (value: number) => void;
   triggerClassName?: string;
+  /** Com texto, o gatilho vira um botão "pílula" (usado no celular). */
+  triggerLabel?: string;
   side?: 'top' | 'bottom' | 'left' | 'right';
   align?: 'start' | 'center' | 'end';
 }) {
   const [expr, setExpr] = useState('');
+  const isMobile = typeof window !== 'undefined' && !window.matchMedia('(min-width: 768px)').matches;
   useEffect(() => {
     if (open) setExpr(initial && initial > 0 ? String(initial).replace('.', ',') : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   const result = evaluateExpression(expr);
+  const valid = result !== null && result > 0;
+  const brl = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const apply = () => {
-    if (result === null) return;
+    if (!valid || result === null) return;
     onApply(Math.abs(result));
     onOpenChange(false);
   };
-  const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', ',', '(', '+'];
-  const append = (k: string) => setExpr(prev => prev + (k === '−' ? '-' : k));
-  return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger
-        render={
-          <button
-            type="button"
-            className={cn("w-9 h-9 rounded-full text-slate-400 dark:text-[#9D99BC] hover:text-primary hover:bg-primary/10 flex items-center justify-center transition-colors shrink-0", triggerClassName)}
-            aria-label="Calculadora"
-            title="Calculadora (tecla =)"
-          >
-            <Calculator size={18} />
-          </button>
-        }
-      />
-      <PopoverContent side={side} align={align} sideOffset={8} className="w-72 p-4 gap-3 rounded-[1.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] ring-1 ring-slate-200/70 dark:ring-white/10 z-[90]">
-        <div className="rounded-xl bg-white dark:bg-[#211E4A] px-3 py-2 shadow-sm">
-          <input
-            autoFocus
-            value={expr}
-            onChange={(e) => setExpr(e.target.value.replace(/[^\d+\-*/().,×÷−\s]/g, '').replace(/−/g, '-'))}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); apply(); }
-              else if (e.key === 'Escape') { e.stopPropagation(); onOpenChange(false); }
-            }}
-            placeholder="Ex: 120 + 35,90 × 2"
-            className="w-full bg-transparent outline-none text-right text-base font-medium text-slate-700 dark:text-[#EDEAF9] placeholder:text-slate-300 dark:placeholder:text-[#6A6594]"
-            inputMode="decimal"
-            aria-label="Expressão"
-          />
-          <p className={cn("text-right font-heading font-medium text-2xl tracking-tight tabular-nums min-h-8", result === null ? "text-slate-300 dark:text-[#6A6594]" : "text-slate-800 dark:text-[#EDE9E3]")}>
-            {result === null ? '= …' : `= ${result.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+  // Mostra os símbolos de conta de verdade (× ÷ −) mesmo se digitar * / -.
+  const prettify = (v: string) => v.replace(/[^\d+\-*/().,×÷−\s]/g, '').replace(/\*/g, '×').replace(/\//g, '÷').replace(/-/g, '−');
+  const append = (k: string) => setExpr(prev => prev + k);
+  const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', ',', '(', ')'];
+  const keyClass = (k: string, big: boolean) => cn(
+    "rounded-xl font-medium active:scale-95 transition-all",
+    big ? "h-14 text-xl" : "h-10 text-base",
+    /[÷×−+]/.test(k) ? "bg-primary/10 text-primary" : /[(),]/.test(k) ? "bg-slate-100 dark:bg-[#2A2755] text-slate-600 dark:text-[#C5C1E5]" : "bg-white dark:bg-[#211E4A] text-slate-700 dark:text-[#EDEAF9] shadow-sm"
+  );
+
+  const body = (big: boolean) => (
+    <div className={cn("flex flex-col gap-3", big && "flex-1 min-h-0")}>
+      <div className="rounded-2xl bg-white dark:bg-[#211E4A] px-4 py-3 shadow-sm">
+        <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">CONTA</p>
+        <input
+          autoFocus={!big}
+          value={expr}
+          onChange={(e) => setExpr(prettify(e.target.value))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); apply(); }
+            else if (e.key === 'Escape') { e.stopPropagation(); onOpenChange(false); }
+          }}
+          placeholder="120 + 35,90 × 2"
+          className={cn("w-full bg-transparent outline-none text-right font-medium text-slate-700 dark:text-[#EDEAF9] placeholder:text-slate-300 dark:placeholder:text-[#6A6594]", big ? "text-2xl" : "text-lg")}
+          inputMode={big ? 'none' : 'decimal'}
+          readOnly={big}
+          aria-label="Conta"
+        />
+        <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-slate-100 dark:border-white/10 pt-2">
+          <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">RESULTADO</p>
+          <p className={cn("font-heading font-medium tracking-tight tabular-nums", big ? "text-4xl" : "text-2xl", result === null ? "text-slate-300 dark:text-[#6A6594]" : "text-slate-800 dark:text-[#EDE9E3]")}>
+            {result === null ? (expr.trim() ? 'Conta incompleta' : 'R$ 0,00') : `R$ ${brl(result)}`}
           </p>
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
-          {keys.map(k => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => append(k)}
-              className={cn("h-10 rounded-xl text-base font-medium active:scale-95 transition-all", /[÷×−+]/.test(k) ? "bg-primary/10 text-primary" : "bg-white dark:bg-[#211E4A] text-slate-700 dark:text-[#EDEAF9] shadow-sm")}
-            >
-              {k}
-            </button>
-          ))}
-          <button type="button" onClick={() => setExpr('')} className="h-10 rounded-xl text-sm font-medium bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm col-span-2">Limpar</button>
-          <button type="button" onClick={() => setExpr(prev => prev.slice(0, -1))} className="h-10 rounded-xl text-sm font-medium bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm col-span-2" aria-label="Apagar último">⌫ Apagar</button>
-        </div>
-        <button
-          type="button"
-          disabled={result === null || result <= 0}
-          onClick={apply}
-          className="h-11 rounded-full bg-primary text-white text-sm font-medium disabled:opacity-40 active:scale-95 transition-all"
-        >
-          {result !== null && result > 0 ? `Usar R$ ${result.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Usar valor'}
+      </div>
+      <div className={cn("grid grid-cols-4 gap-2", big && "flex-1 content-center")}>
+        {keys.map(k => (
+          <button key={k} type="button" onClick={() => append(k)} className={keyClass(k, big)}>{k}</button>
+        ))}
+        <button type="button" onClick={() => append('+')} className={keyClass('+', big)}>+</button>
+        <button type="button" onClick={() => setExpr('')} className={cn("rounded-xl font-medium bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm col-span-2 active:scale-95 transition-all", big ? "h-14 text-base" : "h-10 text-sm")}>Limpar</button>
+        <button type="button" onClick={() => setExpr(prev => prev.slice(0, -1))} className={cn("rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 flex items-center justify-center active:scale-95 transition-all", big ? "h-14" : "h-10")} aria-label="Apagar último caractere" title="Apagar">
+          <Delete size={big ? 24 : 20} strokeWidth={2.2} />
         </button>
+      </div>
+      <button
+        type="button"
+        disabled={!valid}
+        onClick={apply}
+        className={cn("rounded-full bg-primary text-white font-medium disabled:opacity-40 active:scale-95 transition-all", big ? "h-14 text-base" : "h-11 text-sm")}
+      >
+        {valid && result !== null ? `Usar R$ ${brl(result)}` : 'Usar valor'}
+      </button>
+    </div>
+  );
+
+  const trigger = (
+    <button
+      type="button"
+      onClick={isMobile ? () => onOpenChange(true) : undefined}
+      className={cn(
+        triggerLabel
+          ? "h-9 px-4 gap-2 rounded-full bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm text-xs font-medium flex items-center justify-center shrink-0"
+          : "w-9 h-9 rounded-full text-slate-400 dark:text-[#9D99BC] hover:text-primary hover:bg-primary/10 flex items-center justify-center transition-colors shrink-0",
+        triggerClassName
+      )}
+      aria-label="Calculadora"
+      title="Calculadora (tecla =)"
+    >
+      <Calculator size={triggerLabel ? 16 : 18} />
+      {triggerLabel}
+    </button>
+  );
+
+  // Celular: tela cheia, como um modal. Computador: janelinha ao lado do campo.
+  if (isMobile) {
+    return (
+      <>
+        {trigger}
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent showCloseButton={false} className="max-w-none sm:max-w-none w-full h-[100dvh] top-0 bottom-0 left-0 right-0 sm:top-0 sm:bottom-0 sm:left-0 sm:right-0 sm:translate-x-0 rounded-none sm:rounded-none border-none shadow-none p-0 overflow-hidden flex flex-col bg-[#F6F4FD] dark:bg-[#17153A] z-[90]">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Calculadora</DialogTitle>
+              <DialogDescription>Faça uma conta e use o resultado como valor</DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+              <h2 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Calculadora</h2>
+              <button type="button" onClick={() => onOpenChange(false)} className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]" aria-label="Fechar calculadora">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 flex flex-col px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+              {body(true)}
+            </div>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger render={trigger} />
+      <PopoverContent side={side} align={align} sideOffset={8} className="w-72 p-4 gap-3 rounded-[1.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] ring-1 ring-slate-200/70 dark:ring-white/10 z-[90]">
+        {body(false)}
       </PopoverContent>
     </Popover>
   );
@@ -5072,14 +5125,14 @@ export default function App() {
                     <div className="flex items-center justify-center gap-1">
                       <span className="text-3xl font-medium text-slate-300 dark:text-[#7E7AAA]">R$</span>
                       <p className="font-heading font-medium text-5xl text-slate-800 dark:text-[#EDE9E3] tracking-tight">{amountInput}</p>
+                    </div>
+                    <div className="flex justify-center pt-1">
                       <AmountCalculator
                         open={calcTarget === 'amountMobile'}
                         onOpenChange={(o) => setCalcTarget(o ? 'amountMobile' : null)}
                         initial={parseCurrency(amountInput)}
                         onApply={(v) => setAmountInput(maskCurrency(String(Math.round(v * 100))))}
-                        triggerClassName="ml-2"
-                        side="bottom"
-                        align="center"
+                        triggerLabel="Calculadora"
                       />
                     </div>
                   </div>
