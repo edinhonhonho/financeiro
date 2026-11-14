@@ -478,7 +478,7 @@ function AmountCalculator({
   initial,
   onApply,
   triggerClassName,
-  triggerLabel,
+  triggerVariant = 'icon',
   side = 'bottom',
   align = 'end'
 }: {
@@ -487,8 +487,8 @@ function AmountCalculator({
   initial?: number;
   onApply: (value: number) => void;
   triggerClassName?: string;
-  /** Com texto, o gatilho vira um botão "pílula" (usado no celular). */
-  triggerLabel?: string;
+  /** 'key': tecla alta, no estilo das teclas de operação (usado no teclado do celular). */
+  triggerVariant?: 'icon' | 'key';
   side?: 'top' | 'bottom' | 'left' | 'right';
   align?: 'start' | 'center' | 'end';
 }) {
@@ -511,14 +511,14 @@ function AmountCalculator({
   const append = (k: string) => setExpr(prev => prev + k);
   const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', ',', '(', ')'];
   const keyClass = (k: string, big: boolean) => cn(
-    "rounded-xl font-medium active:scale-95 transition-all",
-    big ? "h-14 text-xl" : "h-10 text-base",
+    "font-medium active:scale-95 transition-all",
+    big ? "h-14 text-xl rounded-2xl" : "h-10 text-base rounded-lg",
     /[÷×−+]/.test(k) ? "bg-primary/10 text-primary" : /[(),]/.test(k) ? "bg-slate-100 dark:bg-[#2A2755] text-slate-600 dark:text-[#C5C1E5]" : "bg-white dark:bg-[#211E4A] text-slate-700 dark:text-[#EDEAF9] shadow-sm"
   );
 
   const body = (big: boolean) => (
     <div className={cn("flex flex-col gap-3", big && "flex-1 min-h-0")}>
-      <div className="rounded-2xl bg-white dark:bg-[#211E4A] px-4 py-3 shadow-sm">
+      <div className={cn("bg-white dark:bg-[#211E4A] px-4 py-3 shadow-sm", big ? "rounded-2xl" : "rounded-xl")}>
         <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">CONTA</p>
         <input
           autoFocus={!big}
@@ -541,24 +541,38 @@ function AmountCalculator({
           </p>
         </div>
       </div>
-      <div className={cn("grid grid-cols-4 gap-2", big && "flex-1 content-center")}>
-        {keys.map(k => (
-          <button key={k} type="button" onClick={() => append(k)} className={keyClass(k, big)}>{k}</button>
-        ))}
+      <div className={cn("grid grid-cols-4", big ? "gap-2.5 flex-1 content-center" : "gap-1.5")}>
+        <button type="button" onClick={() => setExpr('')} className={cn("font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 active:scale-95 transition-all", big ? "h-14 text-base rounded-2xl" : "h-10 text-sm rounded-lg")}>C</button>
+        <button type="button" onClick={() => append('(')} className={keyClass('(', big)}>(</button>
+        <button type="button" onClick={() => append(')')} className={keyClass(')', big)}>)</button>
+        <button type="button" onClick={() => append('÷')} className={keyClass('÷', big)}>÷</button>
+        {['7', '8', '9'].map(k => <button key={k} type="button" onClick={() => append(k)} className={keyClass(k, big)}>{k}</button>)}
+        <button type="button" onClick={() => append('×')} className={keyClass('×', big)}>×</button>
+        {['4', '5', '6'].map(k => <button key={k} type="button" onClick={() => append(k)} className={keyClass(k, big)}>{k}</button>)}
+        <button type="button" onClick={() => append('−')} className={keyClass('−', big)}>−</button>
+        {['1', '2', '3'].map(k => <button key={k} type="button" onClick={() => append(k)} className={keyClass(k, big)}>{k}</button>)}
         <button type="button" onClick={() => append('+')} className={keyClass('+', big)}>+</button>
-        <button type="button" onClick={() => setExpr('')} className={cn("rounded-xl font-medium bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm col-span-2 active:scale-95 transition-all", big ? "h-14 text-base" : "h-10 text-sm")}>Limpar</button>
-        <button type="button" onClick={() => setExpr(prev => prev.slice(0, -1))} className={cn("rounded-xl bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 flex items-center justify-center active:scale-95 transition-all", big ? "h-14" : "h-10")} aria-label="Apagar último caractere" title="Apagar">
+        <button type="button" onClick={() => append('0')} className={cn(keyClass('0', big), "col-span-2")}>0</button>
+        <button type="button" onClick={() => append(',')} className={keyClass(',', big)}>,</button>
+        <button type="button" onClick={() => setExpr(prev => prev.slice(0, -1))} className={cn("bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm flex items-center justify-center active:scale-95 transition-all", big ? "h-14 rounded-2xl" : "h-10 rounded-lg")} aria-label="Apagar último caractere" title="Apagar">
           <Delete size={big ? 24 : 20} strokeWidth={2.2} />
         </button>
       </div>
-      <button
-        type="button"
-        disabled={!valid}
-        onClick={apply}
-        className={cn("rounded-full bg-primary text-white font-medium disabled:opacity-40 active:scale-95 transition-all", big ? "h-14 text-base" : "h-11 text-sm")}
-      >
-        {valid && result !== null ? `Usar R$ ${brl(result)}` : 'Usar valor'}
-      </button>
+      <div className="flex gap-2">
+        {big && (
+          <button type="button" onClick={() => onOpenChange(false)} className="h-14 px-6 rounded-full bg-white dark:bg-[#211E4A] text-slate-600 dark:text-[#C5C1E5] shadow-sm text-base font-medium active:scale-95 transition-all">
+            Sair
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={!valid}
+          onClick={apply}
+          className={cn("flex-1 rounded-full bg-primary text-white font-medium disabled:opacity-40 active:scale-95 transition-all", big ? "h-14 text-base" : "h-11 text-sm")}
+        >
+          {valid && result !== null ? `Usar R$ ${brl(result)}` : 'Usar valor'}
+        </button>
+      </div>
     </div>
   );
 
@@ -567,16 +581,15 @@ function AmountCalculator({
       type="button"
       onClick={isMobile ? () => onOpenChange(true) : undefined}
       className={cn(
-        triggerLabel
-          ? "h-9 px-4 gap-2 rounded-full bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm text-xs font-medium flex items-center justify-center shrink-0"
+        triggerVariant === 'key'
+          ? "flex-1 rounded-2xl bg-primary/10 text-primary flex items-center justify-center active:scale-95 transition-all"
           : "w-9 h-9 rounded-full text-slate-400 dark:text-[#9D99BC] hover:text-primary hover:bg-primary/10 flex items-center justify-center transition-colors shrink-0",
         triggerClassName
       )}
       aria-label="Calculadora"
       title="Calculadora (tecla =)"
     >
-      <Calculator size={triggerLabel ? 16 : 18} />
-      {triggerLabel}
+      <Calculator size={triggerVariant === 'key' ? 26 : 18} />
     </button>
   );
 
@@ -593,9 +606,6 @@ function AmountCalculator({
             </DialogHeader>
             <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
               <h2 className="text-2xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Calculadora</h2>
-              <button type="button" onClick={() => onOpenChange(false)} className="w-11 h-11 rounded-full border border-slate-200/70 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#C5C1E5]" aria-label="Fechar calculadora">
-                <X size={20} />
-              </button>
             </div>
             <div className="flex-1 min-h-0 flex flex-col px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
               {body(true)}
@@ -608,7 +618,7 @@ function AmountCalculator({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger render={trigger} />
-      <PopoverContent side={side} align={align} sideOffset={8} className="w-72 p-4 gap-3 rounded-[1.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] ring-1 ring-slate-200/70 dark:ring-white/10 z-[90]">
+      <PopoverContent side={side} align={align} sideOffset={8} className="w-72 p-3.5 gap-3 rounded-[1.25rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] ring-1 ring-slate-200/70 dark:ring-white/10 z-[90]">
         {body(false)}
       </PopoverContent>
     </Popover>
@@ -5126,36 +5136,38 @@ export default function App() {
                       <span className="text-3xl font-medium text-slate-300 dark:text-[#7E7AAA]">R$</span>
                       <p className="font-heading font-medium text-5xl text-slate-800 dark:text-[#EDE9E3] tracking-tight">{amountInput}</p>
                     </div>
-                    <div className="flex justify-center pt-1">
+                  </div>
+
+                  <div className="flex gap-3 w-full max-w-xs">
+                    <div className="grid grid-cols-3 gap-3 flex-1">
+                      {['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0'].map(d => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => pressAmountDigit(d)}
+                          className={cn("h-16 rounded-2xl bg-slate-50 dark:bg-[#2A2755] text-slate-700 dark:text-[#EDEAF9] text-xl font-medium active:scale-95 transition-all", d === '0' && "col-span-2")}
+                        >
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-3 w-16">
+                      <button
+                        type="button"
+                        onClick={backspaceAmountDigit}
+                        className="h-16 rounded-2xl bg-slate-50 dark:bg-[#2A2755] text-slate-400 dark:text-[#9D99BC] flex items-center justify-center active:scale-95 transition-all"
+                        aria-label="Apagar dígito"
+                      >
+                        <Delete size={20} />
+                      </button>
                       <AmountCalculator
                         open={calcTarget === 'amountMobile'}
                         onOpenChange={(o) => setCalcTarget(o ? 'amountMobile' : null)}
                         initial={parseCurrency(amountInput)}
                         onApply={(v) => setAmountInput(maskCurrency(String(Math.round(v * 100))))}
-                        triggerLabel="Calculadora"
+                        triggerVariant="key"
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
-                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', '00', '0'].map(d => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => pressAmountDigit(d)}
-                        className="h-16 rounded-2xl bg-slate-50 dark:bg-[#2A2755] text-slate-700 dark:text-[#EDEAF9] text-xl font-medium active:scale-95 transition-all"
-                      >
-                        {d}
-                      </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={backspaceAmountDigit}
-                      className="h-16 rounded-2xl bg-slate-50 dark:bg-[#2A2755] text-slate-400 dark:text-[#9D99BC] flex items-center justify-center active:scale-95 transition-all"
-                      aria-label="Apagar dígito"
-                    >
-                      <Delete size={20} />
-                    </button>
                   </div>
                 </div>
               </div>
