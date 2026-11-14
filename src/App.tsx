@@ -26,6 +26,7 @@ import {
   Download,
   LayoutDashboard,
   PanelLeftClose,
+  Calculator,
   Table2,
   PanelLeftOpen,
   Database,
@@ -407,6 +408,155 @@ function DateField({
             }
           }}
         />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * Calcula uma expressão simples (+ − × ÷, parênteses, vírgula decimal) sem usar
+ * eval. Devolve null se a expressão estiver incompleta ou inválida.
+ */
+function evaluateExpression(input: string): number | null {
+  let src = input.replace(/\s+/g, '').replace(/×/g, '*').replace(/÷/g, '/');
+  if (!src) return null;
+  // "1.234,56" → milhar com ponto e decimal com vírgula; sem vírgula, o ponto é decimal.
+  src = src.includes(',') ? src.replace(/\./g, '').replace(/,/g, '.') : src;
+  if (!/^[\d+\-*/().]+$/.test(src)) return null;
+  let i = 0;
+  const peek = () => src[i];
+  const parseNumber = (): number | null => {
+    const m = src.slice(i).match(/^\d*\.?\d+|^\d+\.?/);
+    if (!m) return null;
+    i += m[0].length;
+    return parseFloat(m[0]);
+  };
+  const parseFactor = (): number | null => {
+    if (peek() === '-') { i++; const v = parseFactor(); return v === null ? null : -v; }
+    if (peek() === '+') { i++; return parseFactor(); }
+    if (peek() === '(') {
+      i++;
+      const v = parseExpr();
+      if (v === null || peek() !== ')') return null;
+      i++;
+      return v;
+    }
+    return parseNumber();
+  };
+  const parseTerm = (): number | null => {
+    let left = parseFactor();
+    if (left === null) return null;
+    while (peek() === '*' || peek() === '/') {
+      const op = src[i++];
+      const right = parseFactor();
+      if (right === null) return null;
+      if (op === '/' && right === 0) return null;
+      left = op === '*' ? left * right : left / right;
+    }
+    return left;
+  };
+  function parseExpr(): number | null {
+    let left = parseTerm();
+    if (left === null) return null;
+    while (peek() === '+' || peek() === '-') {
+      const op = src[i++];
+      const right = parseTerm();
+      if (right === null) return null;
+      left = op === '+' ? left + right : left - right;
+    }
+    return left;
+  }
+  const result = parseExpr();
+  if (result === null || i !== src.length || !isFinite(result)) return null;
+  return Math.round(result * 100) / 100;
+}
+
+/** Calculadora para os campos de valor: botão (ou a tecla "=" no campo) abre; "Usar valor" preenche o campo. */
+function AmountCalculator({
+  open,
+  onOpenChange,
+  initial,
+  onApply,
+  triggerClassName,
+  side = 'bottom',
+  align = 'end'
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial?: number;
+  onApply: (value: number) => void;
+  triggerClassName?: string;
+  side?: 'top' | 'bottom' | 'left' | 'right';
+  align?: 'start' | 'center' | 'end';
+}) {
+  const [expr, setExpr] = useState('');
+  useEffect(() => {
+    if (open) setExpr(initial && initial > 0 ? String(initial).replace('.', ',') : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  const result = evaluateExpression(expr);
+  const apply = () => {
+    if (result === null) return;
+    onApply(Math.abs(result));
+    onOpenChange(false);
+  };
+  const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', ',', '(', '+'];
+  const append = (k: string) => setExpr(prev => prev + (k === '−' ? '-' : k));
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger
+        render={
+          <button
+            type="button"
+            className={cn("w-9 h-9 rounded-full text-slate-400 dark:text-[#9D99BC] hover:text-primary hover:bg-primary/10 flex items-center justify-center transition-colors shrink-0", triggerClassName)}
+            aria-label="Calculadora"
+            title="Calculadora (tecla =)"
+          >
+            <Calculator size={18} />
+          </button>
+        }
+      />
+      <PopoverContent side={side} align={align} sideOffset={8} className="w-72 p-4 gap-3 rounded-[1.5rem] border-none shadow-deep bg-[#F6F4FD] dark:bg-[#17153A] ring-1 ring-slate-200/70 dark:ring-white/10 z-[90]">
+        <div className="rounded-xl bg-white dark:bg-[#211E4A] px-3 py-2 shadow-sm">
+          <input
+            autoFocus
+            value={expr}
+            onChange={(e) => setExpr(e.target.value.replace(/[^\d+\-*/().,×÷−\s]/g, '').replace(/−/g, '-'))}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); apply(); }
+              else if (e.key === 'Escape') { e.stopPropagation(); onOpenChange(false); }
+            }}
+            placeholder="Ex: 120 + 35,90 × 2"
+            className="w-full bg-transparent outline-none text-right text-base font-medium text-slate-700 dark:text-[#EDEAF9] placeholder:text-slate-300 dark:placeholder:text-[#6A6594]"
+            inputMode="decimal"
+            aria-label="Expressão"
+          />
+          <p className={cn("text-right font-heading font-medium text-2xl tracking-tight tabular-nums min-h-8", result === null ? "text-slate-300 dark:text-[#6A6594]" : "text-slate-800 dark:text-[#EDE9E3]")}>
+            {result === null ? '= …' : `= ${result.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          </p>
+        </div>
+        <div className="grid grid-cols-4 gap-1.5">
+          {keys.map(k => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => append(k)}
+              className={cn("h-10 rounded-xl text-base font-medium active:scale-95 transition-all", /[÷×−+]/.test(k) ? "bg-primary/10 text-primary" : "bg-white dark:bg-[#211E4A] text-slate-700 dark:text-[#EDEAF9] shadow-sm")}
+            >
+              {k}
+            </button>
+          ))}
+          <button type="button" onClick={() => setExpr('')} className="h-10 rounded-xl text-sm font-medium bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm col-span-2">Limpar</button>
+          <button type="button" onClick={() => setExpr(prev => prev.slice(0, -1))} className="h-10 rounded-xl text-sm font-medium bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm col-span-2" aria-label="Apagar último">⌫ Apagar</button>
+        </div>
+        <button
+          type="button"
+          disabled={result === null || result <= 0}
+          onClick={apply}
+          className="h-11 rounded-full bg-primary text-white text-sm font-medium disabled:opacity-40 active:scale-95 transition-all"
+        >
+          {result !== null && result > 0 ? `Usar R$ ${result.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Usar valor'}
+        </button>
       </PopoverContent>
     </Popover>
   );
@@ -913,6 +1063,8 @@ export default function App() {
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [amountInput, setAmountInput] = useState('0,00');
+  // Calculadora aberta em qual campo de valor (null = nenhuma).
+  const [calcTarget, setCalcTarget] = useState<'amount' | 'amountMobile' | 'confirm' | null>(null);
   const [globalSplitType, setGlobalSplitType] = useState<'parts' | 'percentage' | 'value'>('parts');
   // Etapa do "Novo lançamento" em tela cheia (mobile): 0 Tipo+Valor, 1
   // Descrição/Data/Categoria, 2 Dividir/Repetição/Status/Salvar.
@@ -4706,7 +4858,16 @@ export default function App() {
                     inputMode="decimal"
                     value={confirmAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     onChange={(e) => setConfirmAmount(parseCurrency(maskCurrency(e.target.value)))}
+                    onKeyDown={(e) => { if (e.key === '=') { e.preventDefault(); setCalcTarget('confirm'); } }}
                   />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                    <AmountCalculator
+                      open={calcTarget === 'confirm'}
+                      onOpenChange={(o) => setCalcTarget(o ? 'confirm' : null)}
+                      initial={confirmAmount}
+                      onApply={(v) => setConfirmAmount(v)}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -4879,6 +5040,15 @@ export default function App() {
                     <div className="flex items-center justify-center gap-1">
                       <span className="text-3xl font-medium text-slate-300 dark:text-[#7E7AAA]">R$</span>
                       <p className="font-heading font-medium text-5xl text-slate-800 dark:text-[#EDE9E3] tracking-tight">{amountInput}</p>
+                      <AmountCalculator
+                        open={calcTarget === 'amountMobile'}
+                        onOpenChange={(o) => setCalcTarget(o ? 'amountMobile' : null)}
+                        initial={parseCurrency(amountInput)}
+                        onApply={(v) => setAmountInput(maskCurrency(String(Math.round(v * 100))))}
+                        triggerClassName="ml-2"
+                        side="bottom"
+                        align="center"
+                      />
                     </div>
                   </div>
 
@@ -5283,6 +5453,14 @@ export default function App() {
                     style={{ width: `${Math.max(4, amountInput.length)}ch` }}
                     value={amountInput}
                     onChange={(e) => setAmountInput(maskCurrency(e.target.value))}
+                    onKeyDown={(e) => { if (e.key === '=') { e.preventDefault(); setCalcTarget('amount'); } }}
+                  />
+                  <AmountCalculator
+                    open={calcTarget === 'amount'}
+                    onOpenChange={(o) => setCalcTarget(o ? 'amount' : null)}
+                    initial={parseCurrency(amountInput)}
+                    onApply={(v) => setAmountInput(maskCurrency(String(Math.round(v * 100))))}
+                    triggerClassName="self-center"
                   />
                 </div>
               </div>
@@ -8531,6 +8709,8 @@ function BatchEntryDialog({
     return isNaN(d.getTime()) ? '' : format(d, 'yyyy-MM-dd');
   };
   const parseAmount = (raw: string) => {
+    // Aceita contas direto na célula (ex: 12,50+30*2); a tecla "=" calcula na hora.
+    if (/[+*/×÷()]|\d\s*-/.test(raw)) { const r = evaluateExpression(raw); if (r !== null) return Math.abs(r); }
     const v = raw.replace(/[^\d,.-]/g, '');
     if (!v) return 0;
     const normalized = v.includes(',') ? v.replace(/\./g, '').replace(',', '.') : v;
@@ -8706,7 +8886,15 @@ function BatchEntryDialog({
                         placeholder="0,00"
                         onChange={(e) => update(i, { amount: e.target.value })}
                         onBlur={() => { const v = parseAmount(r.amount); if (v > 0) update(i, { amount: brl(v) }); }}
-                        onKeyDown={(e) => onCellEnter(e, i, 'amount')}
+                        onKeyDown={(e) => {
+                          if (e.key === '=') {
+                            e.preventDefault();
+                            const res = evaluateExpression(r.amount);
+                            if (res !== null) update(i, { amount: brl(Math.abs(res)) });
+                            return;
+                          }
+                          onCellEnter(e, i, 'amount');
+                        }}
                       />
                     </td>
                     <td className="px-1.5 py-1">
