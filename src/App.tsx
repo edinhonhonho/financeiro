@@ -512,14 +512,14 @@ function AmountCalculator({
   const keys = ['7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', ',', '(', ')'];
   const keyClass = (k: string, big: boolean) => cn(
     "font-medium active:scale-95 transition-all",
-    big ? "h-14 text-xl rounded-2xl" : "h-10 text-base rounded-lg",
+    big ? "h-14 text-xl rounded-[12px]" : "h-10 text-base rounded-[8px]",
     /[÷×−+]/.test(k) ? "bg-primary/10 text-primary" : /[(),]/.test(k) ? "bg-slate-100 dark:bg-[#2A2755] text-slate-600 dark:text-[#C5C1E5]" : "bg-white dark:bg-[#211E4A] text-slate-700 dark:text-[#EDEAF9] shadow-sm"
   );
 
   const body = (big: boolean) => (
     <div className={cn("flex flex-col gap-3", big && "flex-1 min-h-0")}>
-      <div className={cn("bg-white dark:bg-[#211E4A] px-4 py-3 shadow-sm", big ? "rounded-2xl" : "rounded-xl")}>
-        <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">CONTA</p>
+      <div className={cn("bg-white dark:bg-[#211E4A] px-4 py-3 shadow-sm", big ? "rounded-[10px]" : "rounded-[8px]")}>
+        <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">Conta</p>
         <input
           autoFocus={!big}
           value={expr}
@@ -535,14 +535,18 @@ function AmountCalculator({
           aria-label="Conta"
         />
         <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-slate-100 dark:border-white/10 pt-2">
-          <p className="text-[10px] font-medium tracking-wider text-slate-400 dark:text-[#9D99BC]">RESULTADO</p>
-          <p className={cn("font-heading font-medium tracking-tight tabular-nums", big ? "text-4xl" : "text-2xl", result === null ? "text-slate-300 dark:text-[#6A6594]" : "text-slate-800 dark:text-[#EDE9E3]")}>
-            {result === null ? (expr.trim() ? 'Conta incompleta' : 'R$ 0,00') : `R$ ${brl(result)}`}
-          </p>
+          <p className="text-[11px] font-normal text-slate-400 dark:text-[#9D99BC]">Resultado</p>
+          {result === null && expr.trim() ? (
+            <p className="text-[11px] font-normal text-slate-300 dark:text-[#6A6594]">incompleta</p>
+          ) : (
+            <p className={cn("font-heading font-medium tracking-tight tabular-nums", big ? "text-4xl" : "text-2xl", result === null ? "text-slate-300 dark:text-[#6A6594]" : "text-slate-800 dark:text-[#EDE9E3]")}>
+              {result === null ? 'R$ 0,00' : `R$ ${brl(result)}`}
+            </p>
+          )}
         </div>
       </div>
       <div className={cn("grid grid-cols-4", big ? "gap-2.5 flex-1 content-center" : "gap-1.5")}>
-        <button type="button" onClick={() => setExpr('')} className={cn("font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 active:scale-95 transition-all", big ? "h-14 text-base rounded-2xl" : "h-10 text-sm rounded-lg")}>C</button>
+        <button type="button" onClick={() => setExpr('')} className={cn("font-medium bg-rose-50 dark:bg-rose-500/10 text-rose-500 dark:text-rose-400 active:scale-95 transition-all", big ? "h-14 text-base rounded-[12px]" : "h-10 text-sm rounded-[8px]")}>C</button>
         <button type="button" onClick={() => append('(')} className={keyClass('(', big)}>(</button>
         <button type="button" onClick={() => append(')')} className={keyClass(')', big)}>)</button>
         <button type="button" onClick={() => append('÷')} className={keyClass('÷', big)}>÷</button>
@@ -554,7 +558,7 @@ function AmountCalculator({
         <button type="button" onClick={() => append('+')} className={keyClass('+', big)}>+</button>
         <button type="button" onClick={() => append('0')} className={cn(keyClass('0', big), "col-span-2")}>0</button>
         <button type="button" onClick={() => append(',')} className={keyClass(',', big)}>,</button>
-        <button type="button" onClick={() => setExpr(prev => prev.slice(0, -1))} className={cn("bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm flex items-center justify-center active:scale-95 transition-all", big ? "h-14 rounded-2xl" : "h-10 rounded-lg")} aria-label="Apagar último caractere" title="Apagar">
+        <button type="button" onClick={() => setExpr(prev => prev.slice(0, -1))} className={cn("bg-white dark:bg-[#211E4A] text-slate-500 dark:text-[#C5C1E5] shadow-sm flex items-center justify-center active:scale-95 transition-all", big ? "h-14 rounded-[12px]" : "h-10 rounded-[8px]")} aria-label="Apagar último caractere" title="Apagar">
           <Delete size={big ? 24 : 20} strokeWidth={2.2} />
         </button>
       </div>
@@ -582,14 +586,14 @@ function AmountCalculator({
       onClick={isMobile ? () => onOpenChange(true) : undefined}
       className={cn(
         triggerVariant === 'key'
-          ? "flex-1 rounded-2xl bg-primary/10 text-primary flex items-center justify-center active:scale-95 transition-all"
+          ? "h-16 w-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center active:scale-95 transition-all"
           : "w-9 h-9 rounded-full text-slate-400 dark:text-[#9D99BC] hover:text-primary hover:bg-primary/10 flex items-center justify-center transition-colors shrink-0",
         triggerClassName
       )}
       aria-label="Calculadora"
       title="Calculadora (tecla =)"
     >
-      <Calculator size={triggerVariant === 'key' ? 26 : 18} />
+      <Calculator size={triggerVariant === 'key' ? 22 : 18} />
     </button>
   );
 
@@ -655,9 +659,19 @@ function SortControl({ by, dir, onBy, onDir, dateLabel = 'Vencimento' }: { by: '
 
 /** Texto sem acentos e em minúsculas — buscas não podem depender de acentuação. */
 const normalizeText = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-const matchesQuery = (query: string, ...fields: Array<string | undefined | null>) => {
-  const q = normalizeText(query.trim());
-  return !q || fields.some(f => !!f && normalizeText(f).includes(q));
+const matchesQuery = (query: string, ...fields: Array<string | number | undefined | null>) => {
+  const q = normalizeText(query.trim()).replace(/^r\$\s*/, '');
+  if (!q) return true;
+  return fields.some(f => {
+    if (f === undefined || f === null) return false;
+    if (typeof f === 'number') {
+      // Valor da compra: aceita "45", "45,5", "45.50", "1.234,56" ou "1234".
+      const br = f.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const forms = [br, br.replace(/\./g, ''), f.toFixed(2), String(f), String(f).replace('.', ',')];
+      return forms.some(x => x.includes(q) || x.includes(q.replace('.', ',')));
+    }
+    return normalizeText(f).includes(q);
+  });
 };
 
 function SearchBar({ value, onChange, placeholder, className }: { value: string; onChange: (v: string) => void; placeholder: string; className?: string }) {
@@ -6938,7 +6952,7 @@ export default function App() {
                 <div className="relative md:flex-1 md:max-w-sm">
                   <Search size={16} strokeWidth={2.5} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-[#7E7AAA]" />
                   <Input
-                    placeholder="Buscar movimentações"
+                    placeholder="Buscar movimentação ou valor"
                     className="h-11 rounded-full border-none bg-slate-50 dark:bg-[#2A2755] font-normal text-sm pl-11 pr-11 shadow-sm"
                     value={movSearchQuery}
                     onChange={(e) => setMovSearchQuery(e.target.value)}
@@ -7125,7 +7139,7 @@ export default function App() {
                       {(() => {
                         const filtered = movimentacoesLists.all
                           .filter(t => movStatusFilter === 'all' ? true : t.status === movStatusFilter)
-                          .filter(t => matchesQuery(movSearchQuery, t.description, t.category));
+                          .filter(t => matchesQuery(movSearchQuery, t.description, t.category, t.amount));
                         const renderRow = (t: Transaction) => {
                           const card = cards.find(c => c.id === t.cardId);
                           return (
@@ -7174,7 +7188,7 @@ export default function App() {
                 {(movTab === 'apagar' || movTab === 'areceber') && (() => {
                   const isPay = movTab === 'apagar';
                   const list = (isPay ? movimentacoesLists.aPagar : movimentacoesLists.aReceber)
-                    .filter(t => matchesQuery(movSearchQuery, t.description, t.category))
+                    .filter(t => matchesQuery(movSearchQuery, t.description, t.category, t.amount))
                     .slice()
                     .sort((a, b) => a.date.localeCompare(b.date));
                   const today = startOfDay(new Date());
@@ -7435,7 +7449,7 @@ export default function App() {
                   <h1 className="text-4xl font-heading font-normal tracking-tighter text-slate-800 dark:text-[#EDE9E3]">Cartões</h1>
                 )}
                 {!showCardForm && cards.length > 0 && (
-                  <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compras da fatura" className="lg:hidden" />
+                  <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compra ou valor" className="lg:hidden" />
                 )}
               </div>
 
@@ -7686,7 +7700,7 @@ export default function App() {
                                 .reduce((acc, t) => acc + t.amount, 0);
                               const diff = Math.round((paidAmount - billTotal) * 100) / 100;
                               const visibleItems = cardBillItems
-                                .filter(t => matchesQuery(cardSearchQuery, t.description, t.category))
+                                .filter(t => matchesQuery(cardSearchQuery, t.description, t.category, t.amount))
                                 .sort((a, b) => {
                                   if (cardSortBy === 'amount') {
                                     const diff = a.amount - b.amount;
@@ -7744,7 +7758,7 @@ export default function App() {
                                   </div>
                                   {cardBillItems.length > 0 && (
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compras da fatura" className="hidden lg:block lg:w-72" />
+                                      <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compra ou valor" className="hidden lg:block lg:w-72" />
                                       <SortControl by={cardSortBy} dir={cardSortDir} onBy={setCardSortBy} onDir={() => setCardSortDir(d => d === 'desc' ? 'asc' : 'desc')} dateLabel="Data" />
                                     </div>
                                   )}
@@ -7758,17 +7772,30 @@ export default function App() {
                                     </div>
                                   ) : (
                                     <div className="space-y-2">
-                                      {visibleItems.map(t => (
-                                        <div key={t.id}>
-                                          <TransactionItem
-                                            transaction={t}
-                                            onClick={() => handleTransactionClick(t)}
-                                            hideStatus
-                                            sharedWith={sharedWithOf(t)}
-                                            categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
-                                          />
-                                        </div>
-                                      ))}
+                                      {visibleItems.map((t, idx) => {
+                                        // Pequena divisão onde um dia termina e outro começa (só na ordem por data).
+                                        const day = purchaseDateOf(t);
+                                        const showDay = cardSortBy === 'date' && (idx === 0 || purchaseDateOf(visibleItems[idx - 1]) !== day);
+                                        return (
+                                          <React.Fragment key={t.id}>
+                                            {showDay && (
+                                              <div className={cn("flex items-center gap-3 px-2", idx > 0 && "pt-3")}>
+                                                <span className="text-[11px] font-medium text-slate-400 dark:text-[#9D99BC] inline-block first-letter:uppercase whitespace-nowrap">
+                                                  {format(parseISO(day), "EEE, dd 'de' MMM", { locale: ptBR })}
+                                                </span>
+                                                <span className="h-px flex-1 bg-slate-200/70 dark:bg-white/10" />
+                                              </div>
+                                            )}
+                                            <TransactionItem
+                                              transaction={t}
+                                              onClick={() => handleTransactionClick(t)}
+                                              hideStatus
+                                              sharedWith={sharedWithOf(t)}
+                                              categoryIcon={categories.find(c => c.name === t.category)?.icon || DEFAULT_CATEGORY_ICON}
+                                            />
+                                          </React.Fragment>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </>
@@ -8122,7 +8149,7 @@ export default function App() {
                             // Pendentes primeiro (são o que forma o saldo); os já quitados
                             // ficam embaixo, marcados e esmaecidos.
                             const renderList = (fullList: typeof charges.items, owedToMe: boolean) => {
-                              const list = fullList.filter(t => matchesQuery(personSearchQuery, t.description, t.category));
+                              const list = fullList.filter(t => matchesQuery(personSearchQuery, t.description, t.category, t.amount));
                               const pendingList = list.filter(t => t.status !== 'actual');
                               const doneList = list.filter(t => t.status === 'actual');
                               const row = (t: typeof list[number]) => (
