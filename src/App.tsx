@@ -2101,13 +2101,45 @@ export default function App() {
     el.scrollLeft = Math.max(0, target);
   }, [selectedCard, currentDate, selectedBillDate, cards.length, activeTab]);
 
+  // Data da compra original: parcelas cobradas em meses seguintes contam pela
+  // data da 1ª parcela (a compra de fato), não pela data em que cada uma vence.
+  const purchaseDateOf = useMemo(() => {
+    const firstOfSeries = new Map<string, string>();
+    transactions.forEach(t => {
+      if (t.type === 'card_purchase' && t.seriesId && t.installments) {
+        const prev = firstOfSeries.get(t.seriesId);
+        if (!prev || t.date < prev) firstOfSeries.set(t.seriesId, t.date);
+      }
+    });
+    return (t: Transaction): string => {
+      if (t.installments) {
+        const first = t.seriesId ? firstOfSeries.get(t.seriesId) : undefined;
+        if (first) return first;
+        if (t.installments.current > 1) return format(addMonths(parseISO(t.date), -(t.installments.current - 1)), 'yyyy-MM-dd');
+      }
+      return t.date;
+    };
+  }, [transactions]);
+
+  /** Mais recente primeiro: data da compra e, no mesmo dia, o que foi adicionado por último. */
+  const compareByPurchaseDesc = (a: Transaction, b: Transaction) => {
+    const da = purchaseDateOf(a), db = purchaseDateOf(b);
+    if (da !== db) return da < db ? 1 : -1;
+    // Sem createdAt (criado agora/offline) conta como o mais novo.
+    const ca = a.createdAt ? Date.parse(a.createdAt) : Number.MAX_SAFE_INTEGER;
+    const cb = b.createdAt ? Date.parse(b.createdAt) : Number.MAX_SAFE_INTEGER;
+    if (ca !== cb) return cb > ca ? 1 : -1;
+    // Parcelas da mesma compra: a de número maior primeiro não faz sentido; mantém a ordem natural.
+    return (a.installments?.current ?? 0) - (b.installments?.current ?? 0);
+  };
+
   const cardBillItems = useMemo(() => {
     const activeCard = cards.find(c => c.id === selectedCard) || cards[0];
     if (!activeCard) return [];
     return transactions
       .filter(t => t.type === 'card_purchase' && t.cardId === activeCard.id && format(getTransactionEffectiveMonth(t), 'yyyy-MM') === format(selectedBillDate, 'yyyy-MM'))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [cards, selectedCard, transactions, selectedBillDate]);
+      .sort(compareByPurchaseDesc);
+  }, [cards, selectedCard, transactions, selectedBillDate, purchaseDateOf]);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -7591,8 +7623,12 @@ export default function App() {
                               const visibleItems = cardBillItems
                                 .filter(t => matchesQuery(cardSearchQuery, t.description, t.category))
                                 .sort((a, b) => {
-                                  const diff = cardSortBy === 'amount' ? a.amount - b.amount : new Date(a.date).getTime() - new Date(b.date).getTime();
-                                  return cardSortDir === 'asc' ? diff : -diff;
+                                  if (cardSortBy === 'amount') {
+                                    const diff = a.amount - b.amount;
+                                    return diff !== 0 ? (cardSortDir === 'asc' ? diff : -diff) : compareByPurchaseDesc(a, b);
+                                  }
+                                  const diff = compareByPurchaseDesc(a, b);
+                                  return cardSortDir === 'asc' ? -diff : diff;
                                 });
                               return (
                                 <>

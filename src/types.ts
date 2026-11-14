@@ -44,6 +44,8 @@ export interface Transaction {
   categoryId?: string | null;
   // Só no aparelho: criado sem internet e ainda não enviado (nunca vai para o banco).
   pendingSync?: boolean;
+  // Quando o registro foi criado no banco (usado para desempatar a ordem).
+  createdAt?: string;
 }
 
 export interface Person {
