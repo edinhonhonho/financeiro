@@ -412,6 +412,34 @@ function DateField({
   );
 }
 
+function SortControl({ by, dir, onBy, onDir, dateLabel = 'Vencimento' }: { by: 'date' | 'amount'; dir: 'desc' | 'asc'; onBy: (v: 'date' | 'amount') => void; onDir: () => void; dateLabel?: string }) {
+  return (
+    <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex bg-slate-100 dark:bg-[#312D62] p-1 rounded-full shadow-inner" role="group" aria-label="Ordenar por">
+        {([['date', dateLabel], ['amount', 'Valor']] as const).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onBy(key)}
+            className={cn("px-3.5 py-2 rounded-full text-xs font-medium transition-all", by === key ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC]")}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onDir}
+        className="h-9 w-9 rounded-full bg-slate-100 dark:bg-[#312D62] text-primary flex items-center justify-center"
+        aria-label={dir === 'desc' ? 'Ordem decrescente' : 'Ordem crescente'}
+        title={by === 'date' ? (dir === 'desc' ? 'Mais recentes primeiro' : 'Mais antigos primeiro') : (dir === 'desc' ? 'Maiores primeiro' : 'Menores primeiro')}
+      >
+        {dir === 'desc' ? <ArrowDown size={15} strokeWidth={2.5} /> : <ArrowUp size={15} strokeWidth={2.5} />}
+      </button>
+    </div>
+  );
+}
+
 /** Texto sem acentos e em minúsculas — buscas não podem depender de acentuação. */
 const normalizeText = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const matchesQuery = (query: string, ...fields: Array<string | undefined | null>) => {
@@ -587,17 +615,34 @@ export default function App() {
   const [cards, setCards] = useState<Card[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [activeTab, setActiveTab] = useState('visao-geral');
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('financeiro:activeTab');
+      return saved && ['visao-geral', 'despesas', 'receitas', 'cartoes', 'pessoas'].includes(saved) ? saved : 'visao-geral';
+    } catch { return 'visao-geral'; }
+  });
+  useEffect(() => { try { localStorage.setItem('financeiro:activeTab', activeTab); } catch { /* ignore */ } }, [activeTab]);
   const [transactionFilter, setTransactionFilter] = useState<'pending' | 'all'>('all');
-  const [movTab, setMovTab] = useState<'movimentacoes' | 'apagar' | 'areceber'>('movimentacoes');
+  const [movTab, setMovTab] = useState<'movimentacoes' | 'apagar' | 'areceber'>(() => {
+    try {
+      const saved = localStorage.getItem('financeiro:movTab');
+      return saved === 'apagar' || saved === 'areceber' ? saved : 'movimentacoes';
+    } catch { return 'movimentacoes'; }
+  });
+  useEffect(() => { try { localStorage.setItem('financeiro:movTab', movTab); } catch { /* ignore */ } }, [movTab]);
   const [movStatusFilter, setMovStatusFilter] = useState<'all' | 'planned' | 'actual'>('all');
   const [movSearchQuery, setMovSearchQuery] = useState('');
   // Ordenação de Movimentações: por vencimento (data) ou por valor.
   const [movSortBy, setMovSortBy] = useState<'date' | 'amount'>('date');
   const [movSortDir, setMovSortDir] = useState<'desc' | 'asc'>('desc');
   const [cardSearchQuery, setCardSearchQuery] = useState('');
+  const [cardSortBy, setCardSortBy] = useState<'date' | 'amount'>('date');
+  const [cardSortDir, setCardSortDir] = useState<'desc' | 'asc'>('desc');
   const [personSearchQuery, setPersonSearchQuery] = useState('');
-  const [selectedCard, setSelectedCard] = useState<string | null>(null);
+  const [selectedCard, setSelectedCard] = useState<string | null>(() => {
+    try { return localStorage.getItem('financeiro:selectedCard') || null; } catch { return null; }
+  });
+  useEffect(() => { try { selectedCard ? localStorage.setItem('financeiro:selectedCard', selectedCard) : localStorage.removeItem('financeiro:selectedCard'); } catch { /* ignore */ } }, [selectedCard]);
   const [showCardForm, setShowCardForm] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
@@ -656,7 +701,10 @@ export default function App() {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState('');
   const [isPessoasSummaryOpen, setIsPessoasSummaryOpen] = useState(false);
-  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(() => {
+    try { return localStorage.getItem('financeiro:selectedPerson') || null; } catch { return null; }
+  });
+  useEffect(() => { try { selectedPersonId ? localStorage.setItem('financeiro:selectedPerson', selectedPersonId) : localStorage.removeItem('financeiro:selectedPerson'); } catch { /* ignore */ } }, [selectedPersonId]);
   const [groupMode, setGroupMode] = useState<'date' | 'category' | 'person'>('date');
   const [sortMode, setSortMode] = useState<'date' | 'min' | 'max'>('date');
   const [alertConfig, setAlertConfig] = useState<{ open: boolean, title: string, message: string }>({ open: false, title: '', message: '' });
@@ -6631,29 +6679,7 @@ export default function App() {
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <div className="flex bg-slate-100 dark:bg-[#312D62] p-1 rounded-full shadow-inner" role="group" aria-label="Ordenar por">
-                    {([['date', 'Vencimento'], ['amount', 'Valor']] as const).map(([key, label]) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setMovSortBy(key)}
-                        className={cn("px-3.5 py-2 rounded-full text-xs font-medium transition-all", movSortBy === key ? "bg-white dark:bg-[#211E4A] text-primary shadow-sm" : "text-slate-400 dark:text-[#9D99BC]")}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setMovSortDir(d => d === 'desc' ? 'asc' : 'desc')}
-                    className="h-9 w-9 rounded-full bg-slate-100 dark:bg-[#312D62] text-primary flex items-center justify-center"
-                    aria-label={movSortDir === 'desc' ? 'Ordem decrescente' : 'Ordem crescente'}
-                    title={movSortBy === 'date' ? (movSortDir === 'desc' ? 'Mais recentes primeiro' : 'Mais antigos primeiro') : (movSortDir === 'desc' ? 'Maiores primeiro' : 'Menores primeiro')}
-                  >
-                    {movSortDir === 'desc' ? <ArrowDown size={15} strokeWidth={2.5} /> : <ArrowUp size={15} strokeWidth={2.5} />}
-                  </button>
-                </div>
+                <SortControl by={movSortBy} dir={movSortDir} onBy={setMovSortBy} onDir={() => setMovSortDir(d => d === 'desc' ? 'asc' : 'desc')} />
                 </div>
               </div>
 
@@ -7384,7 +7410,12 @@ export default function App() {
                                 .filter(t => isBillPaymentRow(t) && t.status === 'actual' && t.cardId === activeCard.id && format(parseISO(t.date), 'yyyy-MM') === selectedMonthKey)
                                 .reduce((acc, t) => acc + t.amount, 0);
                               const diff = Math.round((paidAmount - billTotal) * 100) / 100;
-                              const visibleItems = cardBillItems.filter(t => matchesQuery(cardSearchQuery, t.description, t.category));
+                              const visibleItems = cardBillItems
+                                .filter(t => matchesQuery(cardSearchQuery, t.description, t.category))
+                                .sort((a, b) => {
+                                  const diff = cardSortBy === 'amount' ? a.amount - b.amount : new Date(a.date).getTime() - new Date(b.date).getTime();
+                                  return cardSortDir === 'asc' ? diff : -diff;
+                                });
                               return (
                                 <>
                                   <div className="flex items-center justify-between ml-2 gap-3">
@@ -7433,7 +7464,10 @@ export default function App() {
                                     )}
                                   </div>
                                   {cardBillItems.length > 0 && (
-                                    <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compras da fatura" className="hidden lg:block lg:max-w-sm" />
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <SearchBar value={cardSearchQuery} onChange={setCardSearchQuery} placeholder="Buscar compras da fatura" className="hidden lg:block lg:w-72" />
+                                      <SortControl by={cardSortBy} dir={cardSortDir} onBy={setCardSortBy} onDir={() => setCardSortDir(d => d === 'desc' ? 'asc' : 'desc')} dateLabel="Data" />
+                                    </div>
                                   )}
                                   {cardBillItems.length === 0 ? (
                                     <div className="bg-card rounded-[1.75rem] shadow-soft p-8 text-center">
